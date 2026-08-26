@@ -117,7 +117,6 @@ Google Drive:
 ## Pendencias para as proximas fases
 
 - definir URL/subdominio final do sistema;
-- validar o envio SMTP real quando a senha de app do remetente de teste estiver disponivel;
 - definir o remetente definitivo de producao para recuperacao de senha;
 - configurar Google Cloud/Drive API na Fase 4;
 - validar escopo OAuth e status de producao na Fase 4/9;

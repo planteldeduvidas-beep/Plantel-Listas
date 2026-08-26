@@ -75,9 +75,11 @@ Um administrador local de teste foi criado pelo bootstrap e validado. Suas crede
 
 ## 7. SMTP e recuperacao
 
-Foi implementado um provider SMTP configuravel por ambiente e um provider falso para testes automatizados. O remetente de teste foi configurado somente no `backend/.env` ignorado.
+Foi implementado um provider SMTP configuravel por ambiente e um provider falso para testes automatizados. O remetente de teste e sua senha de app foram configurados somente no `backend/.env` ignorado.
 
-O envio real nao foi executado porque a senha de app do Gmail ainda nao foi fornecida. O sistema exige configuracao SMTP completa antes de ativar o provider real; sem ela, mantem a resposta externa neutra e invalida o token que nao pôde ser entregue. A senha normal da conta nao deve ser usada.
+A conexao autenticada com o SMTP do Gmail foi aprovada por TLS na porta configurada. Em seguida, uma solicitacao real de recuperacao para o administrador local retornou HTTP 200, persistiu o token hasheado e teve a mensagem aceita pelo servidor SMTP para entrega. Endereco, senha de app e token nao foram exibidos nem versionados. A confirmacao visual da chegada na caixa de entrada ou spam permanece manual.
+
+O sistema exige configuracao SMTP completa antes de ativar o provider real; sem ela, mantem a resposta externa neutra e invalida o token que nao pôde ser entregue. A senha normal da conta nao deve ser usada.
 
 ## 8. Testes automatizados
 
@@ -108,6 +110,8 @@ Cobertura principal:
 - `GET /api/saude`: HTTP 200;
 - `GET /api/autenticacao/csrf`: HTTP 200;
 - Vite de desenvolvimento respondeu em `127.0.0.1:5173`;
+- conexao autenticada com o SMTP do Gmail: aprovada;
+- recuperacao real: HTTP 200, token hasheado persistido e mensagem aceita pelo SMTP;
 - `npm audit`: 0 vulnerabilidades;
 - `npm audit --omit=dev`: 0 vulnerabilidades;
 - `git diff --check`: aprovado;
@@ -128,7 +132,7 @@ O navegador integrado nao estava disponivel na sessao, portanto nao foi possivel
 
 ## 11. Riscos e pendencias
 
-- testar conexao e entrega SMTP reais quando a senha de app estiver disponivel;
+- confirmar manualmente a chegada da mensagem de teste na caixa de entrada ou spam;
 - definir o remetente definitivo de producao;
 - validar `TRUST_PROXY` conforme a topologia real da Hostinger;
 - validar a dependencia nativa do Argon2 no ambiente de deploy;
