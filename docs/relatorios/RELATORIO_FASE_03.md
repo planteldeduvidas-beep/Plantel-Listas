@@ -16,7 +16,9 @@ Tags genericas nao foram criadas porque ainda nao existe caso funcional aprovado
 - Branch: `fase/03-estrutura-acervo`.
 - Base: `main` no commit `d842c15`.
 - Commit tecnico: `0d42372` - `feat: implementa estrutura do acervo da fase 3`.
-- O presente relatorio e o estado atualizado ficam no commit documental seguinte.
+- Commit documental inicial: `01e27cc` - `docs: registra conclusao da fase 3`.
+- Correcao de UX: `fee5a62` - `fix: simplifica experiencia da fase 3`.
+- A presente atualizacao do relatorio fica no commit documental seguinte.
 - Nenhum merge em `main` foi realizado.
 - Nenhum deploy foi realizado.
 
@@ -266,3 +268,37 @@ A unica decisao de escopo foi nao criar tags genericas, pois o prompt as condici
 **PRONTA PARA VALIDACAO**
 
 A Fase 3 esta pronta para revisao humana. Nao houve merge em `main`, deploy, inicio da Fase 4 ou integracao com Google Drive.
+
+## 24. Revisao de UX apos validacao humana
+
+Durante a validacao humana, a funcionalidade da Fase 3 foi aprovada, mas a interface foi considerada tecnica demais para usuarios leigos. Foi realizada uma correcao restrita ao frontend, sem alterar backend, banco, migrations, endpoints, regras de negocio, autenticacao, autorizacao ou seguranca.
+
+Alteracoes realizadas:
+
+- `Categoria` passou a ser apresentada como `Pasta` nos textos visiveis;
+- `Categoria pai` passou a ser `Criar dentro de`;
+- a area administrativa passou a usar o titulo `Organizar o acervo`;
+- o perfil da conta passou a ser exibido como tipo de usuario em linguagem natural;
+- a area do professor passou a usar `Pastas que voce pode gerenciar`;
+- `Permissoes de professor` passou a ser `Acesso dos professores`;
+- o admin agora seleciona um professor, marca as pastas desejadas e usa uma unica acao `Salvar acessos`;
+- acoes de estado passaram a usar `Mostrar` e `Ocultar`;
+- o campo numerico de ordem foi removido da interface, preservando internamente o contrato existente;
+- formularios de pastas, disciplinas e concursos passaram a abrir somente quando solicitados;
+- foram adicionadas acoes diretas como `+ Nova pasta`, `+ Adicionar disciplina` e `+ Adicionar concurso`;
+- IDs, nomes internos e conceitos de banco continuam sem exposicao visual;
+- mensagens de sucesso, erro e estados vazios foram simplificadas para linguagem cotidiana;
+- o layout responsivo foi ajustado para os novos fluxos progressivos e para a selecao de pastas.
+
+Validacao da correcao:
+
+- arquivos alterados: somente `frontend/src/PainelAcervo.jsx` e `frontend/src/styles.css`;
+- `npm run check`: 38 testes aprovados, 0 falhas;
+- build Vite: aprovado, 26 modulos transformados;
+- `git diff --check`: aprovado;
+- smoke isolado: backend, HTML do frontend e modulo `PainelAcervo.jsx` responderam HTTP 200;
+- nenhuma arrow function foi introduzida no frontend;
+- nenhum termo tecnico alvo permaneceu nos elementos visiveis revisados;
+- navegador integrado indisponivel, portanto a aprovacao visual final permanece para a nova validacao humana.
+
+Estado apos a correcao: **PRONTA PARA NOVA VALIDACAO HUMANA**.
