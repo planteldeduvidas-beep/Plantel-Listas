@@ -2,7 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { PassThrough } = require("node:stream");
 const pinoHttp = require("pino-http");
+const request = require("supertest");
 const criarLogger = require("../src/shared/config/logger");
+const criarAplicacao = require("../src/app");
 
 test("remove cabecalhos sensiveis dos logs", function testarRedacaoDosLogs() {
   const destino = new PassThrough();
@@ -18,7 +20,8 @@ test("remove cabecalhos sensiveis dos logs", function testarRedacaoDosLogs() {
     url: "/api/saude",
     headers: {
       authorization: "Bearer segredo-que-nao-pode-vazar",
-      cookie: "sessao=segredo-do-cookie"
+      cookie: "sessao=segredo-do-cookie",
+      "x-csrf-token": "segredo-csrf"
     },
     socket: {}
   };
@@ -36,6 +39,28 @@ test("remove cabecalhos sensiveis dos logs", function testarRedacaoDosLogs() {
 
   assert.equal(conteudo.includes("segredo-que-nao-pode-vazar"), false);
   assert.equal(conteudo.includes("segredo-do-cookie"), false);
+  assert.equal(conteudo.includes("segredo-csrf"), false);
   assert.equal(conteudo.includes("[REMOVIDO]"), true);
+});
+
+test("nao registra senha enviada no corpo", async function testarCorpoForaDoLog() {
+  const destino = new PassThrough();
+  let conteudo = "";
+  destino.on("data", function acumularDados(parte) {
+    conteudo += parte.toString("utf8");
+  });
+  const configuracao = {
+    ambiente: "test",
+    nivelDeLog: "info",
+    origensCors: ["http://localhost:5173"],
+    confiarProxy: false
+  };
+  const logger = criarLogger(configuracao, destino);
+  const app = criarAplicacao(configuracao, logger);
+  await request(app)
+    .post("/rota-inexistente")
+    .send({ senha: "senha-do-corpo-que-nao-pode-vazar" });
+
+  assert.equal(conteudo.includes("senha-do-corpo-que-nao-pode-vazar"), false);
 });
 

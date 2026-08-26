@@ -8,19 +8,25 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "pretest": "node scripts/prepararBancoTeste.js",
     "test": "node --test --test-concurrency=1",
     "db:create": "node scripts/criarBanco.js",
-    "migrate": "node scripts/executarMigrations.js"
+    "migrate": "node scripts/executarMigrations.js",
+    "bootstrap:admin": "node scripts/bootstrapAdmin.js"
   },
   "engines": {
     "node": ">=22.12.0"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
     "helmet": "^8.3.0",
     "mysql2": "^3.24.2",
+    "nodemailer": "^9.0.5",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0"
   },

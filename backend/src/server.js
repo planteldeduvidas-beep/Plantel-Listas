@@ -3,6 +3,7 @@ const criarAplicacao = require("./app");
 const { obterConfiguracao } = require("./shared/config/ambiente");
 const criarLogger = require("./shared/config/logger");
 const { criarPool, verificarConexaoComBanco } = require("./shared/database/conexao");
+const { criarEmailProvider } = require("./shared/providers/emailProvider");
 
 async function iniciarServidor() {
   let configuracao;
@@ -14,7 +15,11 @@ async function iniciarServidor() {
     const pool = criarPool(configuracao.banco);
     await verificarConexaoComBanco(pool);
 
-    const aplicacao = criarAplicacao(configuracao, logger);
+    const emailProvider = criarEmailProvider(configuracao.email, logger);
+    const aplicacao = criarAplicacao(configuracao, logger, {
+      pool: pool,
+      emailProvider: emailProvider
+    });
     const servidor = http.createServer(aplicacao);
 
     servidor.listen(configuracao.porta, function informarInicio() {

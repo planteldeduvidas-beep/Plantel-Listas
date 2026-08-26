@@ -1,8 +1,8 @@
 const mysql = require("mysql2/promise");
 const { obterConfiguracao } = require("../src/shared/config/ambiente");
 
-async function criarBanco() {
-  const configuracao = obterConfiguracao();
+async function criarBanco(configuracaoInformada) {
+  const configuracao = configuracaoInformada || obterConfiguracao();
   const banco = configuracao.banco;
   const conexao = await mysql.createConnection({
     host: banco.host,
@@ -23,8 +23,12 @@ async function criarBanco() {
   }
 }
 
-criarBanco().catch(function tratarFalha(erro) {
-  console.error("Falha ao criar banco local: " + erro.message);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  criarBanco().catch(function tratarFalha(erro) {
+    console.error("Falha ao criar banco local: " + erro.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = criarBanco;
 

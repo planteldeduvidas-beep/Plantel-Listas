@@ -12,8 +12,8 @@ async function listarMigrations() {
   }).sort();
 }
 
-async function executarMigrations() {
-  const configuracao = obterConfiguracao();
+async function executarMigrations(configuracaoInformada) {
+  const configuracao = configuracaoInformada || obterConfiguracao();
   const banco = configuracao.banco;
   const conexao = await mysql.createConnection({
     host: banco.host,
@@ -71,8 +71,12 @@ async function executarMigrations() {
   }
 }
 
-executarMigrations().catch(function tratarFalha(erro) {
-  console.error("Falha ao executar migrations: " + erro.message);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  executarMigrations().catch(function tratarFalha(erro) {
+    console.error("Falha ao executar migrations: " + erro.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = executarMigrations;
 
