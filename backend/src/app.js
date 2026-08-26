@@ -18,6 +18,14 @@ const criarAutenticacaoController = require("./modules/autenticacao/autenticacao
 const criarUsuarioController = require("./modules/usuarios/usuarioController");
 const criarAutenticacaoRoutes = require("./modules/autenticacao/autenticacaoRoutes");
 const criarUsuarioRoutes = require("./modules/usuarios/usuarioRoutes");
+const criarEstruturaAcervoRepository = require("./modules/categorias/estruturaAcervoRepository");
+const criarEstruturaAcervoService = require("./modules/categorias/estruturaAcervoService");
+const criarEstruturaAcervoController = require("./modules/categorias/estruturaAcervoController");
+const criarEstruturaAcervoRoutes = require("./modules/categorias/estruturaAcervoRoutes");
+const criarPermissaoRepository = require("./modules/permissoes/permissaoRepository");
+const criarPermissaoService = require("./modules/permissoes/permissaoService");
+const criarPermissaoController = require("./modules/permissoes/permissaoController");
+const criarPermissaoRoutes = require("./modules/permissoes/permissaoRoutes");
 const {
   criarAutenticacaoMiddleware,
   autorizarAdmin
@@ -59,6 +67,20 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     configuracao
   );
   const rateLimiters = criarRateLimiters(configuracao);
+  const estruturaRepository = criarEstruturaAcervoRepository(pool);
+  const estruturaService = criarEstruturaAcervoService(estruturaRepository);
+  const estruturaController = criarEstruturaAcervoController(estruturaService);
+  const estruturaRoutes = criarEstruturaAcervoRoutes({
+    controller: estruturaController,
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin
+  });
+  const permissaoRepository = criarPermissaoRepository(pool);
+  const permissaoService = criarPermissaoService({
+    repository: permissaoRepository,
+    usuarioRepository: usuarioRepository,
+    estruturaRepository: estruturaRepository
+  });
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
     controller: criarAutenticacaoController(serviceAutenticacao, configuracao),
@@ -67,6 +89,15 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   }));
   aplicacao.use("/api/usuarios", criarUsuarioRoutes({
     controller: criarUsuarioController(serviceUsuario),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin
+  }));
+  aplicacao.use("/api/estrutura-acervo", estruturaRoutes.publica);
+  aplicacao.use("/api/categorias", estruturaRoutes.categorias);
+  aplicacao.use("/api/disciplinas", estruturaRoutes.disciplinas);
+  aplicacao.use("/api/concursos", estruturaRoutes.concursos);
+  aplicacao.use("/api/permissoes", criarPermissaoRoutes({
+    controller: criarPermissaoController(permissaoService),
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
   }));

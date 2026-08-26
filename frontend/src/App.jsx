@@ -7,6 +7,7 @@ import {
   solicitarRecuperacao,
   redefinirSenha
 } from "./api.js";
+import PainelAcervo from "./PainelAcervo.jsx";
 
 function App() {
   const [tokenRecuperacao] = useState(function lerTokenRecuperacao() {
@@ -137,22 +138,7 @@ function App() {
   }
 
   if (usuario) {
-    return (
-      <main className="pagina-autenticacao">
-        <section className="cartao-autenticacao" aria-labelledby="titulo-conta">
-          <span className="marca">Plantel Listas</span>
-          <h1 id="titulo-conta">Sessao autenticada</h1>
-          <dl className="dados-conta">
-            <div><dt>Email</dt><dd>{usuario.email}</dd></div>
-            <div><dt>Papel</dt><dd>{usuario.papel}</dd></div>
-          </dl>
-          {erro && <p className="aviso erro" role="alert">{erro}</p>}
-          <button type="button" onClick={encerrarSessao} disabled={processando}>
-            {processando ? "Encerrando..." : "Sair"}
-          </button>
-        </section>
-      </main>
-    );
+    return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} />;
   }
 
   const configuracoesDaTela = {

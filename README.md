@@ -2,7 +2,7 @@
 
 Sistema Plantel Listas com React/Vite no frontend e backend Node.js/Express em monolito modular por domínio, com MySQL.
 
-O escopo funcional da V1 e as regras de continuidade estão em [`docs/LEIA_PRIMEIRO.md`](docs/LEIA_PRIMEIRO.md). A Fase 2 implementa cadastro, autenticação, sessões, recuperação de senha e administração básica de usuários. Materiais e Google Drive permanecem fora do escopo.
+O escopo funcional da V1 e as regras de continuidade estão em [`docs/LEIA_PRIMEIRO.md`](docs/LEIA_PRIMEIRO.md). As Fases 2 e 3 implementam autenticação, usuários, categorias hierárquicas, disciplinas, concursos e permissões de professor por categoria. Materiais e Google Drive permanecem fora do escopo.
 
 ## Requisitos locais
 
@@ -73,7 +73,16 @@ npm run audit:prod    # audita dependências de produção
 
 Antes do primeiro `bootstrap:admin`, preencha temporariamente `BOOTSTRAP_ADMIN_EMAIL` e `BOOTSTRAP_ADMIN_PASSWORD` no `.env`; limpe ambos logo após a execução. O script recusa criar um segundo administrador.
 
-O endpoint `GET /api/saude` responde `{"status":"ok"}`. A API também expõe `/api/autenticacao/*` para cadastro, login, logout, sessão e recuperação, e `/api/usuarios/*` para operações exclusivas de administrador. Rotas inexistentes e erros usam o contrato `{ "erro": { "codigo", "mensagem" } }`.
+O endpoint `GET /api/saude` responde `{"status":"ok"}`. A API também expõe:
+
+- `/api/autenticacao/*`: cadastro, login, logout, sessão e recuperação;
+- `/api/usuarios/*`: administração de usuários;
+- `GET /api/estrutura-acervo`: categorias, disciplinas e concursos ativos;
+- `/api/categorias`, `/api/disciplinas` e `/api/concursos`: administração estrutural;
+- `/api/permissoes`: concessão, consulta e revogação por admin;
+- `GET /api/permissoes/minhas`: áreas autorizadas do professor autenticado.
+
+Rotas inexistentes e erros usam o contrato `{ "erro": { "codigo", "mensagem" } }`.
 
 ## Estrutura
 
@@ -95,7 +104,7 @@ frontend/
 docs/
 ```
 
-Os módulos de autenticação e usuários seguem routes, controllers, services, repositories e validators. Os demais diretórios de domínio continuam reservados, sem funcionalidades antecipadas.
+Os módulos de autenticação, usuários, categorias e permissões seguem routes, controllers, services, repositories e validators. Os demais diretórios de domínio continuam reservados, sem funcionalidades antecipadas.
 
 ## Segurança
 
@@ -112,11 +121,14 @@ Os módulos de autenticação e usuários seguem routes, controllers, services, 
 - cookies de sessão `HttpOnly`, `SameSite=Lax` e `Secure` em produção;
 - proteção CSRF e rate limit nos endpoints sensíveis;
 - recuperação neutra, token de uso único e revogação das sessões após redefinição;
-- autorização administrativa validada no backend.
+- autorização administrativa validada no backend;
+- hierarquia protegida contra pai próprio, ciclos e referências inválidas;
+- professor consulta apenas permissões derivadas da própria sessão;
+- permissões são concedidas e revogadas somente por admin e persistidas no MySQL.
 
 ## Hostinger
 
 A raiz contém `package.json`, lockfile, script `build`, script `start` e restrição de Node compatível com as versões 22.x e 24.x oferecidas pela Hostinger. O build gera `frontend/dist`, servido pelo Express quando `NODE_ENV=production`.
 
-No deploy futuro, será necessário configurar as variáveis no hPanel, validar `TRUST_PROXY`, SMTP e a dependência nativa do Argon2, além de definir uma estratégia idempotente para migrations. A execução de migrations em produção e o deploy não fazem parte da Fase 2.
+No deploy futuro, será necessário configurar as variáveis no hPanel, validar `TRUST_PROXY`, SMTP e a dependência nativa do Argon2, além de definir uma estratégia idempotente para migrations. A execução de migrations em produção e o deploy não fazem parte da Fase 3.
 
