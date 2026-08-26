@@ -7,7 +7,9 @@ Atualizado em: 26/08/2026
 
 FASE 0 concluida: documentacao e preparacao inicial.
 
-Proxima fase autorizavel: FASE 1 - fundacao tecnica.
+FASE 1 implementada na branch `fase/01-fundacao` e PRONTA PARA VALIDACAO.
+
+A Fase 2 ainda nao esta autorizada. Nenhum merge ou deploy foi realizado.
 
 A V1 esta funcionalmente congelada.
 
@@ -119,8 +121,7 @@ Google Drive:
 
 ## Proxima acao
 
-1. Substituir os documentos antigos pelos documentos v1.1.
-2. Enviar ao Codex `PROMPT_INICIAL_CODEX_FASE_1.md`.
-3. Codex cria branch de Fase 1 e executa a fase.
-4. Codex gera `docs/relatorios/RELATORIO_FASE_01.md` e para.
-5. Responsavel traz o relatorio para auditoria antes de qualquer merge em `main` ou Fase 2.
+1. Revisar `docs/relatorios/RELATORIO_FASE_01.md`.
+2. Validar a fundacao tecnica na branch `fase/01-fundacao`.
+3. Decidir separadamente sobre merge em `main`.
+4. Autorizar explicitamente a Fase 2 antes de qualquer implementacao funcional.
