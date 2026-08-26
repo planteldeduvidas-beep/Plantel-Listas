@@ -1,7 +1,7 @@
 # RELATORIO DA FASE 02 - AUTENTICACAO E USUARIOS
 
 Data: 26/08/2026  
-Estado: **APROVADA - PRONTA PARA INTEGRACAO**
+Estado: **APROVADA E INTEGRADA**
 
 ## 1. Resumo
 
@@ -16,8 +16,8 @@ Materiais, categorias funcionais, Google Drive, analytics, auditoria funcional, 
 - Commit tecnico: `1f5b3e9` - `feat: implementa autenticacao da fase 2`.
 - Correcao SMTP: `b0208f0` - `fix: corrige destinatario da recuperacao por smtp`.
 - Correcao de renderizacao: `41cb059` - `fix: restaura renderizacao React no frontend`.
-- Fechamento documental: commit seguinte no topo da branch.
-- Nenhum merge em `main` foi realizado.
+- Fechamento documental: `f63b93b` - `docs: registra aprovacao da fase 2`.
+- Merge em `main`: `1145571` - `merge: integra autenticacao da fase 2`.
 - Nenhum deploy foi realizado.
 
 ## 3. Banco e migration
@@ -161,6 +161,6 @@ O navegador integrado nao estava disponivel na sessao do Codex, portanto nao foi
 
 ## 12. Estado final
 
-**FASE 2 APROVADA - PRONTA PARA INTEGRACAO**
+**FASE 2 APROVADA E INTEGRADA**
 
-A validacao humana foi concluida e o merge em `main` foi autorizado. Ate este registro, nao houve deploy, inicio da Fase 3 ou integracao com Google Drive.
+A validacao humana e o merge em `main` foram concluidos. Nao houve deploy, inicio da Fase 3 ou integracao com Google Drive.

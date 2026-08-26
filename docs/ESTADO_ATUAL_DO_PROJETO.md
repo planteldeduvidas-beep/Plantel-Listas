@@ -9,9 +9,9 @@ FASE 0 concluida: documentacao e preparacao inicial.
 
 FASE 1 aprovada pelo responsavel humano e integrada na branch `main`.
 
-FASE 2 aprovada pelo responsavel humano e autorizada para integracao na branch `main`.
+FASE 2 aprovada pelo responsavel humano e integrada na branch `main`.
 
-O fechamento tecnico e o merge seguro fazem parte da presente atualizacao. Nenhum deploy foi realizado.
+O fechamento tecnico e o merge seguro foram concluidos. Nenhum deploy foi realizado.
 
 A V1 esta funcionalmente congelada.
 
@@ -24,7 +24,7 @@ Documentacao inicial ja foi versionada no repositorio antes desta atualizacao.
 
 A documentacao 1.1 e a fundacao tecnica da Fase 1 estao integradas na `main`.
 
-A implementacao aprovada da Fase 2 foi concluida na branch `fase/02-autenticacao`.
+A implementacao aprovada da Fase 2 esta integrada na `main`.
 
 ## Arquitetura fechada
 
@@ -125,6 +125,5 @@ Google Drive:
 
 ## Proxima acao
 
-1. Concluir o merge autorizado da Fase 2 na `main`.
+1. Aguardar autorizacao explicita para iniciar a Fase 3.
 2. Nao realizar deploy sem autorizacao explicita.
-3. Aguardar autorizacao explicita para iniciar a Fase 3.
