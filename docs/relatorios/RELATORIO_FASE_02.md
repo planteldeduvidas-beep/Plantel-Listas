@@ -1,7 +1,7 @@
 # RELATORIO DA FASE 02 - AUTENTICACAO E USUARIOS
 
 Data: 26/08/2026  
-Estado: **IMPLEMENTADA - AGUARDANDO VALIDACAO**
+Estado: **APROVADA - PRONTA PARA INTEGRACAO**
 
 ## 1. Resumo
 
@@ -16,7 +16,7 @@ Materiais, categorias funcionais, Google Drive, analytics, auditoria funcional, 
 - Commit tecnico: `1f5b3e9` - `feat: implementa autenticacao da fase 2`.
 - Correcao SMTP: `b0208f0` - `fix: corrige destinatario da recuperacao por smtp`.
 - Correcao de renderizacao: `41cb059` - `fix: restaura renderizacao React no frontend`.
-- O presente relatorio e o estado atualizado ficam no commit documental seguinte.
+- Fechamento documental: commit seguinte no topo da branch.
 - Nenhum merge em `main` foi realizado.
 - Nenhum deploy foi realizado.
 
@@ -126,7 +126,20 @@ Cobertura principal:
 - `backend/.env` e `frontend/.env` confirmados como ignorados e ausentes do historico;
 - nenhuma credencial real encontrada nos arquivos versionaveis.
 
-O navegador integrado nao estava disponivel na sessao, portanto nao foi possivel realizar uma revisao visual automatizada. A interface foi validada por build, inicializacao do Vite e resposta HTTP.
+O navegador integrado nao estava disponivel na sessao do Codex, portanto nao foi possivel realizar uma revisao visual automatizada. Depois da correcao, o responsavel humano repetiu o teste no navegador e confirmou que a interface passou a renderizar normalmente.
+
+### Validacao humana final
+
+- o bug `React is not defined` foi encontrado durante a validacao manual;
+- a causa foi a ausencia do import padrao de `React` em arquivos JSX sob o transform atual do Vite;
+- `main.jsx` e `App.jsx` receberam o import necessario, sem mudanca funcional adicional;
+- o novo teste manual confirmou a renderizacao normal da interface;
+- a solicitacao real de recuperacao de senha foi realizada;
+- o email de recuperacao foi recebido;
+- o link de recuperacao foi aberto no navegador;
+- a senha foi redefinida com sucesso;
+- o login com a nova senha foi aprovado;
+- a rejeicao da senha anterior foi comprovada pelo teste automatizado de integracao; nao foi registrada confirmacao manual separada desse ultimo passo.
 
 ## 10. Erros encontrados e corrigidos
 
@@ -139,16 +152,15 @@ O navegador integrado nao estava disponivel na sessao, portanto nao foi possivel
 
 ## 11. Riscos e pendencias
 
-- confirmar manualmente a chegada da mensagem de teste na caixa de entrada ou spam;
 - definir o remetente definitivo de producao;
 - validar `TRUST_PROXY` conforme a topologia real da Hostinger;
 - validar a dependencia nativa do Argon2 no ambiente de deploy;
 - definir limpeza operacional de sessoes e tokens expirados;
 - considerar armazenamento compartilhado para rate limit se houver mais de um processo;
-- realizar teste visual/E2E quando um navegador integrado estiver disponivel.
+- considerar teste E2E automatizado quando um navegador integrado estiver disponivel.
 
 ## 12. Estado final
 
-**FASE 2 IMPLEMENTADA - AGUARDANDO VALIDACAO**
+**FASE 2 APROVADA - PRONTA PARA INTEGRACAO**
 
-A branch esta pronta para revisao humana. Nao houve merge em `main`, deploy, inicio da Fase 3 ou integracao com Google Drive.
+A validacao humana foi concluida e o merge em `main` foi autorizado. Ate este registro, nao houve deploy, inicio da Fase 3 ou integracao com Google Drive.
