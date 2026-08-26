@@ -13,9 +13,9 @@ FASE 2 aprovada pelo responsavel humano e integrada na branch `main`.
 
 O fechamento tecnico e o merge seguro foram concluidos. Nenhum deploy foi realizado.
 
-FASE 3 IMPLEMENTADA - AGUARDANDO VALIDACAO na branch `fase/03-estrutura-acervo`.
+FASE 3 aprovada pelo responsavel humano e integrada na branch `main`.
 
-Categorias, disciplinas, concursos e permissoes de professor por categoria foram implementados. A Fase 3 ainda nao foi integrada na `main`.
+Categorias, disciplinas, concursos, acessos de professor por pasta e a revisao de UX foram aprovados. Nenhum deploy foi realizado.
 
 A V1 esta funcionalmente congelada.
 
@@ -30,7 +30,7 @@ A documentacao 1.1 e a fundacao tecnica da Fase 1 estao integradas na `main`.
 
 A implementacao aprovada da Fase 2 esta integrada na `main`.
 
-A implementacao da Fase 3 esta isolada na branch `fase/03-estrutura-acervo`.
+A implementacao aprovada da Fase 3 esta integrada na `main`.
 
 ## Arquitetura fechada
 
@@ -131,6 +131,5 @@ Google Drive:
 
 ## Proxima acao
 
-1. Revisar e validar humanamente a Fase 3.
-2. Nao integrar a Fase 3 na `main` sem aprovacao explicita.
-3. Nao realizar deploy nem iniciar a Fase 4 sem autorizacao explicita.
+1. Aguardar autorizacao explicita para iniciar a Fase 4.
+2. Nao realizar deploy sem autorizacao explicita.

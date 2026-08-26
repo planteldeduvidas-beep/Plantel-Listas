@@ -1,7 +1,7 @@
 # RELATORIO DA FASE 03 - ESTRUTURA DO ACERVO
 
 Data: 26/08/2026  
-Estado: **PRONTA PARA VALIDACAO**
+Estado: **APROVADA E INTEGRADA**
 
 ## 1. Resumo
 
@@ -19,7 +19,7 @@ Tags genericas nao foram criadas porque ainda nao existe caso funcional aprovado
 - Commit documental inicial: `01e27cc` - `docs: registra conclusao da fase 3`.
 - Correcao de UX: `fee5a62` - `fix: simplifica experiencia da fase 3`.
 - A presente atualizacao do relatorio fica no commit documental seguinte.
-- Nenhum merge em `main` foi realizado.
+- Merge seguro em `main` autorizado e realizado no fechamento.
 - Nenhum deploy foi realizado.
 
 ## 3. Arquivos
@@ -237,11 +237,11 @@ A revisao visual automatizada nao foi executada por ausencia de navegador integr
 - mudancas concorrentes muito raras na hierarquia dependem da serializacao operacional administrativa; considerar locks transacionais se o volume administrativo justificar;
 - a permissao atual guarda o estado e autoria mais recente; historico completo de eventos pertence a auditoria da fase futura;
 - dados estruturais reais ainda precisam de curadoria humana antes da integracao/indexacao do Drive;
-- validar visualmente os tres perfis durante a revisao humana.
+- manter a revisao visual dos tres perfis em futuras alteracoes de interface.
 
 ## 20. Pendencias
 
-- revisao humana da Fase 3;
+- manter a regressao da Fase 3 nas fases seguintes;
 - cadastrar a estrutura real somente apos curadoria;
 - definir como disciplinas e concursos se associarao aos materiais na fase autorizada correspondente;
 - manter as pendencias operacionais de producao ja registradas no Estado Atual.
@@ -259,15 +259,15 @@ A unica decisao de escopo foi nao criar tags genericas, pois o prompt as condici
 - senha SMTP, segredo CSRF e senha real de teste: 0 ocorrencias nos arquivos versionaveis e historico;
 - nenhum log persistido foi criado;
 - branch de trabalho: `fase/03-estrutura-acervo`;
-- `main` permanece intacta em `d842c15`;
+- a integracao segura na `main` foi autorizada apos a validacao humana;
 - nenhum force push ou reescrita de historico;
 - nenhum deploy.
 
 ## 23. Estado final
 
-**PRONTA PARA VALIDACAO**
+**APROVADA E INTEGRADA**
 
-A Fase 3 esta pronta para revisao humana. Nao houve merge em `main`, deploy, inicio da Fase 4 ou integracao com Google Drive.
+A Fase 3 foi aprovada pelo responsavel humano e integrada na `main`. Nao houve deploy, inicio da Fase 4 ou integracao com Google Drive.
 
 ## 24. Revisao de UX apos validacao humana
 
@@ -301,4 +301,18 @@ Validacao da correcao:
 - nenhum termo tecnico alvo permaneceu nos elementos visiveis revisados;
 - navegador integrado indisponivel, portanto a aprovacao visual final permanece para a nova validacao humana.
 
-Estado apos a correcao: **PRONTA PARA NOVA VALIDACAO HUMANA**.
+Estado apos a correcao: **APROVADA NA VALIDACAO HUMANA**.
+
+## 25. Fechamento e integracao
+
+O responsavel humano aprovou a revisao de UX e autorizou explicitamente o merge da branch `fase/03-estrutura-acervo` na `main`.
+
+Checks finais antes da integracao:
+
+- `npm run check`: 38 testes aprovados, 0 falhas e build Vite aprovado;
+- `npm audit`: 0 vulnerabilidades;
+- `npm audit --omit=dev`: 0 vulnerabilidades;
+- `git diff --check`: aprovado;
+- `backend/.env` e `frontend/.env`: ignorados e fora do Git.
+
+A integracao foi realizada sem force push e sem reescrita de historico. Nenhum deploy foi executado e a Fase 4 nao foi iniciada.
