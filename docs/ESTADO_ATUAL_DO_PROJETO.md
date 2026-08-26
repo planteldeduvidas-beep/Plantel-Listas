@@ -9,7 +9,9 @@ FASE 0 concluida: documentacao e preparacao inicial.
 
 FASE 1 aprovada pelo responsavel humano e integrada na branch `main`.
 
-A Fase 2 ainda nao esta autorizada. Nenhum deploy foi realizado.
+FASE 2 IMPLEMENTADA - AGUARDANDO VALIDACAO na branch `fase/02-autenticacao`.
+
+Nenhum merge da Fase 2 e nenhum deploy foram realizados.
 
 A V1 esta funcionalmente congelada.
 
@@ -21,6 +23,8 @@ Repositorio GitHub:
 Documentacao inicial ja foi versionada no repositorio antes desta atualizacao.
 
 A documentacao 1.1 e a fundacao tecnica da Fase 1 estao integradas na `main`.
+
+A implementacao da Fase 2 esta isolada na branch `fase/02-autenticacao`.
 
 ## Arquitetura fechada
 
@@ -113,7 +117,8 @@ Google Drive:
 ## Pendencias para as proximas fases
 
 - definir URL/subdominio final do sistema;
-- definir endereco remetente para recuperacao de senha;
+- validar o envio SMTP real quando a senha de app do remetente de teste estiver disponivel;
+- definir o remetente definitivo de producao para recuperacao de senha;
 - configurar Google Cloud/Drive API na Fase 4;
 - validar escopo OAuth e status de producao na Fase 4/9;
 - validar limite pratico de videos na Hostinger antes do go-live;
@@ -121,5 +126,6 @@ Google Drive:
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para iniciar a Fase 2.
-2. Nao iniciar implementacao funcional antes dessa autorizacao.
+1. Revisar e validar humanamente a Fase 2.
+2. Nao integrar a Fase 2 na `main` sem aprovacao explicita.
+3. Aguardar autorizacao explicita para iniciar a Fase 3.
