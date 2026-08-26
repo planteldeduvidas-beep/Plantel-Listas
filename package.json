@@ -1,0 +1,25 @@
+{
+  "name": "plantel-listas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo do Plantel Listas",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "start": "npm run start --workspace backend",
+    "build": "npm run build --workspace frontend",
+    "test": "npm run test --workspace backend",
+    "db:create": "npm run db:create --workspace backend",
+    "migrate": "npm run migrate --workspace backend",
+    "check": "npm run test && npm run build",
+    "audit:prod": "npm audit --omit=dev"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
+
