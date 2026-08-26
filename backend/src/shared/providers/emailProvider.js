@@ -42,7 +42,7 @@ function criarEmailProviderSmtp(configuracao) {
     enviarRecuperacaoSenha: async function enviarRecuperacao(dados) {
       await transportador.sendMail({
         from: configuracao.remetente,
-        to: dados.email,
+        to: dados.destinatario,
         subject: "Redefinicao de senha - Plantel Listas",
         text: [
           "Recebemos uma solicitacao para redefinir sua senha.",

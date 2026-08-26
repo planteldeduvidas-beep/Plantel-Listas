@@ -364,6 +364,10 @@ test("recuperacao e neutra, de uso unico e revoga sessoes", async function testa
   const existente = await solicitarRecuperacao(agente, "recuperacao@example.com");
   const mensagemExistente = existente.body.mensagem;
   assert.equal(Object.hasOwn(existente.body, "token"), false);
+  assert.equal(
+    emailProvider.obterMensagens()[0].destinatario,
+    "recuperacao@example.com"
+  );
   const token = extrairTokenDeRecuperacao();
   const [recuperacoes] = await pool.execute(
     "SELECT token_hash FROM recuperacoes_senha WHERE usada_em IS NULL LIMIT 1"

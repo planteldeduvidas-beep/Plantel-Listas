@@ -77,7 +77,7 @@ Um administrador local de teste foi criado pelo bootstrap e validado. Suas crede
 
 Foi implementado um provider SMTP configuravel por ambiente e um provider falso para testes automatizados. O remetente de teste e sua senha de app foram configurados somente no `backend/.env` ignorado.
 
-A conexao autenticada com o SMTP do Gmail foi aprovada por TLS na porta configurada. Em seguida, uma solicitacao real de recuperacao para o administrador local retornou HTTP 200, persistiu o token hasheado e teve a mensagem aceita pelo servidor SMTP para entrega. Endereco, senha de app e token nao foram exibidos nem versionados. A confirmacao visual da chegada na caixa de entrada ou spam permanece manual.
+A conexao autenticada com o SMTP do Gmail foi aprovada por TLS na porta configurada. Em seguida, uma solicitacao real de recuperacao para o administrador local retornou HTTP 200, persistiu um token hasheado ativo e teve a mensagem aceita pelo servidor SMTP para entrega. O token criado apenas para o smoke foi invalidado logo depois. Endereco, senha de app e token nao foram exibidos nem versionados. A confirmacao visual da chegada na caixa de entrada ou spam permanece manual.
 
 O sistema exige configuracao SMTP completa antes de ativar o provider real; sem ela, mantem a resposta externa neutra e invalida o token que nao pôde ser entregue. A senha normal da conta nao deve ser usada.
 
@@ -128,6 +128,7 @@ O navegador integrado nao estava disponivel na sessao, portanto nao foi possivel
 - a primeira chamada do bootstrap pela raiz nao possuia script correspondente; o script do workspace e o atalho da raiz foram alinhados;
 - a porta IPv4 `127.0.0.1:3000` estava ocupada pelo Live Preview do VS Code; os smokes foram realizados por `localhost` e depois em porta livre;
 - Nodemailer 7 apresentou vulnerabilidades na auditoria; foi substituido pela versao 9.0.5 e a auditoria voltou a zero;
+- o servico de recuperacao enviava `destinatario`, enquanto o provider SMTP lia `email`; o contrato foi alinhado, recebeu teste de regressao e o fluxo SMTP real foi repetido com sucesso;
 - `node --check` nao aceita a extensao `.jsx`; esses arquivos foram corretamente validados pelo build Vite.
 
 ## 11. Riscos e pendencias
