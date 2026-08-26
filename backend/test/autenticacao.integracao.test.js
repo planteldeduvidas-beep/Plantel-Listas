@@ -29,7 +29,24 @@ const logger = pino({ level: "silent" });
 let aplicacao;
 let emailProvider;
 
+async function limparCategorias() {
+  let removidas = 1;
+
+  while (removidas > 0) {
+    const [resultado] = await pool.execute(
+      "DELETE categoria FROM categorias categoria "
+      + "LEFT JOIN categorias filha ON filha.categoria_pai_id = categoria.id "
+      + "WHERE filha.id IS NULL"
+    );
+    removidas = resultado.affectedRows;
+  }
+}
+
 async function limparBanco() {
+  await pool.execute("DELETE FROM permissoes_professor_categoria");
+  await limparCategorias();
+  await pool.execute("DELETE FROM disciplinas");
+  await pool.execute("DELETE FROM concursos");
   await pool.execute("DELETE FROM recuperacoes_senha");
   await pool.execute("DELETE FROM sessoes");
   await pool.execute("DELETE FROM usuarios");

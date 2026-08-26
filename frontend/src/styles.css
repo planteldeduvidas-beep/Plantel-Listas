@@ -71,7 +71,9 @@ label {
   font-weight: 650;
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   padding: 13px 14px;
   border: 1px solid #d1d5db;
@@ -81,9 +83,133 @@ input {
   font: inherit;
 }
 
-input:focus {
+input:focus,
+select:focus,
+textarea:focus {
   border-color: #45c9c1;
   outline: 3px solid #ddf6f3;
+}
+
+.pagina-painel {
+  min-height: 100vh;
+  padding: clamp(20px, 4vw, 56px);
+}
+
+.cabecalho-painel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.cabecalho-painel h1 {
+  margin-bottom: 0;
+}
+
+.usuario-painel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #6b7280;
+}
+
+.grade-publica,
+.grade-admin {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  margin: 22px 0;
+}
+
+.cartao-painel,
+.bloco-admin {
+  padding: 22px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.cartao-painel h2,
+.bloco-admin h3,
+.area-administrativa > h2 {
+  margin: 0 0 16px;
+  color: #242424;
+}
+
+.area-administrativa {
+  margin-top: 34px;
+}
+
+.bloco-admin {
+  margin-bottom: 18px;
+}
+
+.formulario-compacto {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.acoes-formulario {
+  display: flex;
+  gap: 8px;
+}
+
+button.secundario {
+  min-height: 36px;
+  padding: 7px 11px;
+  background: #ddf6f3;
+  color: #155e59;
+}
+
+.lista-administrativa,
+.lista-simples,
+.arvore-categorias {
+  margin: 16px 0 0;
+  padding-left: 20px;
+}
+
+.lista-administrativa {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-administrativa li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 9px;
+  background: #f6f7f8;
+}
+
+.lista-administrativa li > div {
+  display: flex;
+  gap: 8px;
+}
+
+.lista-administrativa .inativo {
+  opacity: 0.62;
+}
+
+.arvore-categorias li {
+  margin: 8px 0;
+  color: #303234;
+}
+
+.arvore-categorias span {
+  display: block;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.estado-vazio {
+  font-size: 0.95rem;
 }
 
 small {
@@ -184,6 +310,17 @@ button:disabled {
     border-top: 5px solid #45c9c1;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  .pagina-painel {
+    padding: 18px;
+  }
+
+  .cabecalho-painel,
+  .usuario-painel,
+  .lista-administrativa li {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 
