@@ -7,9 +7,9 @@ Atualizado em: 26/08/2026
 
 FASE 0 concluida: documentacao e preparacao inicial.
 
-FASE 1 implementada na branch `fase/01-fundacao` e PRONTA PARA VALIDACAO.
+FASE 1 aprovada pelo responsavel humano e integrada na branch `main`.
 
-A Fase 2 ainda nao esta autorizada. Nenhum merge ou deploy foi realizado.
+A Fase 2 ainda nao esta autorizada. Nenhum deploy foi realizado.
 
 A V1 esta funcionalmente congelada.
 
@@ -20,7 +20,7 @@ Repositorio GitHub:
 
 Documentacao inicial ja foi versionada no repositorio antes desta atualizacao.
 
-A documentacao 1.1 deve substituir a anterior antes de iniciar a Fase 1.
+A documentacao 1.1 e a fundacao tecnica da Fase 1 estao integradas na `main`.
 
 ## Arquitetura fechada
 
@@ -110,7 +110,7 @@ Google Drive:
 - conta Gmail comum designada ao acervo;
 - cerca de 3 GB usados de 15 GB, conforme informacao recebida.
 
-## Pendencias que nao bloqueiam a Fase 1
+## Pendencias para as proximas fases
 
 - definir URL/subdominio final do sistema;
 - definir endereco remetente para recuperacao de senha;
@@ -121,7 +121,5 @@ Google Drive:
 
 ## Proxima acao
 
-1. Revisar `docs/relatorios/RELATORIO_FASE_01.md`.
-2. Validar a fundacao tecnica na branch `fase/01-fundacao`.
-3. Decidir separadamente sobre merge em `main`.
-4. Autorizar explicitamente a Fase 2 antes de qualquer implementacao funcional.
+1. Aguardar autorizacao explicita para iniciar a Fase 2.
+2. Nao iniciar implementacao funcional antes dessa autorizacao.
