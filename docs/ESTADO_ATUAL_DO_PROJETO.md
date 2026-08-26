@@ -1,52 +1,127 @@
 # ESTADO ATUAL DO PROJETO - PLANTEL LISTAS
-Atualizado em 26/08/2026
+
+Versao da documentacao: 1.1
+Atualizado em: 26/08/2026
 
 ## Status
-FASE 0 - documentacao e preparacao.
 
-V1 funcionalmente congelada.
+FASE 0 concluida: documentacao e preparacao inicial.
 
-## Infraestrutura definida
-- Hostinger Business Web Hosting ate 17/03/2030.
-- Node.js/Express em producao.
-- MySQL da Hostinger.
-- Desenvolvimento local com Laragon + MySQL + MySQL Workbench.
-- React + Vite no frontend.
-- Google Drive para PDFs/videos.
+FASE 1 implementada na branch `fase/01-fundacao` e PRONTA PARA VALIDACAO.
 
-## Drive
+A Fase 2 ainda nao esta autorizada. Nenhum merge ou deploy foi realizado.
+
+A V1 esta funcionalmente congelada.
+
+## Repositorio
+
+Repositorio GitHub:
+`https://github.com/planteldeduvidas-beep/Plantel-Listas`
+
+Documentacao inicial ja foi versionada no repositorio antes desta atualizacao.
+
+A documentacao 1.1 deve substituir a anterior antes de iniciar a Fase 1.
+
+## Arquitetura fechada
+
+Backend:
+- Node.js;
+- Express;
+- CommonJS;
+- monolito modular por dominio;
+- `src/modules` + `src/shared`.
+
+Frontend:
+- React;
+- Vite;
+- JavaScript.
+
+Banco:
+- MySQL;
+- Laragon + MySQL + MySQL Workbench localmente;
+- MySQL Hostinger em producao.
+
+Arquivos:
+- Google Drive via Drive API.
+
+Producao:
+- Hostinger Business Web Hosting.
+
+## Regra operacional
+
+O Codex e o programador principal.
+
+Dentro de cada fase autorizada, ele deve executar diretamente tudo que o ambiente permitir, incluindo:
+
+- criar arquivos/estrutura;
+- instalar dependencias;
+- criar/configurar banco local;
+- rodar migrations;
+- executar testes;
+- corrigir erros;
+- versionar a fase em branch/commit;
+- gerar relatorio.
+
+O responsavel humano revisa e aprova. O Codex pede intervencao somente para segredo, autorizacao externa ou decisao humana inevitavel.
+
+## Perfis
+
+- aluno;
+- professor;
+- admin.
+
+Aluno:
+- cadastro/login;
+- recuperacao de senha;
+- navegar, buscar, filtrar, visualizar, assistir e baixar.
+
+Professor:
+- tudo do aluno;
+- upload/edicao/movimentacao/substituicao/lixeira somente em areas autorizadas;
+- sem analytics, relatorios, auditoria geral ou gestao de usuarios/permissoes.
+
+Admin:
+- controle administrativo completo, analytics, relatorios e auditoria.
+
+## Drive confirmado
+
 Pasta raiz:
 `10Kokm2f3IpeOFuzIJvJDc4HpHZpBoOIX`
 
-Conteudo raiz confirmado:
-- LISTAS
-- PROVAS ANTIGAS
+Raiz observada:
+- LISTAS;
+- PROVAS ANTIGAS.
 
-A equipe informou que o conteudo disponivel nessa pasta corresponde ao acervo atual a ser usado.
+A equipe confirmou que esse e o acervo atual a ser usado no sistema.
 
-## Usuarios
-Roles fechadas:
-- aluno
-- professor
-- admin
+## Infraestrutura informada
 
-Aluno tera cadastro e login.
+Hostinger:
+- Business Web Hosting;
+- dominio `planteldeduvidas.com.br`;
+- validade informada ate 17/03/2030.
 
-Professor:
-- pode gerenciar arquivos somente em areas autorizadas;
-- nao acessa analytics/relatorios/auditoria geral.
+Email:
+- Starter Business Email;
+- dominio `planteldeduvidas.com.br`;
+- validade informada ate 20/08/2027.
 
-Admin:
-- controle administrativo completo.
+Google Drive:
+- conta Gmail comum designada ao acervo;
+- cerca de 3 GB usados de 15 GB, conforme informacao recebida.
 
-## Pendencias tecnicas que nao alteram regra de negocio
-1. Configurar projeto Google Cloud e Drive API.
-2. Validar menor escopo OAuth que atende ao acervo legado e operacoes de escrita.
-3. Definir subdominio/URL final.
-4. Definir remetente SMTP de recuperacao de senha.
-5. Testar limite pratico de upload de videos na Hostinger.
-6. Criar repositorio e estrutura inicial.
-7. Executar Fase 1.
+## Pendencias que nao bloqueiam a Fase 1
 
-## Proxima acao autorizada
-Criar repositorio/estrutura da Fase 1 somente depois de o responsavel inserir estes documentos em `/docs` e entregar ao Codex o prompt da Fase 1.
+- definir URL/subdominio final do sistema;
+- definir endereco remetente para recuperacao de senha;
+- configurar Google Cloud/Drive API na Fase 4;
+- validar escopo OAuth e status de producao na Fase 4/9;
+- validar limite pratico de videos na Hostinger antes do go-live;
+- definir estrategia exata de migration no deploy Hostinger antes da Fase 9.
+
+## Proxima acao
+
+1. Revisar `docs/relatorios/RELATORIO_FASE_01.md`.
+2. Validar a fundacao tecnica na branch `fase/01-fundacao`.
+3. Decidir separadamente sobre merge em `main`.
+4. Autorizar explicitamente a Fase 2 antes de qualquer implementacao funcional.
