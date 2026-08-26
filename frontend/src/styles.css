@@ -16,14 +16,14 @@ body {
   min-height: 100vh;
 }
 
-.pagina-fundacao {
+.pagina-autenticacao {
   display: grid;
   min-height: 100vh;
   place-items: center;
   padding: 24px;
 }
 
-.cartao-fundacao {
+.cartao-autenticacao {
   width: min(100%, 640px);
   padding: clamp(32px, 7vw, 64px);
   border: 1px solid #e5e7eb;
@@ -53,5 +53,137 @@ p {
   color: #6b7280;
   font-size: 1.05rem;
   line-height: 1.7;
+}
+
+.descricao {
+  margin-bottom: 28px;
+}
+
+form {
+  display: grid;
+  gap: 18px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  color: #303234;
+  font-weight: 650;
+}
+
+input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  color: #202124;
+  background: #ffffff;
+  font: inherit;
+}
+
+input:focus {
+  border-color: #45c9c1;
+  outline: 3px solid #ddf6f3;
+}
+
+small {
+  color: #6b7280;
+  font-weight: 400;
+}
+
+button {
+  min-height: 44px;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 9px;
+  background: #303234;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #242424;
+}
+
+button:focus-visible {
+  outline: 3px solid #45c9c1;
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.acoes-secundarias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 22px;
+}
+
+.acoes-secundarias button {
+  min-height: auto;
+  padding: 4px 0;
+  background: transparent;
+  color: #287f79;
+  font-weight: 650;
+}
+
+.aviso {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.sucesso {
+  color: #155e59;
+  background: #ddf6f3;
+}
+
+.erro {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.dados-conta {
+  display: grid;
+  gap: 14px;
+  margin: 28px 0;
+}
+
+.dados-conta div {
+  padding: 14px;
+  border-radius: 9px;
+  background: #f6f7f8;
+}
+
+.dados-conta dt {
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dados-conta dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+}
+
+@media (max-width: 520px) {
+  .pagina-autenticacao {
+    padding: 0;
+  }
+
+  .cartao-autenticacao {
+    min-height: 100vh;
+    border: 0;
+    border-top: 5px solid #45c9c1;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 

@@ -15,6 +15,7 @@
     "test": "npm run test --workspace backend",
     "db:create": "npm run db:create --workspace backend",
     "migrate": "npm run migrate --workspace backend",
+    "bootstrap:admin": "npm run bootstrap:admin --workspace backend",
     "check": "npm run test && npm run build",
     "audit:prod": "npm audit --omit=dev"
   },

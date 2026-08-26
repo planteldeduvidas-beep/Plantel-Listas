@@ -8,6 +8,7 @@ function criarLogger(configuracao, destino) {
       paths: [
         "req.headers.authorization",
         "req.headers.cookie",
+        "req.headers.x-csrf-token",
         "res.headers.set-cookie",
         "senha",
         "token",

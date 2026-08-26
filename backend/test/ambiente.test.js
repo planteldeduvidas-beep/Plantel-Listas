@@ -8,6 +8,16 @@ function criarVariaveisValidas() {
     PORT: "3000",
     LOG_LEVEL: "silent",
     CORS_ORIGENS: "http://localhost:5173",
+    FRONTEND_URL: "http://localhost:5173",
+    TRUST_PROXY: "0",
+    CSRF_SECRET: "segredo-de-teste-com-mais-de-32-caracteres",
+    SESSION_DURATION_HOURS: "168",
+    PASSWORD_RESET_DURATION_MINUTES: "30",
+    SESSION_COOKIE_NAME: "plantel_sessao",
+    CSRF_COOKIE_NAME: "plantel_csrf",
+    RATE_LIMIT_WINDOW_MINUTES: "15",
+    AUTH_RATE_LIMIT_MAX: "10",
+    RECOVERY_RATE_LIMIT_MAX: "5",
     DB_HOST: "127.0.0.1",
     DB_PORT: "3306",
     DB_USER: "root",
@@ -21,6 +31,25 @@ test("aceita uma configuracao valida", function testarConfiguracaoValida() {
   const configuracao = validarVariaveisDeAmbiente(criarVariaveisValidas());
   assert.equal(configuracao.ambiente, "test");
   assert.equal(configuracao.banco.nome, "plantel_listas_test");
+  assert.equal(configuracao.email.host, "");
+  assert.equal(configuracao.email.porta, 465);
+  assert.equal(configuracao.email.seguro, true);
+});
+
+test("valida a configuracao SMTP quando informada", function testarSmtp() {
+  const variaveis = criarVariaveisValidas();
+  variaveis.SMTP_HOST = "smtp.example.com";
+  variaveis.SMTP_PORT = "587";
+  variaveis.SMTP_SECURE = "false";
+  variaveis.SMTP_USER = "usuario@example.com";
+  variaveis.SMTP_PASSWORD = "segredo-de-teste";
+  variaveis.SMTP_FROM = "usuario@example.com";
+
+  const configuracao = validarVariaveisDeAmbiente(variaveis);
+  assert.equal(configuracao.email.host, "smtp.example.com");
+  assert.equal(configuracao.email.porta, 587);
+  assert.equal(configuracao.email.seguro, false);
+  assert.equal(configuracao.email.senha, "segredo-de-teste");
 });
 
 test("falha de forma controlada quando uma env obrigatoria esta ausente", function testarEnvAusente() {
