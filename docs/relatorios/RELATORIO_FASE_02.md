@@ -14,6 +14,8 @@ Materiais, categorias funcionais, Google Drive, analytics, auditoria funcional, 
 - Branch: `fase/02-autenticacao`.
 - Base: `main` no commit `9910d81`.
 - Commit tecnico: `1f5b3e9` - `feat: implementa autenticacao da fase 2`.
+- Correcao SMTP: `b0208f0` - `fix: corrige destinatario da recuperacao por smtp`.
+- Correcao de renderizacao: `41cb059` - `fix: restaura renderizacao React no frontend`.
 - O presente relatorio e o estado atualizado ficam no commit documental seguinte.
 - Nenhum merge em `main` foi realizado.
 - Nenhum deploy foi realizado.
@@ -110,6 +112,9 @@ Cobertura principal:
 - `GET /api/saude`: HTTP 200;
 - `GET /api/autenticacao/csrf`: HTTP 200;
 - Vite de desenvolvimento respondeu em `127.0.0.1:5173`;
+- apos a correcao de renderizacao, backend e Vite foram reiniciados em portas locais livres e responderam HTTP 200;
+- `App.jsx` foi renderizado em runtime e produziu o estado inicial esperado;
+- os modulos transformados de `main.jsx` e `App.jsx` foram servidos com `React` definido no escopo;
 - conexao autenticada com o SMTP do Gmail: aprovada;
 - recuperacao real: HTTP 200, token hasheado persistido e mensagem aceita pelo SMTP;
 - `npm audit`: 0 vulnerabilidades;
@@ -129,6 +134,7 @@ O navegador integrado nao estava disponivel na sessao, portanto nao foi possivel
 - a porta IPv4 `127.0.0.1:3000` estava ocupada pelo Live Preview do VS Code; os smokes foram realizados por `localhost` e depois em porta livre;
 - Nodemailer 7 apresentou vulnerabilidades na auditoria; foi substituido pela versao 9.0.5 e a auditoria voltou a zero;
 - o servico de recuperacao enviava `destinatario`, enquanto o provider SMTP lia `email`; o contrato foi alinhado, recebeu teste de regressao e o fluxo SMTP real foi repetido com sucesso;
+- na validacao manual, o frontend abria em branco com `ReferenceError: React is not defined`; o transform JSX atual exige `React` no escopo, portanto o import padrao foi adicionado a `main.jsx` e `App.jsx`, sem alterar comportamento, dependencias ou escopo funcional;
 - `node --check` nao aceita a extensao `.jsx`; esses arquivos foram corretamente validados pelo build Vite.
 
 ## 11. Riscos e pendencias
