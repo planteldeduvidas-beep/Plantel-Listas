@@ -120,7 +120,7 @@ function BibliotecaAcervo({ usuario }) {
         <button type="submit">Buscar</button>
       </form>
       <div className="filtros-acervo">
-        <label>Tipo<select value={tipo} onChange={function mudar(evento) { definirTipo(evento.target.value); definirPagina(1); }}><option value="">Todos</option><option value="pdf">PDF</option><option value="video">Vídeo</option><option value="outro">Outros arquivos</option></select></label>
+        <label>Tipo<select value={tipo} onChange={function mudar(evento) { definirTipo(evento.target.value); definirPagina(1); }}><option value="">Todos</option><option value="pdf">PDF</option><option value="video">Vídeo</option></select></label>
         <label>Disciplina<select value={disciplinaId} onChange={function mudar(evento) { definirDisciplinaId(evento.target.value); definirPagina(1); }}><option value="">Todas</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label>
         <label>Concurso<select value={concursoId} onChange={function mudar(evento) { definirConcursoId(evento.target.value); definirPagina(1); }}><option value="">Todos</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label>
         <label>Ordem<select value={ordenar} onChange={function mudar(evento) { definirOrdenar(evento.target.value); }}><option value="nome_asc">Nome: A a Z</option><option value="nome_desc">Nome: Z a A</option><option value="recente">Mais recentes</option></select></label>

@@ -9,6 +9,8 @@ const { criarEmailProviderFake } = require("../src/shared/providers/emailProvide
 const { criarHashDaSenha } = require("../src/modules/autenticacao/senha");
 const { ESCOPO_LEITURA } = require("../src/shared/providers/googleDriveProvider");
 const { gerarHashDoToken } = require("../src/shared/utils/tokens");
+const criarChangesRepository = require("../src/modules/materiais/googleDriveChangesRepository");
+const criarAcervoRepository = require("../src/modules/materiais/acervoRepository");
 
 const base = obterConfiguracao();
 const nomeBanco = process.env.DB_TEST_NAME || base.banco.nome + "_test";
@@ -217,6 +219,28 @@ test("acervo exige sessao e rejeita parametros fora da allowlist", async functio
   assert.equal((await autenticado.agente.get("/api/acervo?driveFileId=qualquer")).status, 400);
 });
 
+test("arquivos fora dos tipos aprovados nao aparecem nem sao entregues", async function testarTiposNaoAprovados() {
+  const [sincronizacoes] = await pool.execute(
+    "SELECT id FROM sincronizacoes_google_drive ORDER BY id DESC LIMIT 1"
+  );
+  const [outro] = await pool.execute(
+    "INSERT INTO materiais (drive_file_id,categoria_id,nome,mime_type,tipo,extensao,tamanho_bytes,"
+    + "ultima_sincronizacao_drive_id) VALUES ('driveDocxNaoAprovado',?,'material.docx',"
+    + "'application/vnd.openxmlformats-officedocument.wordprocessingml.document','outro','docx',100,?)",
+    [categoriaId, Number(sincronizacoes[0].id)]
+  );
+  const autenticado = await autenticar("aluno");
+  const consulta = await autenticado.agente.get("/api/acervo?categoriaId=" + categoriaId);
+  assert.equal(consulta.status, 200);
+  assert.equal(consulta.body.materiais.some(function localizar(item) {
+    return item.id === Number(outro.insertId);
+  }), false);
+  assert.equal((await autenticado.agente.get(
+    "/api/acervo/materiais/" + Number(outro.insertId) + "/download"
+  )).status, 404);
+  assert.equal((await autenticado.agente.get("/api/acervo?tipo=outro")).status, 400);
+});
+
 test("webhook valida canal e token, aceita chamada publica e ignora duplicata", async function testarWebhook() {
   const channelId = "123e4567-e89b-12d3-a456-426614174000";
   const resourceId = "resource_fase5_123";
@@ -242,4 +266,141 @@ test("webhook valida canal e token, aceita chamada publica e ignora duplicata", 
   assert.equal(invalida.status, 403);
   const [notificacoes] = await pool.execute("SELECT COUNT(*) AS total FROM notificacoes_google_drive");
   assert.equal(Number(notificacoes[0].total), 1);
+});
+
+test("sync inicial pode chegar com canal ainda em preparacao e nao processa materiais", async function testarSyncAntecipado() {
+  const channelId = "223e4567-e89b-12d3-a456-426614174000";
+  const token = "token-sync-antecipado-com-mais-de-trinta-e-dois-caracteres";
+  await pool.execute(
+    "INSERT INTO canais_google_drive (channel_id,resource_id,token_hash,expira_em,status,criado_em) "
+    + "VALUES (?,NULL,?,DATE_ADD(NOW(3),INTERVAL 1 DAY),'preparando',NOW(3))",
+    [channelId, gerarHashDoToken(token)]
+  );
+  const cabecalhos = {
+    "X-Goog-Channel-ID": channelId,
+    "X-Goog-Resource-ID": "resource_sync_antecipado",
+    "X-Goog-Message-Number": "1",
+    "X-Goog-Resource-State": "sync",
+    "X-Goog-Channel-Token": token
+  };
+  assert.equal((await request(aplicacao).post("/api/integracoes/google-drive/webhook").set(cabecalhos)).status, 202);
+  assert.equal((await request(aplicacao).post("/api/integracoes/google-drive/webhook").set(cabecalhos)).status, 202);
+  const [notificacoes] = await pool.execute(
+    "SELECT resource_state,COUNT(*) AS total FROM notificacoes_google_drive "
+    + "WHERE channel_id=? GROUP BY resource_state",
+    [channelId]
+  );
+  assert.equal(notificacoes[0].resource_state, "sync");
+  assert.equal(Number(notificacoes[0].total), 1);
+});
+
+test("reconcilia renomeacao, movimentacao e remocao de subarvore sem full sync", async function testarSubarvore() {
+  const [destino] = await pool.execute(
+    "INSERT INTO categorias (nome,drive_pasta_id,disciplina_id,classificacao_origem) "
+    + "VALUES ('Destino','driveDestinoFase5',?,'manual')",
+    [disciplinaId]
+  );
+  const [afetada] = await pool.execute(
+    "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id) VALUES ('Nome antigo',?,'driveSubarvoreFase5')",
+    [categoriaId]
+  );
+  const [sincronizacoes] = await pool.execute(
+    "SELECT id FROM sincronizacoes_google_drive ORDER BY id DESC LIMIT 1"
+  );
+  await pool.execute(
+    "INSERT INTO materiais (drive_file_id,categoria_id,nome,mime_type,tipo,extensao,tamanho_bytes,"
+    + "ultima_sincronizacao_drive_id) VALUES ('driveArquivoAntigoSubarvore',?,'antigo.pdf',"
+    + "'application/pdf','pdf','pdf',10,?)",
+    [Number(afetada.insertId), Number(sincronizacoes[0].id)]
+  );
+  await pool.execute(
+    "INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em) VALUES (1,'pagina-antiga',NOW(3))"
+  );
+  const repository = criarChangesRepository(pool);
+  const alteracaoSubarvore = {
+    fileId: "driveSubarvoreFase5",
+    pastaRaizId: configuracao.googleDrive.pastaRaizId,
+    subarvore: {
+      pastas: [{
+        id: "driveSubarvoreFase5",
+        name: "Nome novo",
+        mimeType: "application/vnd.google-apps.folder",
+        parentId: "driveDestinoFase5",
+        nivel: 0
+      }, {
+        id: "driveFilhaSubarvoreFase5",
+        name: "Filha",
+        mimeType: "application/vnd.google-apps.folder",
+        parentId: "driveSubarvoreFase5",
+        nivel: 1
+      }],
+      arquivos: [{
+        id: "driveArquivoNovoSubarvore",
+        name: "novo.pdf",
+        mimeType: "application/pdf",
+        size: "20",
+        parentId: "driveFilhaSubarvoreFase5"
+      }]
+    }
+  };
+  const conexao = await repository.adquirirTrava();
+  const resumo = await repository.aplicarAlteracoes(
+    conexao,
+    [alteracaoSubarvore],
+    "pagina-nova"
+  );
+  await repository.liberarTrava(conexao);
+  assert.equal(resumo.reconciliacaoNecessaria, false);
+  const [pastas] = await pool.execute(
+    "SELECT nome,categoria_pai_id,ativo FROM categorias WHERE drive_pasta_id='driveSubarvoreFase5'"
+  );
+  assert.equal(pastas[0].nome, "Nome novo");
+  assert.equal(Number(pastas[0].categoria_pai_id), Number(destino.insertId));
+  assert.equal(Number(pastas[0].ativo), 1);
+  const [materiais] = await pool.execute(
+    "SELECT drive_file_id,disponivel FROM materiais "
+    + "WHERE drive_file_id IN ('driveArquivoAntigoSubarvore','driveArquivoNovoSubarvore') ORDER BY drive_file_id"
+  );
+  assert.deepEqual(materiais.map(function mapear(item) {
+    return [item.drive_file_id, Number(item.disponivel)];
+  }), [["driveArquivoAntigoSubarvore", 0], ["driveArquivoNovoSubarvore", 1]]);
+  const catalogo = await criarAcervoRepository(pool).listarMateriais({
+    categoriaId: Number(destino.insertId),
+    pagina: 1,
+    limite: 10,
+    busca: "novo.pdf",
+    tipo: null,
+    disciplinaId: null,
+    concursoId: null,
+    ordenar: "nome_asc"
+  });
+  assert.equal(catalogo.itens[0].caminho, "Destino / Nome novo / Filha");
+  assert.equal(catalogo.itens[0].disciplina.id, disciplinaId);
+  const conexaoRepeticao = await repository.adquirirTrava();
+  const repetida = await repository.aplicarAlteracoes(
+    conexaoRepeticao,
+    [alteracaoSubarvore],
+    "pagina-repetida"
+  );
+  await repository.liberarTrava(conexaoRepeticao);
+  assert.equal(repetida.reconciliacaoNecessaria, false);
+  const [duplicados] = await pool.execute(
+    "SELECT COUNT(*) AS total,COUNT(DISTINCT drive_file_id) AS distintos FROM materiais "
+    + "WHERE drive_file_id='driveArquivoNovoSubarvore'"
+  );
+  assert.equal(Number(duplicados[0].total), 1);
+  assert.equal(Number(duplicados[0].distintos), 1);
+
+  const conexaoRemocao = await repository.adquirirTrava();
+  const removida = await repository.aplicarAlteracoes(conexaoRemocao, [{
+    fileId: "driveSubarvoreFase5",
+    removerSubarvore: true
+  }], "pagina-remocao");
+  await repository.liberarTrava(conexaoRemocao);
+  assert.equal(removida.reconciliacaoNecessaria, false);
+  const [estadoPastas] = await pool.execute(
+    "SELECT COUNT(*) AS ativas FROM categorias WHERE drive_pasta_id IN "
+    + "('driveSubarvoreFase5','driveFilhaSubarvoreFase5') AND ativo=1"
+  );
+  assert.equal(Number(estadoPastas[0].ativas), 0);
 });

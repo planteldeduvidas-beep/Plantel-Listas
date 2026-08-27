@@ -74,7 +74,7 @@ function criarAcervoRepository(pool) {
       criarArvoreSql()
       + "SELECT a.*,d.nome AS disciplina_nome,c.nome AS concurso_nome,"
       + "(SELECT COUNT(*) FROM categorias f WHERE f.categoria_pai_id=a.id AND f.ativo=1) AS quantidade_pastas,"
-      + "(SELECT COUNT(*) FROM materiais m WHERE m.categoria_id=a.id AND m.disponivel=1) AS quantidade_materiais "
+      + "(SELECT COUNT(*) FROM materiais m WHERE m.categoria_id=a.id AND m.disponivel=1 AND m.tipo IN ('pdf','video')) AS quantidade_materiais "
       + "FROM arvore a LEFT JOIN disciplinas d ON d.id=a.disciplina_efetiva_id AND d.ativo=1 "
       + "LEFT JOIN concursos c ON c.id=a.concurso_efetivo_id AND c.ativo=1 "
       + "WHERE a.ativo=1 AND a.categoria_pai_id <=> ? ORDER BY a.nome ASC",
@@ -84,7 +84,7 @@ function criarAcervoRepository(pool) {
   }
 
   function criarCondicoes(filtros) {
-    const condicoes = ["m.disponivel=1", "a.ativo=1"];
+    const condicoes = ["m.disponivel=1", "m.tipo IN ('pdf','video')", "a.ativo=1"];
     const parametros = [];
     if (filtros.categoriaId && !filtros.busca && !filtros.disciplinaId && !filtros.concursoId && !filtros.tipo) {
       condicoes.push("m.categoria_id=?");
@@ -149,7 +149,7 @@ function criarAcervoRepository(pool) {
     const [registros] = await pool.execute(
       "SELECT m.id,m.drive_file_id,m.nome,m.mime_type,m.tipo,m.extensao,m.tamanho_bytes,m.resource_key "
       + "FROM materiais m INNER JOIN categorias c ON c.id=m.categoria_id "
-      + "WHERE m.id=? AND m.disponivel=1 AND c.ativo=1 LIMIT 1",
+      + "WHERE m.id=? AND m.disponivel=1 AND m.tipo IN ('pdf','video') AND c.ativo=1 LIMIT 1",
       [id]
     );
     return registros[0] || null;
@@ -166,7 +166,8 @@ function criarAcervoRepository(pool) {
   async function contarNaoClassificados() {
     const [registros] = await pool.execute(
       criarArvoreSql() + "SELECT COUNT(*) AS total FROM materiais m INNER JOIN arvore a ON a.id=m.categoria_id "
-      + "WHERE m.disponivel=1 AND a.disciplina_efetiva_id IS NULL AND a.concurso_efetivo_id IS NULL"
+      + "WHERE m.disponivel=1 AND m.tipo IN ('pdf','video') "
+      + "AND a.disciplina_efetiva_id IS NULL AND a.concurso_efetivo_id IS NULL"
     );
     return Number(registros[0].total);
   }

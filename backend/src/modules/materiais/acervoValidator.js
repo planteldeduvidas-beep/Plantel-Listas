@@ -36,7 +36,7 @@ function validarConsulta(query) {
   if (pagina > 100000 || limite > 60 || busca.length > 120) {
     throw new AppError("Consulta invalida", 400, "PARAMETRO_INVALIDO");
   }
-  if (tipo && !["pdf", "video", "outro"].includes(tipo)) {
+  if (tipo && !["pdf", "video"].includes(tipo)) {
     throw new AppError("Tipo de arquivo invalido", 400, "PARAMETRO_INVALIDO");
   }
   if (!ORDENACOES[ordenar]) {

@@ -21,6 +21,182 @@ function dataOuNula(valor) {
 }
 
 function criarGoogleDriveChangesRepository(pool) {
+  async function buscarCategoriaDrive(conexao, drivePastaId) {
+    const [registros] = await conexao.execute(
+      "SELECT id,drive_pasta_id FROM categorias WHERE drive_pasta_id=? LIMIT 1",
+      [drivePastaId]
+    );
+    return registros[0] || null;
+  }
+
+  async function buscarCategoriaPorNomeNoPai(conexao, nome, categoriaPaiId) {
+    const [registros] = await conexao.execute(
+      "SELECT id,drive_pasta_id FROM categorias "
+      + "WHERE categoria_pai_chave=IFNULL(?,0) AND nome=? LIMIT 1",
+      [categoriaPaiId, nome]
+    );
+    return registros[0] || null;
+  }
+
+  async function salvarCategoriaDaSubarvore(conexao, pasta, categoriaPaiId, ordem, sincronizacaoId) {
+    let categoria = await buscarCategoriaDrive(conexao, pasta.id);
+    if (!categoria) {
+      categoria = await buscarCategoriaPorNomeNoPai(conexao, pasta.name, categoriaPaiId);
+      if (categoria && categoria.drive_pasta_id && categoria.drive_pasta_id !== pasta.id) {
+        return null;
+      }
+    }
+    if (categoria) {
+      await conexao.execute(
+        "UPDATE categorias SET nome=?,categoria_pai_id=?,drive_pasta_id=?,ordem=?,ativo=1,"
+        + "ultima_sincronizacao_drive_id=? WHERE id=?",
+        [pasta.name, categoriaPaiId, pasta.id, ordem, sincronizacaoId, categoria.id]
+      );
+      return Number(categoria.id);
+    }
+    const [resultado] = await conexao.execute(
+      "INSERT INTO categorias (nome,descricao,categoria_pai_id,drive_pasta_id,ordem,ativo,"
+      + "ultima_sincronizacao_drive_id) VALUES (?,NULL,?,?,?,1,?)",
+      [pasta.name, categoriaPaiId, pasta.id, ordem, sincronizacaoId]
+    );
+    return Number(resultado.insertId);
+  }
+
+  async function salvarMaterial(conexao, item, categoriaId, sincronizacaoId) {
+    await conexao.execute(
+      "INSERT INTO materiais (drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,"
+      + "extensao,tamanho_bytes,checksum_md5,drive_criado_em,drive_modificado_em,resource_key,"
+      + "disponivel,ultima_sincronizacao_drive_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?) AS novo "
+      + "ON DUPLICATE KEY UPDATE drive_parent_file_id=novo.drive_parent_file_id,categoria_id=novo.categoria_id,"
+      + "nome=novo.nome,mime_type=novo.mime_type,tipo=novo.tipo,extensao=novo.extensao,"
+      + "tamanho_bytes=novo.tamanho_bytes,checksum_md5=novo.checksum_md5,drive_criado_em=novo.drive_criado_em,"
+      + "drive_modificado_em=novo.drive_modificado_em,resource_key=novo.resource_key,disponivel=1,"
+      + "ultima_sincronizacao_drive_id=novo.ultima_sincronizacao_drive_id",
+      [
+        item.id, item.parentId, categoriaId, item.name, item.mimeType,
+        identificarTipo(item.mimeType), obterExtensao(item.name),
+        typeof item.size === "string" && /^\d+$/.test(item.size) ? item.size : null,
+        item.md5Checksum || null, dataOuNula(item.createdTime), dataOuNula(item.modifiedTime),
+        item.resourceKey || null, sincronizacaoId
+      ]
+    );
+  }
+
+  async function listarIdsDaSubarvore(conexao, categoriaId) {
+    const [registros] = await conexao.execute(
+      "WITH RECURSIVE subarvore AS (SELECT id FROM categorias WHERE id=? "
+      + "UNION ALL SELECT c.id FROM categorias c INNER JOIN subarvore p ON c.categoria_pai_id=p.id) "
+      + "SELECT id FROM subarvore",
+      [categoriaId]
+    );
+    return registros.map(function obterId(item) { return Number(item.id); });
+  }
+
+  async function indisponibilizarIds(conexao, ids, sincronizacaoId, desativarPastas) {
+    if (!ids.length) {
+      return 0;
+    }
+    const marcadores = ids.map(function marcador() { return "?"; }).join(",");
+    const [materiais] = await conexao.execute(
+      "UPDATE materiais SET disponivel=0,ultima_sincronizacao_drive_id=? "
+      + "WHERE categoria_id IN (" + marcadores + ") AND disponivel=1",
+      [sincronizacaoId].concat(ids)
+    );
+    if (desativarPastas) {
+      await conexao.execute(
+        "UPDATE categorias SET ativo=0,ultima_sincronizacao_drive_id=? "
+        + "WHERE id IN (" + marcadores + ") AND drive_pasta_id IS NOT NULL",
+        [sincronizacaoId].concat(ids)
+      );
+    }
+    return Number(materiais.affectedRows);
+  }
+
+  async function removerSubarvore(conexao, drivePastaId, sincronizacaoId) {
+    const categoria = await buscarCategoriaDrive(conexao, drivePastaId);
+    if (!categoria) {
+      return 0;
+    }
+    return indisponibilizarIds(
+      conexao,
+      await listarIdsDaSubarvore(conexao, Number(categoria.id)),
+      sincronizacaoId,
+      true
+    );
+  }
+
+  async function aplicarSubarvore(conexao, alteracao, sincronizacaoId) {
+    const subarvore = alteracao.subarvore;
+    const pastaRaiz = subarvore.pastas[0];
+    let categoriaPaiId = null;
+    if (pastaRaiz.parentId !== alteracao.pastaRaizId) {
+      const categoriaPai = await buscarCategoriaDrive(conexao, pastaRaiz.parentId);
+      if (!categoriaPai) {
+        return { segura: false, atualizados: 0, indisponiveis: 0 };
+      }
+      categoriaPaiId = Number(categoriaPai.id);
+    }
+
+    const categoriasPorDrive = new Map();
+    if (categoriaPaiId) {
+      categoriasPorDrive.set(pastaRaiz.parentId, categoriaPaiId);
+    }
+    let atualizados = 0;
+    for (let indice = 0; indice < subarvore.pastas.length; indice += 1) {
+      const pasta = subarvore.pastas[indice];
+      const paiId = pasta.parentId === alteracao.pastaRaizId
+        ? null
+        : categoriasPorDrive.get(pasta.parentId);
+      if (pasta.parentId !== alteracao.pastaRaizId && !paiId) {
+        return { segura: false, atualizados: atualizados, indisponiveis: 0 };
+      }
+      const categoriaId = await salvarCategoriaDaSubarvore(
+        conexao,
+        pasta,
+        paiId,
+        indice,
+        sincronizacaoId
+      );
+      if (!categoriaId) {
+        return { segura: false, atualizados: atualizados, indisponiveis: 0 };
+      }
+      categoriasPorDrive.set(pasta.id, categoriaId);
+    }
+
+    for (const arquivo of subarvore.arquivos) {
+      const categoriaId = categoriasPorDrive.get(arquivo.parentId);
+      if (!categoriaId) {
+        return { segura: false, atualizados: atualizados, indisponiveis: 0 };
+      }
+      await salvarMaterial(conexao, arquivo, categoriaId, sincronizacaoId);
+      atualizados += 1;
+    }
+
+    const categoriaRaizId = categoriasPorDrive.get(pastaRaiz.id);
+    const ids = await listarIdsDaSubarvore(conexao, categoriaRaizId);
+    if (ids.length) {
+      const marcadores = ids.map(function marcador() { return "?"; }).join(",");
+      const [materiaisAusentes] = await conexao.execute(
+        "UPDATE materiais SET disponivel=0,ultima_sincronizacao_drive_id=? "
+        + "WHERE categoria_id IN (" + marcadores + ") "
+        + "AND ultima_sincronizacao_drive_id<>? AND disponivel=1",
+        [sincronizacaoId].concat(ids, [sincronizacaoId])
+      );
+      await conexao.execute(
+        "UPDATE categorias SET ativo=0,ultima_sincronizacao_drive_id=? "
+        + "WHERE id IN (" + marcadores + ") AND drive_pasta_id IS NOT NULL "
+        + "AND ultima_sincronizacao_drive_id<>?",
+        [sincronizacaoId].concat(ids, [sincronizacaoId])
+      );
+      return {
+        segura: true,
+        atualizados: atualizados,
+        indisponiveis: Number(materiaisAusentes.affectedRows)
+      };
+    }
+    return { segura: true, atualizados: atualizados, indisponiveis: 0 };
+  }
+
   async function adquirirTrava() {
     const conexao = await pool.getConnection();
     const [registros] = await conexao.execute(
@@ -80,8 +256,33 @@ function criarGoogleDriveChangesRepository(pool) {
       let reconciliacao = false;
 
       for (const alteracao of alteracoes) {
-        if (alteracao.estrutural) {
+        if (alteracao.fallback) {
           reconciliacao = true;
+          continue;
+        }
+        if (alteracao.removerSubarvore) {
+          indisponiveis += await removerSubarvore(
+            conexao,
+            alteracao.fileId,
+            sincronizacaoId
+          );
+          continue;
+        }
+        if (alteracao.subarvore) {
+          await conexao.query("SAVEPOINT reconciliacao_subarvore");
+          const resultadoSubarvore = await aplicarSubarvore(
+            conexao,
+            alteracao,
+            sincronizacaoId
+          );
+          if (resultadoSubarvore.segura) {
+            await conexao.query("RELEASE SAVEPOINT reconciliacao_subarvore");
+            atualizados += resultadoSubarvore.atualizados;
+            indisponiveis += resultadoSubarvore.indisponiveis;
+          } else {
+            await conexao.query("ROLLBACK TO SAVEPOINT reconciliacao_subarvore");
+            reconciliacao = true;
+          }
           continue;
         }
         if (!alteracao.disponivel) {
@@ -101,23 +302,11 @@ function criarGoogleDriveChangesRepository(pool) {
           reconciliacao = true;
           continue;
         }
-        const item = alteracao.item;
-        await conexao.execute(
-          "INSERT INTO materiais (drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,"
-          + "extensao,tamanho_bytes,checksum_md5,drive_criado_em,drive_modificado_em,resource_key,"
-          + "disponivel,ultima_sincronizacao_drive_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?) AS novo "
-          + "ON DUPLICATE KEY UPDATE drive_parent_file_id=novo.drive_parent_file_id,categoria_id=novo.categoria_id,"
-          + "nome=novo.nome,mime_type=novo.mime_type,tipo=novo.tipo,extensao=novo.extensao,"
-          + "tamanho_bytes=novo.tamanho_bytes,checksum_md5=novo.checksum_md5,drive_criado_em=novo.drive_criado_em,"
-          + "drive_modificado_em=novo.drive_modificado_em,resource_key=novo.resource_key,disponivel=1,"
-          + "ultima_sincronizacao_drive_id=novo.ultima_sincronizacao_drive_id",
-          [
-            item.id, item.parentId, Number(categorias[0].id), item.name, item.mimeType,
-            identificarTipo(item.mimeType), obterExtensao(item.name),
-            typeof item.size === "string" && /^\d+$/.test(item.size) ? item.size : null,
-            item.md5Checksum || null, dataOuNula(item.createdTime), dataOuNula(item.modifiedTime),
-            item.resourceKey || null, sincronizacaoId
-          ]
+        await salvarMaterial(
+          conexao,
+          alteracao.item,
+          Number(categorias[0].id),
+          sincronizacaoId
         );
         atualizados += 1;
       }
@@ -141,16 +330,35 @@ function criarGoogleDriveChangesRepository(pool) {
     }
   }
 
-  async function salvarCanal(canal, tokenHash) {
+  async function prepararCanal(canal, tokenHash) {
+    await pool.execute(
+      "UPDATE canais_google_drive SET status='expirado' "
+      + "WHERE status='preparando' AND expira_em<=CURRENT_TIMESTAMP(3)"
+    );
+    await pool.execute(
+      "INSERT INTO canais_google_drive (channel_id,resource_id,token_hash,expira_em,status,criado_em) "
+      + "VALUES (?,NULL,?,?, 'preparando',CURRENT_TIMESTAMP(3))",
+      [canal.id, tokenHash, new Date(Number(canal.expiration))]
+    );
+  }
+
+  async function ativarCanal(canal) {
     const conexao = await pool.getConnection();
     try {
       await conexao.beginTransaction();
-      await conexao.execute("UPDATE canais_google_drive SET status='substituido' WHERE status='ativo'");
       await conexao.execute(
-        "INSERT INTO canais_google_drive (channel_id,resource_id,token_hash,expira_em,status,criado_em) "
-        + "VALUES (?,?,?,?, 'ativo',CURRENT_TIMESTAMP(3))",
-        [canal.id, canal.resourceId, tokenHash, new Date(Number(canal.expiration))]
+        "UPDATE canais_google_drive SET status='substituido' "
+        + "WHERE status='ativo' AND channel_id<>?",
+        [canal.id]
       );
+      const [resultado] = await conexao.execute(
+        "UPDATE canais_google_drive SET resource_id=?,expira_em=?,status='ativo' "
+        + "WHERE channel_id=? AND status='preparando'",
+        [canal.resourceId, new Date(Number(canal.expiration)), canal.id]
+      );
+      if (resultado.affectedRows !== 1) {
+        throw new AppError("Canal Google nao pode ser ativado", 409, "GOOGLE_CANAL_INVALIDO");
+      }
       await conexao.commit();
     } catch (erro) {
       await conexao.rollback();
@@ -158,6 +366,14 @@ function criarGoogleDriveChangesRepository(pool) {
     } finally {
       conexao.release();
     }
+  }
+
+  async function falharPreparacaoCanal(channelId) {
+    await pool.execute(
+      "UPDATE canais_google_drive SET status='encerrado' "
+      + "WHERE channel_id=? AND status='preparando'",
+      [channelId]
+    );
   }
 
   async function buscarCanalAtivo() {
@@ -170,9 +386,16 @@ function criarGoogleDriveChangesRepository(pool) {
 
   async function registrarNotificacao(cabecalhos, tokenHash) {
     const [canais] = await pool.execute(
-      "SELECT channel_id FROM canais_google_drive WHERE channel_id=? AND resource_id=? "
-      + "AND token_hash=? AND status='ativo' AND expira_em>CURRENT_TIMESTAMP(3) LIMIT 1",
-      [cabecalhos.channelId, cabecalhos.resourceId, tokenHash]
+      "SELECT channel_id FROM canais_google_drive WHERE channel_id=? AND token_hash=? "
+      + "AND expira_em>CURRENT_TIMESTAMP(3) AND ("
+      + "(status='ativo' AND resource_id=?) OR "
+      + "(status='preparando' AND resource_id IS NULL AND ?='sync')) LIMIT 1",
+      [
+        cabecalhos.channelId,
+        tokenHash,
+        cabecalhos.resourceId,
+        cabecalhos.resourceState
+      ]
     );
     if (!canais[0]) {
       throw new AppError("Notificacao Google invalida", 403, "GOOGLE_WEBHOOK_INVALIDO");
@@ -222,7 +445,9 @@ function criarGoogleDriveChangesRepository(pool) {
     salvarEstadoInicial: salvarEstadoInicial,
     registrarErro: registrarErro,
     aplicarAlteracoes: aplicarAlteracoes,
-    salvarCanal: salvarCanal,
+    prepararCanal: prepararCanal,
+    ativarCanal: ativarCanal,
+    falharPreparacaoCanal: falharPreparacaoCanal,
     buscarCanalAtivo: buscarCanalAtivo,
     registrarNotificacao: registrarNotificacao,
     marcarNotificacoesProcessadas: marcarNotificacoesProcessadas,

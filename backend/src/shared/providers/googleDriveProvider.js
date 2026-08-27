@@ -227,6 +227,17 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
 
   async function obterConteudoArquivo(refreshToken, arquivoId, intervalo) {
     const tokenDeAcesso = await obterTokenDeAcesso(refreshToken);
+    const metadados = await requisitarDrive("/" + encodeURIComponent(arquivoId), {
+      supportsAllDrives: true,
+      fields: "id,trashed,capabilities(canDownload)"
+    }, tokenDeAcesso);
+    if (metadados.trashed || !metadados.capabilities || metadados.capabilities.canDownload !== true) {
+      throw new AppError(
+        "Este arquivo nao esta liberado para download",
+        403,
+        "MATERIAL_DOWNLOAD_NAO_PERMITIDO"
+      );
+    }
     const url = new URL(URL_API_DRIVE + "/" + encodeURIComponent(arquivoId));
     url.searchParams.set("alt", "media");
     url.searchParams.set("supportsAllDrives", "true");
@@ -251,10 +262,18 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     }
 
     if (![200, 206, 416].includes(resposta.status)) {
-      const codigo = resposta.status === 401 || resposta.status === 403
+      const codigo = resposta.status === 401
         ? "GOOGLE_AUTORIZACAO_INVALIDA"
-        : "GOOGLE_DRIVE_INDISPONIVEL";
-      throw new AppError("Nao foi possivel obter o arquivo", 503, codigo);
+        : resposta.status === 403
+          ? "MATERIAL_DOWNLOAD_NAO_PERMITIDO"
+          : "GOOGLE_DRIVE_INDISPONIVEL";
+      throw new AppError(
+        codigo === "MATERIAL_DOWNLOAD_NAO_PERMITIDO"
+          ? "Este arquivo nao esta liberado para download"
+          : "Nao foi possivel obter o arquivo",
+        codigo === "MATERIAL_DOWNLOAD_NAO_PERMITIDO" ? 403 : 503,
+        codigo
+      );
     }
     return resposta;
   }
@@ -429,12 +448,53 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     };
   }
 
+  async function listarSubarvore(refreshToken, pasta) {
+    const tokenDeAcesso = await obterTokenDeAcesso(refreshToken);
+    if (!pasta || pasta.mimeType !== MIME_PASTA || pasta.trashed) {
+      throw new AppError(
+        "Pasta do Google Drive invalida",
+        409,
+        "GOOGLE_SUBARVORE_INVALIDA"
+      );
+    }
+
+    const pastas = [Object.assign({}, pasta, {
+      parentId: pasta.parents && pasta.parents[0] ? pasta.parents[0] : null,
+      nivel: 0
+    })];
+    const arquivos = [];
+    const fila = [{ id: pasta.id, nivel: 0 }];
+
+    for (let indice = 0; indice < fila.length; indice += 1) {
+      const pastaAtual = fila[indice];
+      const filhos = await listarFilhos(pastaAtual.id, tokenDeAcesso);
+      filhos.forEach(function classificar(item) {
+        if (item.mimeType === MIME_ATALHO) {
+          return;
+        }
+        const registro = Object.assign({}, item, {
+          parentId: pastaAtual.id,
+          nivel: pastaAtual.nivel + 1
+        });
+        if (item.mimeType === MIME_PASTA) {
+          pastas.push(registro);
+          fila.push({ id: item.id, nivel: registro.nivel });
+        } else {
+          arquivos.push(registro);
+        }
+      });
+    }
+
+    return { pastas: pastas, arquivos: arquivos };
+  }
+
   return {
     escopo: ESCOPO_LEITURA,
     pastaRaizId: configuracao.pastaRaizId,
     gerarUrlAutorizacao: gerarUrlAutorizacao,
     trocarCodigoPorRefreshToken: trocarCodigoPorRefreshToken,
     listarArvore: listarArvore,
+    listarSubarvore: listarSubarvore,
     obterConteudoArquivo: obterConteudoArquivo,
     obterTokenDeAcesso: obterTokenDeAcesso,
     obterInicioDasAlteracoes: obterInicioDasAlteracoes,

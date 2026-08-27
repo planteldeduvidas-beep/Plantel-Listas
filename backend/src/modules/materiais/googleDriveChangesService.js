@@ -32,14 +32,29 @@ function criarGoogleDriveChangesService(dependencias) {
   async function prepararAlteracao(refreshToken, alteracao) {
     const item = alteracao.file;
     if (alteracao.removed || !item || item.trashed) {
+      const pastaConhecida = item
+        ? item.mimeType === MIME_PASTA
+        : await repository.ehPastaConhecida(alteracao.fileId);
       return {
         fileId: alteracao.fileId,
         disponivel: false,
-        estrutural: item ? item.mimeType === MIME_PASTA : await repository.ehPastaConhecida(alteracao.fileId)
+        removerSubarvore: pastaConhecida
       };
     }
     if (item.mimeType === MIME_PASTA) {
-      return { fileId: item.id, disponivel: true, estrutural: true };
+      if (item.id === provider.pastaRaizId) {
+        return { fileId: item.id, fallback: true };
+      }
+      const dentroDaRaiz = await provider.verificarDescendenteDaRaiz(refreshToken, item);
+      if (!dentroDaRaiz) {
+        return { fileId: item.id, disponivel: false, removerSubarvore: true };
+      }
+      return {
+        fileId: item.id,
+        disponivel: true,
+        pastaRaizId: provider.pastaRaizId,
+        subarvore: await provider.listarSubarvore(refreshToken, item)
+      };
     }
     const dentroDaRaiz = await provider.verificarDescendenteDaRaiz(refreshToken, item);
     return {
@@ -157,12 +172,19 @@ function criarGoogleDriveChangesService(dependencias) {
       token: token,
       expiration: agora + (6 * 24 * 60 * 60 * 1000)
     };
-    const resposta = await provider.observarAlteracoes(refreshToken, estado.page_token, canal);
-    await repository.salvarCanal({
-      id: canal.id,
-      resourceId: resposta.resourceId,
-      expiration: resposta.expiration || canal.expiration
-    }, gerarHashDoToken(token));
+    await repository.prepararCanal(canal, gerarHashDoToken(token));
+    let resposta;
+    try {
+      resposta = await provider.observarAlteracoes(refreshToken, estado.page_token, canal);
+      await repository.ativarCanal({
+        id: canal.id,
+        resourceId: resposta.resourceId,
+        expiration: resposta.expiration || canal.expiration
+      });
+    } catch (erro) {
+      await repository.falharPreparacaoCanal(canal.id);
+      throw erro;
+    }
     if (anterior) {
       provider.encerrarCanal(refreshToken, anterior.channel_id, anterior.resource_id)
         .catch(function ignorarFalhaDeEncerramento() {});

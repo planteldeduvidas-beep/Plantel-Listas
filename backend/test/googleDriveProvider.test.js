@@ -179,3 +179,110 @@ test("lista recursivamente apenas descendentes da raiz e respeita paginacao", as
     }
   });
 });
+
+test("verifica canDownload antes de transmitir e preserva Range", async function testarDownloadPermitido() {
+  const chamadas = [];
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientFake,
+    fetch: async function buscar(urlInformada, opcoes) {
+      const url = new URL(urlInformada);
+      chamadas.push({ url: url, range: opcoes.headers.Range || null });
+      if (url.searchParams.get("alt") === "media") {
+        return new Response(Buffer.from("0123"), {
+          status: 206,
+          headers: { "content-range": "bytes 0-3/10" }
+        });
+      }
+      return criarResposta({
+        id: "arquivoSeguro12345",
+        trashed: false,
+        capabilities: { canDownload: true }
+      });
+    }
+  });
+  const resposta = await provider.obterConteudoArquivo(
+    "refresh-token-de-teste",
+    "arquivoSeguro12345",
+    "bytes=0-3"
+  );
+  assert.equal(resposta.status, 206);
+  assert.equal(chamadas.length, 2);
+  assert.equal(chamadas[0].url.searchParams.get("fields"), "id,trashed,capabilities(canDownload)");
+  assert.equal(chamadas[1].range, "bytes=0-3");
+});
+
+test("recusa arquivo sem capacidade de download com erro funcional", async function testarDownloadNegado() {
+  let chamadas = 0;
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientFake,
+    fetch: async function buscar() {
+      chamadas += 1;
+      return criarResposta({
+        id: "arquivoBloqueado12345",
+        trashed: false,
+        capabilities: { canDownload: false }
+      });
+    }
+  });
+  await assert.rejects(
+    provider.obterConteudoArquivo(
+      "refresh-token-de-teste",
+      "arquivoBloqueado12345",
+      null
+    ),
+    function validar(erro) {
+      assert.equal(erro.statusCode, 403);
+      assert.equal(erro.codigo, "MATERIAL_DOWNLOAD_NAO_PERMITIDO");
+      assert.match(erro.message, /nao esta liberado/);
+      return true;
+    }
+  );
+  assert.equal(chamadas, 1);
+});
+
+test("lista somente a subarvore afetada e nao segue atalhos", async function testarSubarvore() {
+  const consultas = [];
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientFake,
+    fetch: async function buscar(urlInformada) {
+      const url = new URL(urlInformada);
+      const query = url.searchParams.get("q") || "";
+      consultas.push(query);
+      if (query.includes("pastaAfetada12345")) {
+        return criarResposta({ files: [{
+          id: "pastaFilha12345",
+          name: "Filha",
+          mimeType: "application/vnd.google-apps.folder"
+        }, {
+          id: "atalhoExterno12345",
+          name: "Atalho",
+          mimeType: "application/vnd.google-apps.shortcut"
+        }] });
+      }
+      if (query.includes("pastaFilha12345")) {
+        return criarResposta({ files: [{
+          id: "arquivoFilho12345",
+          name: "lista.pdf",
+          mimeType: "application/pdf"
+        }] });
+      }
+      throw new Error("Consulta inesperada");
+    }
+  });
+  const resultado = await provider.listarSubarvore("refresh-token-de-teste", {
+    id: "pastaAfetada12345",
+    name: "Afetada",
+    mimeType: "application/vnd.google-apps.folder",
+    parents: ["pastaRaizTeste12345"]
+  });
+  assert.deepEqual(resultado.pastas.map(function id(item) { return item.id; }), [
+    "pastaAfetada12345",
+    "pastaFilha12345"
+  ]);
+  assert.deepEqual(resultado.arquivos.map(function id(item) { return item.id; }), [
+    "arquivoFilho12345"
+  ]);
+  assert.equal(consultas.some(function contem(consulta) {
+    return consulta.includes("atalhoExterno12345");
+  }), false);
+});
