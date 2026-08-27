@@ -8,6 +8,7 @@ const { criarPool } = require("../src/shared/database/conexao");
 const { criarEmailProviderFake } = require("../src/shared/providers/emailProvider");
 const { criarHashDaSenha } = require("../src/modules/autenticacao/senha");
 const { ESCOPO_LEITURA } = require("../src/shared/providers/googleDriveProvider");
+const AppError = require("../src/shared/errors/AppError");
 
 const configuracaoBase = obterConfiguracao();
 const nomeBancoTeste = process.env.DB_TEST_NAME || configuracaoBase.banco.nome + "_test";
@@ -35,6 +36,9 @@ let usuarios;
 let arvoreAtual;
 let esperaDaListagem;
 let avisarInicioDaListagem;
+let erroDaListagem;
+let tarefasAgendadas = [];
+let refreshTokenOAuthAtual;
 
 const providerFake = {
   escopo: ESCOPO_LEITURA,
@@ -44,7 +48,7 @@ const providerFake = {
       + encodeURIComponent(ESCOPO_LEITURA) + "&state=" + encodeURIComponent(estado);
   },
   trocarCodigoPorRefreshToken: async function trocarCodigoPorRefreshToken() {
-    return "refresh-token-retornado-pelo-google-fake";
+    return refreshTokenOAuthAtual;
   },
   listarArvore: async function listarArvore() {
     if (avisarInicioDaListagem) {
@@ -54,6 +58,9 @@ const providerFake = {
     if (esperaDaListagem) {
       await esperaDaListagem;
     }
+    if (erroDaListagem) {
+      throw erroDaListagem;
+    }
     return JSON.parse(JSON.stringify(arvoreAtual));
   }
 };
@@ -61,7 +68,10 @@ const providerFake = {
 const aplicacao = criarAplicacao(configuracaoTeste, logger, {
   pool: pool,
   emailProvider: criarEmailProviderFake(),
-  googleDriveProvider: providerFake
+  googleDriveProvider: providerFake,
+  agendarTarefaGoogleDrive: function guardarTarefa(tarefa) {
+    tarefasAgendadas.push(tarefa);
+  }
 });
 
 function criarArvoreInicial() {
@@ -172,12 +182,21 @@ async function autenticar(chave) {
   return { agente: agente, csrf: csrf, usuario: usuario };
 }
 
+async function executarProximaTarefa() {
+  const tarefa = tarefasAgendadas.shift();
+  assert.equal(typeof tarefa, "function");
+  await tarefa();
+}
+
 test.beforeEach(async function prepararTeste() {
   await limparBanco();
   await prepararUsuarios();
   arvoreAtual = criarArvoreInicial();
   esperaDaListagem = null;
   avisarInicioDaListagem = null;
+  erroDaListagem = null;
+  tarefasAgendadas = [];
+  refreshTokenOAuthAtual = "refresh-token-retornado-pelo-google-fake";
 });
 
 test.after(async function encerrarTeste() {
@@ -218,6 +237,19 @@ test("migration cria estrutura segura para OAuth, sincronizacoes e materiais", a
     [nomeBancoTeste]
   );
   assert.equal(colunas.length, 1);
+
+  const [colunasSincronizacao] = await pool.execute(
+    "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS "
+    + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'sincronizacoes_google_drive' "
+    + "AND COLUMN_NAME IN ('status', 'solicitada_em') ORDER BY COLUMN_NAME",
+    [nomeBancoTeste]
+  );
+  assert.equal(colunasSincronizacao.length, 2);
+  const status = colunasSincronizacao.find(function encontrar(coluna) {
+    return coluna.COLUMN_NAME === "status";
+  });
+  assert.equal(status.COLUMN_TYPE.includes("'aguardando'"), true);
+  assert.equal(status.COLUMN_TYPE.includes("'sincronizando'"), true);
 });
 
 test("rotas Google Drive sao exclusivas de admin e mutacoes exigem CSRF", async function testarAutorizacao() {
@@ -293,10 +325,16 @@ test("sincronizacao importa por Drive ID e permanece idempotente", async functio
   const primeira = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
     .set("X-CSRF-Token", admin.csrf)
     .send({});
-  assert.equal(primeira.status, 200);
-  assert.equal(primeira.body.sincronizacao.pastasEncontradas, 2);
-  assert.equal(primeira.body.sincronizacao.arquivosEncontrados, 3);
-  assert.equal(primeira.body.sincronizacao.materiaisCriados, 3);
+  assert.equal(primeira.status, 202);
+  assert.equal(primeira.body.sincronizacao.status, "aguardando");
+  assert.equal(tarefasAgendadas.length, 1);
+  await executarProximaTarefa();
+
+  const statusPrimeira = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(statusPrimeira.body.googleDrive.ultimaSincronizacao.status, "concluida");
+  assert.equal(statusPrimeira.body.googleDrive.ultimaSincronizacao.pastasEncontradas, 2);
+  assert.equal(statusPrimeira.body.googleDrive.ultimaSincronizacao.arquivosEncontrados, 3);
+  assert.equal(statusPrimeira.body.googleDrive.ultimaSincronizacao.materiaisCriados, 3);
 
   const [categorias] = await pool.execute(
     "SELECT id, nome, drive_pasta_id, categoria_pai_id FROM categorias ORDER BY id"
@@ -315,9 +353,11 @@ test("sincronizacao importa por Drive ID e permanece idempotente", async functio
   const segunda = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
     .set("X-CSRF-Token", admin.csrf)
     .send({});
-  assert.equal(segunda.status, 200);
-  assert.equal(segunda.body.sincronizacao.materiaisCriados, 0);
-  assert.equal(segunda.body.sincronizacao.materiaisAtualizados, 3);
+  assert.equal(segunda.status, 202);
+  await executarProximaTarefa();
+  const statusSegunda = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(statusSegunda.body.googleDrive.ultimaSincronizacao.materiaisCriados, 0);
+  assert.equal(statusSegunda.body.googleDrive.ultimaSincronizacao.materiaisAtualizados, 3);
 
   const [quantidades] = await pool.execute(
     "SELECT (SELECT COUNT(*) FROM categorias) AS categorias, "
@@ -331,6 +371,7 @@ test("nova sincronizacao atualiza nomes e marca arquivos ausentes sem apagar reg
   const admin = await autenticar("admin");
   await admin.agente.post("/api/integracoes/google-drive/sincronizar")
     .set("X-CSRF-Token", admin.csrf).send({});
+  await executarProximaTarefa();
 
   arvoreAtual.pastas[0].name = "LISTAS ATUALIZADAS";
   arvoreAtual.arquivos = arvoreAtual.arquivos.filter(function removerPdf(item) {
@@ -346,9 +387,11 @@ test("nova sincronizacao atualiza nomes e marca arquivos ausentes sem apagar reg
 
   const resposta = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
     .set("X-CSRF-Token", admin.csrf).send({});
-  assert.equal(resposta.status, 200);
-  assert.equal(resposta.body.sincronizacao.materiaisCriados, 1);
-  assert.equal(resposta.body.sincronizacao.itensIndisponiveis, 1);
+  assert.equal(resposta.status, 202);
+  await executarProximaTarefa();
+  const status = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(status.body.googleDrive.ultimaSincronizacao.materiaisCriados, 1);
+  assert.equal(status.body.googleDrive.ultimaSincronizacao.itensIndisponiveis, 1);
 
   const [pasta] = await pool.execute(
     "SELECT nome FROM categorias WHERE drive_pasta_id = 'drivePastaListas12345'"
@@ -360,7 +403,7 @@ test("nova sincronizacao atualiza nomes e marca arquivos ausentes sem apagar reg
   assert.equal(arquivoAntigo[0].disponivel, 0);
 });
 
-test("trava impede duas sincronizacoes administrativas simultaneas", async function testarConcorrencia() {
+test("POST desacopla a sincronizacao, expoe status e impede concorrencia", async function testarConcorrencia() {
   const admin = await autenticar("admin");
   let liberarListagem;
   let avisarListagem;
@@ -372,18 +415,122 @@ test("trava impede duas sincronizacoes administrativas simultaneas", async funct
   });
   avisarInicioDaListagem = avisarListagem;
 
-  const primeiraPromessa = admin.agente.post("/api/integracoes/google-drive/sincronizar")
-    .set("X-CSRF-Token", admin.csrf).send({}).then(function concluir(resposta) {
-      return resposta;
-    });
-  await listagemIniciada;
+  const primeira = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
+    .set("X-CSRF-Token", admin.csrf).send({});
+  assert.equal(primeira.status, 202);
+  assert.equal(primeira.body.sincronizacao.status, "aguardando");
 
   const segunda = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
     .set("X-CSRF-Token", admin.csrf).send({});
   assert.equal(segunda.status, 409);
   assert.equal(segunda.body.erro.codigo, "SINCRONIZACAO_EM_ANDAMENTO");
 
+  const tarefa = tarefasAgendadas.shift();
+  const execucao = tarefa();
+  await listagemIniciada;
+  const durante = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(durante.body.googleDrive.ultimaSincronizacao.status, "sincronizando");
+
   liberarListagem();
-  const primeira = await primeiraPromessa;
-  assert.equal(primeira.status, 200);
+  await execucao;
+  const concluida = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(concluida.body.googleDrive.ultimaSincronizacao.status, "concluida");
+});
+
+test("worker persiste falha sem manter a requisicao HTTP aberta", async function testarFalha() {
+  const admin = await autenticar("admin");
+  erroDaListagem = new AppError(
+    "Drive indisponivel no teste",
+    503,
+    "GOOGLE_DRIVE_INDISPONIVEL"
+  );
+
+  const resposta = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
+    .set("X-CSRF-Token", admin.csrf).send({});
+  assert.equal(resposta.status, 202);
+  assert.equal(resposta.body.sincronizacao.status, "aguardando");
+
+  await executarProximaTarefa();
+  const status = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(status.body.googleDrive.ultimaSincronizacao.status, "falhou");
+  assert.equal(
+    status.body.googleDrive.ultimaSincronizacao.erroCodigo,
+    "GOOGLE_DRIVE_INDISPONIVEL"
+  );
+});
+
+test("reinicio encerra execucao interrompida e permite nova solicitacao", async function testarInterrupcao() {
+  const admin = await autenticar("admin");
+  const resposta = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
+    .set("X-CSRF-Token", admin.csrf).send({});
+  assert.equal(resposta.status, 202);
+  await pool.execute(
+    "UPDATE sincronizacoes_google_drive SET status = 'sincronizando', "
+    + "iniciada_em = CURRENT_TIMESTAMP(3) WHERE id = ?",
+    [resposta.body.sincronizacao.id]
+  );
+
+  const encerradas = await aplicacao.locals.integracaoGoogleDriveService
+    .recuperarSincronizacoesInterrompidas();
+  assert.equal(encerradas, 1);
+  tarefasAgendadas = [];
+
+  const status = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(status.body.googleDrive.ultimaSincronizacao.status, "falhou");
+  assert.equal(
+    status.body.googleDrive.ultimaSincronizacao.erroCodigo,
+    "SINCRONIZACAO_INTERROMPIDA"
+  );
+
+  const nova = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
+    .set("X-CSRF-Token", admin.csrf).send({});
+  assert.equal(nova.status, 202);
+});
+
+test("token Google invalido exige renovacao e OAuth substitui a credencial", async function testarRenovacao() {
+  const admin = await autenticar("admin");
+  erroDaListagem = new AppError(
+    "Token revogado no teste",
+    503,
+    "GOOGLE_AUTORIZACAO_INVALIDA"
+  );
+
+  const resposta = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
+    .set("X-CSRF-Token", admin.csrf).send({});
+  assert.equal(resposta.status, 202);
+  await executarProximaTarefa();
+
+  const invalido = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(invalido.body.googleDrive.conectado, false);
+  assert.equal(invalido.body.googleDrive.renovacaoNecessaria, true);
+  assert.equal(JSON.stringify(invalido.body).includes("refresh-token"), false);
+
+  const [credencialAnterior] = await pool.execute(
+    "SELECT refresh_token_criptografado FROM credenciais_google_drive WHERE id = 1"
+  );
+  refreshTokenOAuthAtual = "refresh-token-renovado-pelo-google-fake";
+  const inicio = await admin.agente.post("/api/integracoes/google-drive/oauth/iniciar")
+    .set("X-CSRF-Token", admin.csrf).send({});
+  const estado = new URL(inicio.body.urlAutorizacao).searchParams.get("state");
+  const callback = await admin.agente.get(
+    "/api/integracoes/google-drive/oauth/callback?code=codigo-renovacao-teste&state="
+    + encodeURIComponent(estado)
+  );
+  assert.equal(callback.status, 303);
+  assert.equal(JSON.stringify(callback.body).includes("refresh-token"), false);
+
+  const [credencialNova] = await pool.execute(
+    "SELECT refresh_token_criptografado, renovacao_necessaria, erro_codigo "
+    + "FROM credenciais_google_drive WHERE id = 1"
+  );
+  assert.notEqual(
+    credencialNova[0].refresh_token_criptografado,
+    credencialAnterior[0].refresh_token_criptografado
+  );
+  assert.equal(credencialNova[0].renovacao_necessaria, 0);
+  assert.equal(credencialNova[0].erro_codigo, null);
+
+  const renovado = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(renovado.body.googleDrive.conectado, true);
+  assert.equal(renovado.body.googleDrive.renovacaoNecessaria, false);
 });

@@ -20,6 +20,8 @@ async function iniciarServidor() {
       pool: pool,
       emailProvider: emailProvider
     });
+    await aplicacao.locals.integracaoGoogleDriveService
+      .recuperarSincronizacoesInterrompidas();
     const servidor = http.createServer(aplicacao);
 
     servidor.listen(configuracao.porta, function informarInicio() {

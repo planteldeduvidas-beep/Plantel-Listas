@@ -20,7 +20,11 @@ function obterTipoDeUsuario(papel) {
 }
 
 function obterTextoDaSincronizacao(sincronizacao) {
-  if (sincronizacao.status === "em_andamento") {
+  if (sincronizacao.status === "aguardando") {
+    return "aguardando início";
+  }
+
+  if (sincronizacao.status === "sincronizando") {
     return "em andamento";
   }
 
@@ -218,6 +222,47 @@ function PainelAcervo({ usuario, aoSair }) {
     carregar();
   }, [usuario.id]);
 
+  useEffect(function acompanharSincronizacao() {
+    const ultimaSincronizacao = googleDrive && googleDrive.ultimaSincronizacao;
+    const deveAcompanhar = usuario.papel === "admin"
+      && ultimaSincronizacao
+      && ["aguardando", "sincronizando"].includes(ultimaSincronizacao.status);
+
+    if (!deveAcompanhar) {
+      return undefined;
+    }
+
+    const intervalo = window.setInterval(function consultarStatus() {
+      obterStatusGoogleDrive().then(function atualizar(resultado) {
+        const novoStatus = resultado.googleDrive.ultimaSincronizacao;
+        definirGoogleDrive(resultado.googleDrive);
+        if (novoStatus && novoStatus.status === "concluida") {
+          carregar("Acervo sincronizado com o Google Drive.");
+        } else if (novoStatus && novoStatus.status === "falhou") {
+          if (resultado.googleDrive.renovacaoNecessaria) {
+            definirErro("A conexão com o Google Drive precisa ser renovada.");
+          } else {
+            definirErro("Não foi possível concluir a sincronização do acervo.");
+          }
+        }
+      }).catch(function tratarFalha(falha) {
+        mostrarErro(falha.message);
+      });
+    }, 3000);
+
+    return function pararAcompanhamento() {
+      window.clearInterval(intervalo);
+    };
+  }, [
+    usuario.papel,
+    googleDrive && googleDrive.ultimaSincronizacao
+      ? googleDrive.ultimaSincronizacao.id
+      : null,
+    googleDrive && googleDrive.ultimaSincronizacao
+      ? googleDrive.ultimaSincronizacao.status
+      : null
+  ]);
+
   function limparCategoria() {
     definirCategoriaEmEdicao(null);
     definirNomeCategoria("");
@@ -332,8 +377,11 @@ function PainelAcervo({ usuario, aoSair }) {
     definirProcessandoGoogleDrive(true);
     definirErro("");
     try {
-      await sincronizarGoogleDrive();
-      await carregar("Acervo sincronizado com o Google Drive.");
+      const resultado = await sincronizarGoogleDrive();
+      definirGoogleDrive(Object.assign({}, googleDrive, {
+        ultimaSincronizacao: resultado.sincronizacao
+      }));
+      definirMensagem("Sincronização iniciada. Você pode continuar usando o sistema.");
     } catch (falha) {
       mostrarErro(falha.message);
     } finally {
@@ -350,7 +398,9 @@ function PainelAcervo({ usuario, aoSair }) {
   const sincronizacaoEmAndamento = Boolean(
     googleDrive
     && googleDrive.ultimaSincronizacao
-    && googleDrive.ultimaSincronizacao.status === "em_andamento"
+    && ["aguardando", "sincronizando"].includes(
+      googleDrive.ultimaSincronizacao.status
+    )
   );
 
   if (carregando) {
@@ -400,13 +450,18 @@ function PainelAcervo({ usuario, aoSair }) {
                 </button>
               ) : (
                 <button type="button" onClick={conectarGoogleDrive} disabled={processandoGoogleDrive || !googleDrive || !googleDrive.configurado}>
-                  {processandoGoogleDrive ? "Conectando..." : "Conectar Google Drive"}
+                  {processandoGoogleDrive
+                    ? "Conectando..."
+                    : googleDrive && googleDrive.renovacaoNecessaria
+                      ? "Reconectar Google Drive"
+                      : "Conectar Google Drive"}
                 </button>
               )}
             </div>
             {googleDrive && googleDrive.conectado && <p className="estado-integracao conectado">Google Drive conectado.</p>}
+            {googleDrive && googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente">A conexão com o Google Drive precisa ser renovada. Reconecte a conta do acervo.</p>}
             {googleDrive && !googleDrive.configurado && <p className="estado-integracao pendente">A conexão ainda precisa ser configurada pelo responsável técnico.</p>}
-            {googleDrive && googleDrive.configurado && !googleDrive.conectado && <p className="estado-integracao pendente">Conecte a conta do acervo antes da primeira sincronização.</p>}
+            {googleDrive && googleDrive.configurado && !googleDrive.conectado && !googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente">Conecte a conta do acervo antes da primeira sincronização.</p>}
             {googleDrive && googleDrive.ultimaSincronizacao && (
               <p className="resumo-sincronizacao">
                 Última sincronização: {obterTextoDaSincronizacao(googleDrive.ultimaSincronizacao)}. {googleDrive.ultimaSincronizacao.arquivosEncontrados} arquivos encontrados.

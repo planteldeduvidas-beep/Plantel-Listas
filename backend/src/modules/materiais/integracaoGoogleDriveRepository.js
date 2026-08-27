@@ -14,6 +14,7 @@ function mapearSincronizacao(registro) {
     materiaisAtualizados: Number(registro.materiais_atualizados),
     itensIndisponiveis: Number(registro.itens_indisponiveis),
     erroCodigo: registro.erro_codigo,
+    solicitadaEm: registro.solicitada_em,
     iniciadaEm: registro.iniciada_em,
     concluidaEm: registro.concluida_em
   };
@@ -41,21 +42,35 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     return resultado.affectedRows === 1;
   }
 
-  async function salvarCredencial(refreshTokenCriptografado, escopo, usuarioId) {
-    await pool.execute(
+  async function salvarCredencial(refreshTokenCriptografado, escopo, usuarioId, executorInformado) {
+    const executor = executorInformado || pool;
+    await executor.execute(
       "INSERT INTO credenciais_google_drive "
-      + "(id, refresh_token_criptografado, escopo, autorizado_por_usuario_id, autorizado_em) "
-      + "VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP(3)) AS nova "
+      + "(id, refresh_token_criptografado, escopo, renovacao_necessaria, erro_codigo, "
+      + "invalidada_em, autorizado_por_usuario_id, autorizado_em) "
+      + "VALUES (1, ?, ?, 0, NULL, NULL, ?, CURRENT_TIMESTAMP(3)) AS nova "
       + "ON DUPLICATE KEY UPDATE refresh_token_criptografado = nova.refresh_token_criptografado, "
-      + "escopo = nova.escopo, autorizado_por_usuario_id = nova.autorizado_por_usuario_id, "
+      + "escopo = nova.escopo, renovacao_necessaria = 0, erro_codigo = NULL, "
+      + "invalidada_em = NULL, autorizado_por_usuario_id = nova.autorizado_por_usuario_id, "
       + "autorizado_em = nova.autorizado_em",
       [refreshTokenCriptografado, escopo, usuarioId]
     );
   }
 
-  async function buscarCredencial() {
-    const [registros] = await pool.execute(
-      "SELECT refresh_token_criptografado, escopo, autorizado_em "
+  async function marcarCredencialParaRenovacao(codigo, executorInformado) {
+    const executor = executorInformado || pool;
+    await executor.execute(
+      "UPDATE credenciais_google_drive SET renovacao_necessaria = 1, erro_codigo = ?, "
+      + "invalidada_em = CURRENT_TIMESTAMP(3) WHERE id = 1",
+      [String(codigo || "GOOGLE_AUTORIZACAO_INVALIDA").slice(0, 100)]
+    );
+  }
+
+  async function buscarCredencial(executorInformado) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
+      "SELECT refresh_token_criptografado, escopo, renovacao_necessaria, erro_codigo, "
+      + "invalidada_em, autorizado_em "
       + "FROM credenciais_google_drive WHERE id = 1 LIMIT 1"
     );
     return registros[0] || null;
@@ -64,7 +79,8 @@ function criarIntegracaoGoogleDriveRepository(pool) {
   async function buscarUltimaSincronizacao() {
     const [registros] = await pool.execute(
       "SELECT id, status, pastas_encontradas, arquivos_encontrados, materiais_criados, "
-      + "materiais_atualizados, itens_indisponiveis, erro_codigo, iniciada_em, concluida_em "
+      + "materiais_atualizados, itens_indisponiveis, erro_codigo, solicitada_em, "
+      + "iniciada_em, concluida_em "
       + "FROM sincronizacoes_google_drive ORDER BY id DESC LIMIT 1"
     );
     return mapearSincronizacao(registros[0]);
@@ -95,14 +111,54 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     }
   }
 
-  async function iniciarSincronizacao(conexao, usuarioId) {
+  async function criarSincronizacaoAguardando(usuarioId) {
+    const conexao = await pool.getConnection();
+    let travaAdquirida = false;
+    try {
+      const [trava] = await conexao.execute(
+        "SELECT GET_LOCK('plantel_listas_google_drive_agendamento', 5) AS adquirida"
+      );
+      travaAdquirida = Number(trava[0].adquirida) === 1;
+      if (!travaAdquirida) {
+        return null;
+      }
+
+      const [ativas] = await conexao.execute(
+        "SELECT id FROM sincronizacoes_google_drive "
+        + "WHERE status IN ('aguardando', 'sincronizando') ORDER BY id DESC LIMIT 1"
+      );
+      if (ativas.length > 0) {
+        return null;
+      }
+
+      const [resultado] = await conexao.execute(
+        "INSERT INTO sincronizacoes_google_drive "
+        + "(iniciado_por_usuario_id, status, solicitada_em) "
+        + "VALUES (?, 'aguardando', CURRENT_TIMESTAMP(3))",
+        [usuarioId]
+      );
+      return Number(resultado.insertId);
+    } finally {
+      try {
+        if (travaAdquirida) {
+          await conexao.execute(
+            "SELECT RELEASE_LOCK('plantel_listas_google_drive_agendamento')"
+          );
+        }
+      } finally {
+        conexao.release();
+      }
+    }
+  }
+
+  async function marcarSincronizando(conexao, sincronizacaoId) {
     const [resultado] = await conexao.execute(
-      "INSERT INTO sincronizacoes_google_drive "
-      + "(iniciado_por_usuario_id, status, iniciada_em) "
-      + "VALUES (?, 'em_andamento', CURRENT_TIMESTAMP(3))",
-      [usuarioId]
+      "UPDATE sincronizacoes_google_drive SET status = 'sincronizando', "
+      + "iniciada_em = CURRENT_TIMESTAMP(3), erro_codigo = NULL "
+      + "WHERE id = ? AND status = 'aguardando'",
+      [sincronizacaoId]
     );
-    return Number(resultado.insertId);
+    return resultado.affectedRows === 1;
   }
 
   async function concluirSincronizacao(conexao, sincronizacaoId, resumo) {
@@ -110,7 +166,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
       "UPDATE sincronizacoes_google_drive SET status = 'concluida', "
       + "pastas_encontradas = ?, arquivos_encontrados = ?, materiais_criados = ?, "
       + "materiais_atualizados = ?, itens_indisponiveis = ?, concluida_em = CURRENT_TIMESTAMP(3) "
-      + "WHERE id = ?",
+      + "WHERE id = ? AND status = 'sincronizando'",
       [
         resumo.pastasEncontradas,
         resumo.arquivosEncontrados,
@@ -125,9 +181,23 @@ function criarIntegracaoGoogleDriveRepository(pool) {
   async function falharSincronizacao(conexao, sincronizacaoId, codigo) {
     await conexao.execute(
       "UPDATE sincronizacoes_google_drive SET status = 'falhou', erro_codigo = ?, "
-      + "concluida_em = CURRENT_TIMESTAMP(3) WHERE id = ?",
+      + "concluida_em = CURRENT_TIMESTAMP(3) "
+      + "WHERE id = ? AND status IN ('aguardando', 'sincronizando')",
       [String(codigo || "ERRO_SINCRONIZACAO").slice(0, 100), sincronizacaoId]
     );
+  }
+
+  async function falharSincronizacaoSemTrava(sincronizacaoId, codigo) {
+    await falharSincronizacao(pool, sincronizacaoId, codigo);
+  }
+
+  async function encerrarSincronizacoesInterrompidas(conexao) {
+    const [resultado] = await conexao.execute(
+      "UPDATE sincronizacoes_google_drive SET status = 'falhou', "
+      + "erro_codigo = 'SINCRONIZACAO_INTERROMPIDA', concluida_em = CURRENT_TIMESTAMP(3) "
+      + "WHERE status IN ('aguardando', 'sincronizando')"
+    );
+    return Number(resultado.affectedRows);
   }
 
   async function buscarCategoriaDrive(conexao, drivePastaId) {
@@ -322,13 +392,17 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     criarEstadoOAuth: criarEstadoOAuth,
     consumirEstadoOAuth: consumirEstadoOAuth,
     salvarCredencial: salvarCredencial,
+    marcarCredencialParaRenovacao: marcarCredencialParaRenovacao,
     buscarCredencial: buscarCredencial,
     buscarUltimaSincronizacao: buscarUltimaSincronizacao,
     adquirirTravaDeSincronizacao: adquirirTravaDeSincronizacao,
     liberarTravaDeSincronizacao: liberarTravaDeSincronizacao,
-    iniciarSincronizacao: iniciarSincronizacao,
+    criarSincronizacaoAguardando: criarSincronizacaoAguardando,
+    marcarSincronizando: marcarSincronizando,
     concluirSincronizacao: concluirSincronizacao,
     falharSincronizacao: falharSincronizacao,
+    falharSincronizacaoSemTrava: falharSincronizacaoSemTrava,
+    encerrarSincronizacoesInterrompidas: encerrarSincronizacoesInterrompidas,
     aplicarSincronizacao: aplicarSincronizacao
   };
 }

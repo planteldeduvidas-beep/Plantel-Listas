@@ -111,8 +111,10 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     repository: integracaoGoogleDriveRepository,
     provider: googleDriveProvider,
     configuracao: configuracao,
-    logger: logger
+    logger: logger,
+    agendarTarefa: dependencias.agendarTarefaGoogleDrive
   });
+  aplicacao.locals.integracaoGoogleDriveService = integracaoGoogleDriveService;
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
     controller: criarAutenticacaoController(serviceAutenticacao, configuracao),

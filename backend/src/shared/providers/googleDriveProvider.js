@@ -5,6 +5,22 @@ const AppError = require("../errors/AppError");
 const MIME_PASTA = "application/vnd.google-apps.folder";
 const ESCOPO_LEITURA = "https://www.googleapis.com/auth/drive.readonly";
 const URL_API_DRIVE = "https://www.googleapis.com/drive/v3/files";
+const TEMPO_LIMITE_REQUISICAO_MS = 30000;
+
+async function executarComTempoLimite(tarefa, tempoLimite) {
+  let temporizador;
+  const limite = new Promise(function aguardarLimite(resolve, reject) {
+    temporizador = setTimeout(function excederLimite() {
+      reject(new Error("Tempo limite excedido"));
+    }, tempoLimite);
+  });
+
+  try {
+    return await Promise.race([tarefa, limite]);
+  } finally {
+    clearTimeout(temporizador);
+  }
+}
 
 function validarConfiguracao(configuracao) {
   const campos = [
@@ -154,7 +170,10 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     try {
       const cliente = criarClienteOAuth(configuracao, fabricaOAuth);
       cliente.setCredentials({ refresh_token: refreshToken });
-      const resultado = await cliente.getAccessToken();
+      const resultado = await executarComTempoLimite(
+        cliente.getAccessToken(),
+        TEMPO_LIMITE_REQUISICAO_MS
+      );
       const token = typeof resultado === "string" ? resultado : resultado.token;
       if (!token) {
         throw new Error("Token ausente");
@@ -182,7 +201,8 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     try {
       resposta = await buscar(url, {
         method: "GET",
-        headers: { Authorization: "Bearer " + tokenDeAcesso }
+        headers: { Authorization: "Bearer " + tokenDeAcesso },
+        signal: AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS)
       });
     } catch (erro) {
       throw new AppError(

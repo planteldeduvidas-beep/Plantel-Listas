@@ -33,6 +33,12 @@ class OAuth2ClientFake {
   }
 }
 
+class OAuth2ClientComTokenRevogadoFake extends OAuth2ClientFake {
+  async getAccessToken() {
+    throw new Error("invalid_grant");
+  }
+}
+
 function criarConfiguracao() {
   return {
     clientId: "cliente-de-teste.apps.googleusercontent.com",
@@ -79,6 +85,23 @@ test("protege refresh token com criptografia autenticada", function testarCripto
   assert.throws(function adulterar() {
     descriptografarRefreshToken(criptografadoUm + "x", segredo);
   }, /Credencial Google Drive indisponivel/);
+});
+
+test("traduz refresh token revogado sem expor o token", async function testarTokenRevogado() {
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientComTokenRevogadoFake,
+    fetch: async function buscarNaoUtilizado() { throw new Error("nao esperado"); }
+  });
+  const tokenRevogado = "refresh-token-revogado-e-secreto";
+
+  await assert.rejects(
+    provider.listarArvore(tokenRevogado),
+    function validarErro(erro) {
+      assert.equal(erro.codigo, "GOOGLE_AUTORIZACAO_INVALIDA");
+      assert.equal(erro.message.includes(tokenRevogado), false);
+      return true;
+    }
+  );
 });
 
 test("lista recursivamente apenas descendentes da raiz e respeita paginacao", async function testarArvore() {

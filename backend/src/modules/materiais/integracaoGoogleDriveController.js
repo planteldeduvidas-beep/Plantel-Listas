@@ -28,8 +28,11 @@ function criarIntegracaoGoogleDriveController(service, configuracao) {
 
   async function sincronizar(req, res, next) {
     try {
-      const sincronizacao = await service.sincronizar(req.usuario.id, req.body);
-      res.status(200).json({ sincronizacao: sincronizacao });
+      const sincronizacao = await service.solicitarSincronizacao(
+        req.usuario.id,
+        req.body
+      );
+      res.status(202).json({ sincronizacao: sincronizacao });
     } catch (erro) {
       next(erro);
     }

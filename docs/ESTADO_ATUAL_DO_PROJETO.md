@@ -19,7 +19,7 @@ Categorias, disciplinas, concursos, acessos de professor por pasta e a revisao d
 
 FASE 4 implementada na branch `fase/04-google-drive` e aguardando validacao humana.
 
-A integracao OAuth server-side, a indexacao administrativa e a sincronizacao idempotente do Google Drive foram validadas localmente com o acervo real. Nenhum deploy foi realizado.
+A integracao OAuth server-side, a indexacao administrativa e a sincronizacao idempotente do Google Drive foram validadas localmente com o acervo real. A sincronizacao longa foi desacoplada da requisicao HTTP, possui status persistido, polling no frontend e recuperacao de interrupcoes. Nenhum deploy foi realizado.
 
 A V1 esta funcionalmente congelada.
 
@@ -63,6 +63,16 @@ Arquivos:
 
 Producao:
 - Hostinger Business Web Hosting.
+
+## Regra obrigatoria para arquivos na Fase 5
+
+O frontend nunca devera enviar `driveFileId` arbitrario para visualizar ou baixar arquivos.
+
+Fluxo obrigatorio:
+
+`materialId` -> MySQL -> validar disponibilidade e autorizacao -> obter `drive_file_id` internamente -> Google Drive.
+
+Download e player ainda nao foram implementados.
 
 ## Regra operacional
 
