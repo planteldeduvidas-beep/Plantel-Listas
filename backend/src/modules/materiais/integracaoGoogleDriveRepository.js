@@ -1,4 +1,5 @@
 const AppError = require("../../shared/errors/AppError");
+const { aplicarClassificacaoAutomatica } = require("./classificacaoAutomatica");
 
 function mapearSincronizacao(registro) {
   if (!registro) {
@@ -70,7 +71,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     const executor = executorInformado || pool;
     const [registros] = await executor.execute(
       "SELECT refresh_token_criptografado, escopo, renovacao_necessaria, erro_codigo, "
-      + "invalidada_em, autorizado_em "
+      + "invalidada_em, autorizado_em, autorizado_por_usuario_id "
       + "FROM credenciais_google_drive WHERE id = 1 LIMIT 1"
     );
     return registros[0] || null;
@@ -175,6 +176,9 @@ function criarIntegracaoGoogleDriveRepository(pool) {
         resumo.itensIndisponiveis,
         sincronizacaoId
       ]
+    );
+    await conexao.execute(
+      "UPDATE estado_changes_google_drive SET reconciliacao_necessaria=0 WHERE id=1"
     );
   }
 
@@ -373,6 +377,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
         + "WHERE drive_pasta_id IS NOT NULL AND ultima_sincronizacao_drive_id <> ?",
         [sincronizacaoId]
       );
+      await aplicarClassificacaoAutomatica(conexao);
       await conexao.commit();
 
       return {

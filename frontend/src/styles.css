@@ -143,6 +143,227 @@ textarea:focus {
   grid-column: span 2;
 }
 
+.biblioteca {
+  display: grid;
+  gap: 18px;
+  margin: 22px 0 34px;
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.cabecalho-biblioteca {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.cabecalho-biblioteca h2 {
+  margin: 0 0 5px;
+}
+
+.busca-acervo {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.filtros-acervo {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.filtros-acervo label,
+.busca-acervo label {
+  font-size: 0.9rem;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.breadcrumb > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.breadcrumb button,
+.acao-texto {
+  min-height: auto;
+  padding: 3px;
+  background: transparent;
+  color: #287f79;
+}
+
+.grade-pastas,
+.grade-materiais {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.item-pasta,
+.item-material {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fafbfc;
+}
+
+.abrir-pasta {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+  color: #242424;
+  text-align: left;
+}
+
+.abrir-pasta:hover:not(:disabled) {
+  background: transparent;
+  color: #155e59;
+}
+
+.abrir-pasta > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.abrir-pasta strong,
+.item-material h3 {
+  overflow-wrap: anywhere;
+}
+
+.icone-item {
+  font-size: 1.7rem;
+}
+
+.etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.etiquetas span,
+.tipo-material {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #155e59;
+  background: #ddf6f3;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.classificacao-pasta {
+  margin-top: 8px;
+}
+
+.classificacao-pasta form {
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.classificacao-pasta form > div {
+  display: flex;
+  gap: 7px;
+}
+
+.organizacao-lote { gap: 14px; padding: 18px; border: 1px solid #bfe8e4; border-radius: 12px; background: #f4fbfa; }
+.organizacao-lote h3 { margin: 0 0 4px; }
+.lista-pastas-pendentes { display: grid; max-height: 280px; gap: 8px; overflow: auto; }
+.lista-pastas-pendentes label { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 8px; background: #ffffff; }
+.lista-pastas-pendentes input { width: 18px; margin-top: 3px; }
+.lista-pastas-pendentes span { display: grid; gap: 3px; }
+.campos-lote { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)) auto; align-items: end; gap: 10px; }
+
+.item-material {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.item-material h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.item-material p {
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.acoes-material {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.botao-secundario {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 11px 18px;
+  border-radius: 9px;
+  color: #155e59;
+  background: #ddf6f3;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.visualizador {
+  position: fixed;
+  z-index: 10;
+  inset: 18px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 14px;
+  border-radius: 14px;
+  background: #202124;
+  box-shadow: 0 20px 80px rgb(0 0 0 / 45%);
+}
+
+.visualizador-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 12px;
+  color: #ffffff;
+}
+
+.visualizador iframe,
+.visualizador video {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: #000000;
+}
+
 .cartao-painel h2,
 .bloco-admin h3,
 .area-administrativa > h2 {
@@ -450,6 +671,21 @@ button:disabled {
 
   .cartao-pastas {
     grid-column: auto;
+  }
+
+  .busca-acervo,
+  .filtros-acervo,
+  .campos-lote {
+    grid-template-columns: 1fr;
+  }
+
+  .cabecalho-biblioteca {
+    flex-direction: column;
+  }
+
+  .visualizador {
+    inset: 0;
+    border-radius: 0;
   }
 }
 

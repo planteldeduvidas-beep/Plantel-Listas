@@ -12,6 +12,7 @@
     "test": "node --test --test-concurrency=1",
     "db:create": "node scripts/criarBanco.js",
     "migrate": "node scripts/executarMigrations.js",
+    "classify:archive": "node scripts/classificarAcervo.js",
     "bootstrap:admin": "node scripts/bootstrapAdmin.js"
   },
   "engines": {

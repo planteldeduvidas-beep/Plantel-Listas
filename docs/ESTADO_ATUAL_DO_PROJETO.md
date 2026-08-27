@@ -23,6 +23,16 @@ A integracao OAuth server-side, a indexacao administrativa e a sincronizacao ide
 
 O Google OAuth esta atualmente em modo `Testing`. Como o sistema utiliza `drive.readonly`, a autorizacao e o refresh token da conta de teste expiram apos aproximadamente sete dias e podem exigir reconexao. Isso e comportamento esperado do ambiente de teste, nao falha do Plantel Listas. Antes do uso definitivo sera necessario configurar o OAuth para producao e cumprir o processo de verificacao aplicavel a esse scope.
 
+FASE 5 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
+
+A Fase 6 ainda nao esta autorizada. Nenhum deploy foi realizado.
+
+A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
+
+O acompanhamento de mudancas do Drive usa Changes API com estado persistido, polling de recuperacao e suporte a canal webhook validado. Criacao, renomeacao, movimentacao e remocao de pastas usam reconciliacao incremental da subarvore quando a operacao pode ser comprovada com seguranca; a sincronizacao completa permanece como fallback. A URL publica HTTPS ainda nao foi definida, portanto a criacao e a renovacao de um canal real permanecem pendentes para o ambiente de producao.
+
+PDF e video sao os unicos tipos funcionais da V1. Os cinco DOCX, dois ODT e cinco PNG observados permanecem somente indexados no MySQL e nao sao expostos para consulta, visualizacao ou download enquanto nao houver decisao humana de escopo.
+
 A V1 esta funcionalmente congelada.
 
 ## Repositorio
@@ -39,6 +49,8 @@ A implementacao aprovada da Fase 2 esta integrada na `main`.
 A implementacao aprovada da Fase 3 esta integrada na `main`.
 
 A implementacao aprovada da Fase 4 esta integrada na `main`.
+
+A implementacao aprovada da Fase 5 esta integrada na `main`.
 
 ## Arquitetura fechada
 
@@ -66,7 +78,7 @@ Arquivos:
 Producao:
 - Hostinger Business Web Hosting.
 
-## Regra obrigatoria para arquivos na Fase 5
+## Regra obrigatoria para arquivos
 
 O frontend nunca devera enviar `driveFileId` arbitrario para visualizar ou baixar arquivos.
 
@@ -74,7 +86,7 @@ Fluxo obrigatorio:
 
 `materialId` -> MySQL -> validar disponibilidade e autorizacao -> obter `drive_file_id` internamente -> Google Drive.
 
-Download e player ainda nao foram implementados.
+Essa regra foi implementada na Fase 5 para visualizacao, player e download.
 
 ## Regra operacional
 
@@ -142,6 +154,7 @@ Google Drive:
 ## Pendencias para as proximas fases
 
 - definir URL/subdominio final do sistema;
+- cadastrar a URL HTTPS publica exata do webhook do Google Drive e validar o canal real em producao;
 - definir o remetente definitivo de producao para recuperacao de senha;
 - definir a URL de producao para cadastrar a redirect URI OAuth definitiva;
 - configurar o OAuth para producao e cumprir a verificacao aplicavel ao scope `drive.readonly`;
@@ -152,6 +165,6 @@ Google Drive:
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para iniciar a Fase 5.
-2. Nao iniciar a Fase 5 sem autorizacao explicita.
-3. Nao realizar deploy sem autorizacao explicita.
+1. Aguardar autorizacao explicita para iniciar a Fase 6.
+2. Nao realizar deploy sem autorizacao explicita.
+3. Manter as pendencias de producao para a fase correspondente.

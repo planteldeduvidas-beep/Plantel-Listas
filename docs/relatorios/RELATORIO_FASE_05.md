@@ -1,0 +1,252 @@
+# RELATORIO DA FASE 05 - CONSULTA E ENTREGA DO ACERVO
+
+Data: 27/08/2026
+Estado: **APROVADA E CONCLUIDA**
+
+## 1. Resumo
+
+A Fase 5 transformou os metadados indexados na Fase 4 em uma biblioteca utilizavel por aluno, professor e administrador. Foram implementados navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao por disciplina e concurso, visualizacao de PDF, reproducao de video com HTTP Range e download.
+
+A entrega de arquivos segue obrigatoriamente `materialId -> MySQL -> disponibilidade e autorizacao -> drive_file_id interno -> Google Drive`. O frontend nao recebe nem envia ID de arquivo do Drive.
+
+Tambem foi implementado o acompanhamento incremental pela Changes API, com estado persistido, deduplicacao de notificacoes, polling para recuperar notificacoes perdidas, webhook validado e reconciliacao da pasta/subarvore afetada. A sincronizacao completa permanece somente como fallback quando a mudanca nao pode ser comprovada com seguranca.
+
+Nao foram implementados upload, edicao, movimentacao, substituicao, lixeira operacional, analytics, deploy ou Fase 6.
+
+## 2. Branch e commits
+
+- Branch: `fase/05-acervo`.
+- Base: `main` no commit `ed968f5`.
+- Commit tecnico: `2225fb9` - `feat: implementa consulta segura do acervo`.
+- Ajustes antes da validacao final: `57ed909` - `fix: reconcilia subarvores do google drive`.
+- Classificacao completa em escala: `7137d9d` - `fix: organiza classificacao do acervo em escala`.
+- A documentacao de fechamento esta consolidada na mesma branch.
+- A validacao humana aprovou a fase e autorizou o merge seguro em `main` neste fechamento.
+- Nenhum deploy foi realizado.
+
+## 3. Corpus real analisado
+
+- 6.753 materiais disponiveis;
+- 6.725 PDFs;
+- 16 videos;
+- 12 arquivos de outros tipos;
+- 2.668 pastas vinculadas ao Drive;
+- profundidade maxima de sete niveis;
+- maior arquivo observado: 407.019.548 bytes.
+
+Esses dados justificam paginacao no servidor, limite de 60 itens por pagina, filtros no MySQL e streaming. O frontend nunca carrega o catalogo inteiro nem o conteudo integral de videos grandes.
+
+Inventario dos 12 arquivos fora dos tipos funcionais aprovados:
+
+| Extensao | MIME type | Quantidade |
+| --- | --- | ---: |
+| `docx` | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | 5 |
+| `odt` | `application/vnd.oasis.opendocument.text` | 2 |
+| `png` | `image/png` | 5 |
+
+Esses metadados continuam indexados para diagnostico e decisao futura, mas os arquivos nao aparecem na biblioteca e nao podem ser visualizados ou baixados por aluno, professor ou administrador. PDF e video permanecem como os unicos tipos funcionais da V1.
+
+## 4. Navegacao, busca e filtros
+
+- pastas e subpastas em cards simples;
+- breadcrumb clicavel;
+- 24 materiais por pagina no frontend;
+- busca por nome do arquivo e caminho da pasta;
+- filtros por tipo, disciplina e concurso;
+- ordenacao restrita a uma allowlist: nome crescente, nome decrescente e mais recentes;
+- SQL parametrizado;
+- estados de carregamento, vazio e erro;
+- nomes, tamanhos e tipos amigaveis, sem conceitos de banco ou IDs tecnicos.
+
+Foram adicionados indices compostos para disponibilidade, pasta, tipo e nome, alem de indice FULLTEXT para o nome dos materiais. A consulta atual preserva busca parcial e por caminho com parametros seguros; o indice FULLTEXT fica disponivel para evolucao controlada se a medicao de producao justificar.
+
+## 5. Classificacao
+
+As pastas possuem estados independentes para disciplina e concurso: `herdar`, `definida` e `nao_se_aplica`. Um descendente pode substituir somente a dimensao necessaria. Assim, uma pasta `Fisica` dentro de `EFOMM` resulta simultaneamente em disciplina Fisica e concurso EFOMM.
+
+As regras automaticas sao deterministicas, versionadas e auditadas por pasta, dimensao e codigo da regra. Elas usam contexto estrutural e nomes inequivocos, com normalizacao segura de maiusculas, minusculas e acentos, sem codificar a arvore inteira nem analisar arquivo por arquivo.
+
+Regras aplicadas ao acervo real:
+
+- nomes explicitos das oito disciplinas encontradas, incluindo Biologia;
+- pastas dos 18 concursos militares sob `PROVAS ANTIGAS`;
+- 207 instituicoes encontradas diretamente sob `Vestibulares / Publica` e `Vestibulares / Privada`;
+- pastas compostas `Fisica IME` e `Quimica IME`, que transmitem disciplina e concurso;
+- raizes e pastas comprovadamente mistas ou administrativas, marcadas como `nao_se_aplica` na dimensao correta;
+- pastas do Prof. JP confirmadas como Fisica pelos nomes e pelo conteudo real observado.
+
+Ambiguidades verificadas incluíram `Listas de Fisica e Matematica`, `Professores variados` e provas que reúnem varias disciplinas ou concursos. Esses grupos nao receberam uma classificacao unica artificial: foram marcados como multidisciplinares/`nao_se_aplica`, enquanto subpastas especificas continuam sobrescrevendo a heranca. Nenhuma pasta exigiu revisao humana adicional nesta correcao; a verificacao estrutural e as regras de alta confianca resolveram todas as pastas que possuem materiais funcionais diretos.
+
+Resultado final sobre os 6.741 materiais funcionais da V1:
+
+- 623 com disciplina definida;
+- 6.231 com concurso definido;
+- 123 com disciplina e concurso definidos simultaneamente;
+- 6.618 com `nao_se_aplica` em pelo menos uma das duas dimensoes;
+- 0 materiais realmente pendentes;
+- 0 pastas pendentes;
+- 0 pastas que exigiram revisao humana individual nesta correcao.
+
+O painel informa `Todo o acervo esta organizado` quando nao ha pendencias. Se uma mudanca futura introduzir ambiguidade, mostra a quantidade de pastas, seus caminhos e a contagem de materiais diretos. O admin pode organizar uma pasta ou selecionar ate 100 pastas e aplicar disciplina, concurso, ambos, heranca ou `nao se aplica` em lote, sem ver IDs ou conceitos de banco.
+
+Uma segunda execucao das regras terminou com zero ajustes, confirmando idempotencia. Sincronizacoes completas e incrementais reaplicam as regras antes do commit. Novos materiais herdam a classificacao da subarvore; movimentacoes recalculam a heranca pelo novo caminho; overrides manuais sao preservados; e uma regra automatica que deixa de valer apos renomeacao ou movimentacao retorna de forma auditada ao estado herdado.
+
+## 6. Seguranca dos arquivos
+
+- sessao ativa obrigatoria para consulta, visualizacao e download;
+- aluno, professor e admin possuem leitura conforme a matriz funcional atual;
+- material inexistente, indisponivel ou dentro de pasta oculta retorna resposta controlada;
+- somente materiais `pdf` e `video` aparecem ou podem ser entregues pela biblioteca;
+- nenhum endpoint aceita `driveFileId` do cliente;
+- `drive_file_id` aparece somente em repository/service do backend;
+- mass assignment, IDs invalidos e ordenacoes arbitrarias sao recusados;
+- nomes de download removem caracteres perigosos, CR/LF e recebem `filename` e `filename*` seguros;
+- respostas privadas usam `no-store` e `nosniff`;
+- token de canal Google e redigido dos logs.
+
+## 7. PDF, video e download
+
+- PDF e entregue inline pelo backend;
+- video usa o player nativo responsivo;
+- download usa `Content-Disposition: attachment`;
+- antes do conteudo, o provider consulta `capabilities.canDownload`; capacidade ausente ou falsa retorna HTTP 403 com erro funcional controlado;
+- o backend transmite o corpo recebido do Drive por stream;
+- nenhuma rota carrega o arquivo inteiro em memoria;
+- `Range` simples e validado e encaminhado ao Drive;
+- respostas `206`, `Content-Range`, `Content-Length` e `Accept-Ranges` sao preservadas;
+- intervalos invalidos retornam HTTP 416 com `Content-Range: bytes */tamanho`.
+
+No teste real nao destrutivo, um PDF e um video responderam com HTTP 206 e somente 1.024 bytes cada. Nenhum arquivo foi alterado, movido ou excluido no Drive.
+
+## 8. Changes API e webhook
+
+- `startPageToken` e o page token corrente ficam persistidos no MySQL;
+- processamento e protegido por trava nomeada do MySQL;
+- criacao, alteracao, renomeacao, movimentacao e remocao de arquivos e pastas sao aplicadas pelo ID do Drive;
+- itens fora da pasta raiz ficam indisponiveis e nao sao importados;
+- atalhos nao sao aceitos como caminho para escapar da raiz;
+- cada pasta alterada e validada contra a raiz e, quando segura, somente sua subarvore e lida;
+- a subarvore atualiza pastas, materiais, relacoes pai/filho, disponibilidade e renomeacoes de forma idempotente;
+- caminhos e classificacoes herdadas refletem imediatamente a nova hierarquia pelas consultas recursivas do MySQL;
+- pasta removida ou movida para fora da raiz desativa somente sua subarvore local;
+- conflito de nome/ID, ancestral desconhecido ou mudanca da propria raiz faz rollback da reconciliacao parcial e aciona a sincronizacao completa como fallback;
+- page token expirado reinicia o acompanhamento e exige a reconciliacao de fallback;
+- polling periodico permite recuperar notificacoes perdidas;
+- webhook publico nao exige sessao nem CSRF, mas valida channel ID, resource ID, message number e hash do token do canal;
+- notificacoes duplicadas sao ignoradas por chave unica;
+- o canal e persistido como `preparando` antes da chamada `changes.watch`, permitindo aceitar com seguranca o `sync` inicial mesmo quando ele chega antes da resposta do Google;
+- `X-Goog-Resource-State: sync` e deduplicado e reconhecido somente como confirmacao de canal, sem processar alteracoes de materiais;
+- canal possui expiracao persistida e renovacao antes do vencimento;
+- canal anterior e encerrado de forma best effort depois da substituicao;
+- nenhum OAuth token ou token de canal chega ao frontend.
+
+O webhook publico real nao foi criado porque a URL HTTPS de producao ainda nao foi definida. `GOOGLE_DRIVE_WEBHOOK_URL` e opcional, mas quando informada aceita somente a rota exata `/api/integracoes/google-drive/webhook` em HTTPS. A validacao local cobriu o contrato com mocks e banco real; a validacao do push real permanece para a fase de deploy autorizada.
+
+Referencias oficiais consultadas:
+
+- https://developers.google.com/workspace/drive/api/guides/push
+- https://developers.google.com/workspace/drive/api/guides/manage-downloads
+- https://developers.google.com/workspace/drive/api/reference/rest/v3/changes
+
+## 9. Banco e migrations
+
+`006_consulta_acervo.sql` adicionou classificacao de categorias, indices de consulta, catalogos iniciais de alta confianca e tabelas de estado, canais e notificacoes do Drive.
+
+`007_changes_incrementais.sql` diferenciou sincronizacoes manuais e incrementais e adicionou o marcador persistido de reconciliacao.
+
+`008_reconciliacao_subarvore.sql` adicionou o estado transitorio seguro `preparando` e permitiu persistir o canal antes de o Google informar o resource ID.
+
+`009_classificacao_acervo.sql` separou os estados de disciplina e concurso, adicionou origem e codigo de regra por dimensao, criou a auditoria de alteracoes, acrescentou Biologia ao catalogo e preparou os indices da organizacao em escala.
+
+As quatro migrations da fase foram aplicadas no MySQL local e no banco isolado de testes. O executor reconheceu as migrations aplicadas nas execucoes seguintes sem duplicacao.
+
+## 10. Endpoints
+
+Biblioteca autenticada:
+
+- `GET /api/acervo`;
+- `GET /api/acervo/materiais/:materialId/conteudo`;
+- `GET /api/acervo/materiais/:materialId/download`;
+- `GET /api/acervo/organizacao` - somente admin;
+- `PATCH /api/acervo/pastas/:categoriaId/classificacao` - somente admin e CSRF;
+- `PATCH /api/acervo/organizacao` - classificacao de ate 100 pastas, somente admin e CSRF.
+
+Atualizacoes do Drive:
+
+- `POST /api/integracoes/google-drive/webhook` - publico e validado por canal;
+- `GET /api/integracoes/google-drive/changes/status` - somente admin;
+- `POST /api/integracoes/google-drive/changes/renovar` - somente admin e CSRF.
+
+## 11. Testes
+
+Resultado final: **74 testes aprovados, 0 falhas**.
+
+Os 20 testes adicionados na Fase 5 cobrem:
+
+- navegacao, breadcrumb, busca, filtros e paginacao;
+- SQL injection e parametros fora da allowlist;
+- sessao e perfis;
+- CSRF e mass assignment na classificacao;
+- ausencia de `driveFileId` no contrato publico;
+- material indisponivel;
+- PDF inline, download e nome seguro;
+- Range 206 e intervalo invalido 416;
+- verificacao positiva e negativa de `capabilities.canDownload`;
+- bloqueio de DOCX, ODT, PNG e qualquer `tipo=outro` no contrato publico;
+- webhook valido, invalido, duplicado e `sync` antecipado;
+- `sync` sem processamento de material;
+- criacao, renomeacao, movimentacao, remocao e repeticao idempotente de subarvore;
+- atualizacao de caminho e classificacao herdada depois de movimentacao;
+- classificacao por pasta e em lote;
+- heranca independente de disciplina e concurso, combinacao das duas dimensoes e override;
+- `nao_se_aplica` distinto de pendencia;
+- nova pasta/material herdando a classificacao da subarvore;
+- filtros isolados e combinados imediatamente apos classificacao;
+- regras compostas e ausencia de inferencia para nome ambiguo;
+- entrada e saida da raiz, atalhos, page token perdido, fallback seguro e renovacao do canal.
+
+Os 54 testes das Fases 1 a 4 permaneceram aprovados.
+
+## 12. Checks finais
+
+- `npm run check`: aprovado, 74 testes e build Vite com 27 modulos;
+- `npm audit`: 0 vulnerabilidades;
+- `npm audit --omit=dev`: 0 vulnerabilidades;
+- `git diff --check`: aprovado;
+- smoke HTTP: saude 200, frontend 200, catalogo autenticado 200;
+- smoke real de video: 206, 1.024 bytes e `Accept-Ranges: bytes`;
+- smoke real de PDF: 206, 1.024 bytes e `Content-Range`;
+- estado da Changes API persistido e verificado sem erro.
+
+O navegador integrado nao estava conectado. Por isso nao foi declarada validacao visual automatizada; o servidor Vite, o modulo React, o build e os contratos HTTP foram validados pelos meios disponiveis.
+
+## 13. Secrets e limites externos
+
+- `backend/.env` e `frontend/.env` continuam ignorados;
+- nenhum `.env` real foi versionado;
+- client secret, refresh token, access token, token de canal, senha SMTP e senhas de usuario nao foram adicionados ao Git;
+- nenhum token foi enviado ao frontend ou reproduzido neste relatorio;
+- o scope permanece exclusivamente `drive.readonly`;
+- nenhum arquivo do Drive foi escrito ou excluido.
+
+## 14. Validacao humana
+
+A validacao humana da Fase 5 foi concluida com sucesso. Foram confirmados no navegador:
+
+- navegacao por pastas e breadcrumb;
+- busca e combinacao de filtros;
+- abertura de PDF e download;
+- reproducao de video e seek;
+- experiencia mobile;
+- classificacao do acervo;
+- mensagem `Todo o acervo esta organizado`;
+- 0 materiais pendentes e 0 pastas pendentes;
+- permanencia de DOCX, ODT e PNG fora do escopo funcional da V1.
+
+Permanecem somente pendencias de producao ja documentadas, dependentes de URL e deploy futuramente autorizados: webhook HTTPS real, renovacao do canal e validacao operacional sob os limites da Hostinger.
+
+## 15. Estado final
+
+**APROVADA E CONCLUIDA**
+
+A Fase 5 foi aprovada pelo responsavel humano e integrada na `main` pelo fechamento autorizado. Nao houve deploy nem inicio da Fase 6.

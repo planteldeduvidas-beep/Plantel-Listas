@@ -21,7 +21,8 @@ test("remove cabecalhos sensiveis dos logs", function testarRedacaoDosLogs() {
     headers: {
       authorization: "Bearer segredo-que-nao-pode-vazar",
       cookie: "sessao=segredo-do-cookie",
-      "x-csrf-token": "segredo-csrf"
+      "x-csrf-token": "segredo-csrf",
+      "x-goog-channel-token": "segredo-webhook-google"
     },
     socket: {}
   };
@@ -40,6 +41,7 @@ test("remove cabecalhos sensiveis dos logs", function testarRedacaoDosLogs() {
   assert.equal(conteudo.includes("segredo-que-nao-pode-vazar"), false);
   assert.equal(conteudo.includes("segredo-do-cookie"), false);
   assert.equal(conteudo.includes("segredo-csrf"), false);
+  assert.equal(conteudo.includes("segredo-webhook-google"), false);
   assert.equal(conteudo.includes("[REMOVIDO]"), true);
 });
 
