@@ -18,8 +18,10 @@ Nao foram implementados upload de professor, edicao, movimentacao, substituicao,
 - Commit tecnico inicial: `8bcf231` - `feat: prepara integracao segura com google drive`.
 - Validacao real e relatorio: `2476aef` - `docs: conclui validacao real da fase 4`.
 - Ajuste de formatacao: `bafb357` - `docs: ajusta formatacao do relatorio da fase 4`.
-- A sincronizacao assincrona, a renovacao OAuth e a presente atualizacao documental ficam no commit tecnico seguinte da branch.
-- Merge seguro em `main` autorizado e realizado no fechamento.
+- Sincronizacao assincrona e renovacao OAuth: `d418872` - `fix: desacopla sincronizacao do google drive`.
+- Commit documental final da Fase 4: `591550c` - `docs: registra aprovacao da fase 4`.
+- Merge seguro em `main`: `91c8921` - `merge: integra google drive da fase 4`.
+- Push da `main` para `origin/main` confirmado; repositorio local e remoto ficaram sincronizados e com worktree limpo ao final do fechamento.
 - Nenhum deploy foi realizado.
 
 ## 3. Implementacao
@@ -227,7 +229,7 @@ Os testes das Fases 1, 2 e 3 permaneceram aprovados, incluindo saude, erros, con
 - nenhum arquivo `.env` foi versionado;
 - client secret, senha SMTP, refresh token, access token e senhas de usuario nao foram adicionados ao Git;
 - nenhum valor secreto e reproduzido neste relatorio;
-- a branch `main` permanece no commit aprovado da Fase 3.
+- a Fase 4 esta integrada na `main` pelo merge `91c8921`, enviado para `origin/main`.
 
 ## 19. Erros encontrados e corrigidos
 
