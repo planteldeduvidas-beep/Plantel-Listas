@@ -1,7 +1,7 @@
 # ESTADO ATUAL DO PROJETO - PLANTEL LISTAS
 
 Versao da documentacao: 1.1
-Atualizado em: 26/08/2026
+Atualizado em: 27/08/2026
 
 ## Status
 
@@ -17,6 +17,10 @@ FASE 3 aprovada pelo responsavel humano e integrada na branch `main`.
 
 Categorias, disciplinas, concursos, acessos de professor por pasta e a revisao de UX foram aprovados. Nenhum deploy foi realizado.
 
+FASE 4 implementada na branch `fase/04-google-drive` e aguardando validacao humana.
+
+A integracao OAuth server-side, a indexacao administrativa e a sincronizacao idempotente do Google Drive foram validadas localmente com o acervo real. Nenhum deploy foi realizado.
+
 A V1 esta funcionalmente congelada.
 
 ## Repositorio
@@ -31,6 +35,8 @@ A documentacao 1.1 e a fundacao tecnica da Fase 1 estao integradas na `main`.
 A implementacao aprovada da Fase 2 esta integrada na `main`.
 
 A implementacao aprovada da Fase 3 esta integrada na `main`.
+
+A implementacao da Fase 4 permanece somente na branch `fase/04-google-drive`; a `main` nao foi alterada nesta fase.
 
 ## Arquitetura fechada
 
@@ -52,7 +58,8 @@ Banco:
 - MySQL Hostinger em producao.
 
 Arquivos:
-- Google Drive via Drive API.
+- Google Drive via Drive API, com OAuth server-side e indexacao de metadados no MySQL implementados na Fase 4;
+- arquivos continuam armazenados exclusivamente no Drive.
 
 Producao:
 - Hostinger Business Web Hosting.
@@ -124,12 +131,14 @@ Google Drive:
 
 - definir URL/subdominio final do sistema;
 - definir o remetente definitivo de producao para recuperacao de senha;
-- configurar Google Cloud/Drive API na Fase 4;
-- validar escopo OAuth e status de producao na Fase 4/9;
+- definir a URL de producao para cadastrar a redirect URI OAuth definitiva;
+- validar o fluxo OAuth e a indexacao no ambiente de producao somente na fase de deploy autorizada;
+- avaliar otimizacao controlada da leitura de arvores muito grandes, preservando limites da API;
 - validar limite pratico de videos na Hostinger antes do go-live;
 - definir estrategia exata de migration no deploy Hostinger antes da Fase 9.
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para iniciar a Fase 4.
-2. Nao realizar deploy sem autorizacao explicita.
+1. Aguardar validacao humana da Fase 4.
+2. Nao fazer merge nem iniciar a Fase 5 sem autorizacao explicita.
+3. Nao realizar deploy sem autorizacao explicita.

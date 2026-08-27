@@ -19,6 +19,18 @@ function obterTipoDeUsuario(papel) {
   return tipos[papel] || "Usuário";
 }
 
+function obterTextoDaSincronizacao(sincronizacao) {
+  if (sincronizacao.status === "em_andamento") {
+    return "em andamento";
+  }
+
+  if (sincronizacao.status === "concluida") {
+    return "concluída";
+  }
+
+  return "não concluída";
+}
+
 function traduzirErroDaApi(mensagem) {
   return (mensagem || "Não foi possível concluir a ação.")
     .replace(/Movimentacao criaria ciclo na hierarquia/gi, "Esta pasta não pode ser colocada dentro de uma de suas subpastas")
@@ -335,6 +347,11 @@ function PainelAcervo({ usuario, aoSair }) {
   const categoriasAtivas = categorias.filter(function filtrarCategoria(item) {
     return item.ativo;
   });
+  const sincronizacaoEmAndamento = Boolean(
+    googleDrive
+    && googleDrive.ultimaSincronizacao
+    && googleDrive.ultimaSincronizacao.status === "em_andamento"
+  );
 
   if (carregando) {
     return <main className="pagina-painel"><p>Preparando seu acervo...</p></main>;
@@ -378,8 +395,8 @@ function PainelAcervo({ usuario, aoSair }) {
                 <p>Conecte e atualize as pastas e os arquivos do acervo.</p>
               </div>
               {googleDrive && googleDrive.conectado ? (
-                <button type="button" onClick={sincronizarAcervo} disabled={processandoGoogleDrive}>
-                  {processandoGoogleDrive ? "Sincronizando..." : "Sincronizar agora"}
+                <button type="button" onClick={sincronizarAcervo} disabled={processandoGoogleDrive || sincronizacaoEmAndamento}>
+                  {processandoGoogleDrive || sincronizacaoEmAndamento ? "Sincronizando..." : "Sincronizar agora"}
                 </button>
               ) : (
                 <button type="button" onClick={conectarGoogleDrive} disabled={processandoGoogleDrive || !googleDrive || !googleDrive.configurado}>
@@ -392,7 +409,7 @@ function PainelAcervo({ usuario, aoSair }) {
             {googleDrive && googleDrive.configurado && !googleDrive.conectado && <p className="estado-integracao pendente">Conecte a conta do acervo antes da primeira sincronização.</p>}
             {googleDrive && googleDrive.ultimaSincronizacao && (
               <p className="resumo-sincronizacao">
-                Última sincronização: {googleDrive.ultimaSincronizacao.status === "concluida" ? "concluída" : "não concluída"}. {googleDrive.ultimaSincronizacao.arquivosEncontrados} arquivos encontrados.
+                Última sincronização: {obterTextoDaSincronizacao(googleDrive.ultimaSincronizacao)}. {googleDrive.ultimaSincronizacao.arquivosEncontrados} arquivos encontrados.
               </p>
             )}
           </section>
