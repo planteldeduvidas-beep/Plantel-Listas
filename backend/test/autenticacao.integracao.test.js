@@ -44,9 +44,13 @@ async function limparCategorias() {
 
 async function limparBanco() {
   await pool.execute("DELETE FROM permissoes_professor_categoria");
+  await pool.execute("DELETE FROM materiais");
   await limparCategorias();
   await pool.execute("DELETE FROM disciplinas");
   await pool.execute("DELETE FROM concursos");
+  await pool.execute("DELETE FROM credenciais_google_drive");
+  await pool.execute("DELETE FROM estados_oauth_google_drive");
+  await pool.execute("DELETE FROM sincronizacoes_google_drive");
   await pool.execute("DELETE FROM recuperacoes_senha");
   await pool.execute("DELETE FROM sessoes");
   await pool.execute("DELETE FROM usuarios");

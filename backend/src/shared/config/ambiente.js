@@ -72,6 +72,26 @@ function lerBooleano(variaveis, nome, valorPadrao) {
   throw new Error("Variavel de ambiente invalida: " + nome);
 }
 
+function validarUrlOpcional(valor, nome, ambiente) {
+  if (!valor) {
+    return "";
+  }
+
+  let url;
+  try {
+    url = new URL(valor);
+  } catch (erro) {
+    throw new Error("Variavel de ambiente invalida: " + nome);
+  }
+
+  const localhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol !== "https:" && !(ambiente !== "production" && url.protocol === "http:" && localhost)) {
+    throw new Error("Variavel de ambiente invalida: " + nome);
+  }
+
+  return url.toString();
+}
+
 function lerOrigensCors(variaveis) {
   const textoDasOrigens = exigirTexto(variaveis, "CORS_ORIGENS");
   const origens = textoDasOrigens.split(",").map(function limparOrigem(origem) {
@@ -157,6 +177,18 @@ function validarVariaveisDeAmbiente(variaveis) {
       usuario: lerTextoOpcional(variaveis, "SMTP_USER"),
       senha: variaveis.SMTP_PASSWORD || "",
       remetente: lerTextoOpcional(variaveis, "SMTP_FROM")
+    }),
+    googleDrive: Object.freeze({
+      clientId: lerTextoOpcional(variaveis, "GOOGLE_DRIVE_CLIENT_ID"),
+      clientSecret: lerTextoOpcional(variaveis, "GOOGLE_DRIVE_CLIENT_SECRET"),
+      pastaRaizId: lerTextoOpcional(variaveis, "GOOGLE_DRIVE_PASTA_RAIZ_ID"),
+      redirectUri: validarUrlOpcional(
+        lerTextoOpcional(variaveis, "GOOGLE_DRIVE_REDIRECT_URI"),
+        "GOOGLE_DRIVE_REDIRECT_URI",
+        ambiente
+      ),
+      refreshToken: lerTextoOpcional(variaveis, "GOOGLE_DRIVE_REFRESH_TOKEN"),
+      escopoLeitura: "https://www.googleapis.com/auth/drive.readonly"
     })
   });
 }

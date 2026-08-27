@@ -8,7 +8,10 @@ import {
   listarPermissoes,
   listarMinhasPermissoes,
   concederPermissao,
-  revogarPermissao
+  revogarPermissao,
+  obterStatusGoogleDrive,
+  iniciarOAuthGoogleDrive,
+  sincronizarGoogleDrive
 } from "./api.js";
 
 function obterTipoDeUsuario(papel) {
@@ -159,6 +162,8 @@ function PainelAcervo({ usuario, aoSair }) {
   const [formularioPastaAberto, definirFormularioPastaAberto] = useState(false);
   const [professorId, definirProfessorId] = useState("");
   const [pastasSelecionadas, definirPastasSelecionadas] = useState([]);
+  const [googleDrive, definirGoogleDrive] = useState(null);
+  const [processandoGoogleDrive, definirProcessandoGoogleDrive] = useState(false);
   const [mensagem, definirMensagem] = useState("");
   const [erro, definirErro] = useState("");
   const [carregando, definirCarregando] = useState(true);
@@ -176,13 +181,14 @@ function PainelAcervo({ usuario, aoSair }) {
       if (usuario.papel === "admin") {
         const resultados = await Promise.all([
           apiCategorias.listar(), apiDisciplinas.listar(), apiConcursos.listar(),
-          listarUsuarios(), listarPermissoes()
+          listarUsuarios(), listarPermissoes(), obterStatusGoogleDrive()
         ]);
         definirCategorias(resultados[0].categorias);
         definirDisciplinas(resultados[1].disciplinas);
         definirConcursos(resultados[2].concursos);
         definirUsuarios(resultados[3].usuarios);
         definirPermissoes(resultados[4].permissoes);
+        definirGoogleDrive(resultados[5].googleDrive);
       } else if (usuario.papel === "professor") {
         const proprias = await listarMinhasPermissoes();
         definirMinhasPermissoes(proprias.permissoes);
@@ -298,6 +304,31 @@ function PainelAcervo({ usuario, aoSair }) {
     }
   }
 
+  async function conectarGoogleDrive() {
+    definirProcessandoGoogleDrive(true);
+    definirErro("");
+    try {
+      const resultado = await iniciarOAuthGoogleDrive();
+      window.location.assign(resultado.urlAutorizacao);
+    } catch (falha) {
+      mostrarErro(falha.message);
+      definirProcessandoGoogleDrive(false);
+    }
+  }
+
+  async function sincronizarAcervo() {
+    definirProcessandoGoogleDrive(true);
+    definirErro("");
+    try {
+      await sincronizarGoogleDrive();
+      await carregar("Acervo sincronizado com o Google Drive.");
+    } catch (falha) {
+      mostrarErro(falha.message);
+    } finally {
+      definirProcessandoGoogleDrive(false);
+    }
+  }
+
   const professores = usuarios.filter(function filtrarProfessor(item) {
     return item.papel === "professor" && item.ativo;
   });
@@ -339,6 +370,32 @@ function PainelAcervo({ usuario, aoSair }) {
       {usuario.papel === "admin" && (
         <section className="area-administrativa">
           <div className="introducao-admin"><h2>Organizar o acervo</h2><p>Crie as opções que alunos e professores usarão para encontrar os conteúdos.</p></div>
+
+          <section className="bloco-admin integracao-drive">
+            <div className="cabecalho-bloco">
+              <div>
+                <h3>Google Drive</h3>
+                <p>Conecte e atualize as pastas e os arquivos do acervo.</p>
+              </div>
+              {googleDrive && googleDrive.conectado ? (
+                <button type="button" onClick={sincronizarAcervo} disabled={processandoGoogleDrive}>
+                  {processandoGoogleDrive ? "Sincronizando..." : "Sincronizar agora"}
+                </button>
+              ) : (
+                <button type="button" onClick={conectarGoogleDrive} disabled={processandoGoogleDrive || !googleDrive || !googleDrive.configurado}>
+                  {processandoGoogleDrive ? "Conectando..." : "Conectar Google Drive"}
+                </button>
+              )}
+            </div>
+            {googleDrive && googleDrive.conectado && <p className="estado-integracao conectado">Google Drive conectado.</p>}
+            {googleDrive && !googleDrive.configurado && <p className="estado-integracao pendente">A conexão ainda precisa ser configurada pelo responsável técnico.</p>}
+            {googleDrive && googleDrive.configurado && !googleDrive.conectado && <p className="estado-integracao pendente">Conecte a conta do acervo antes da primeira sincronização.</p>}
+            {googleDrive && googleDrive.ultimaSincronizacao && (
+              <p className="resumo-sincronizacao">
+                Última sincronização: {googleDrive.ultimaSincronizacao.status === "concluida" ? "concluída" : "não concluída"}. {googleDrive.ultimaSincronizacao.arquivosEncontrados} arquivos encontrados.
+              </p>
+            )}
+          </section>
 
           <section className="bloco-admin">
             <div className="cabecalho-bloco">
