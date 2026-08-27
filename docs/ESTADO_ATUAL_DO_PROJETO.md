@@ -23,7 +23,9 @@ A integracao OAuth server-side, a indexacao administrativa e a sincronizacao ide
 
 O Google OAuth esta atualmente em modo `Testing`. Como o sistema utiliza `drive.readonly`, a autorizacao e o refresh token da conta de teste expiram apos aproximadamente sete dias e podem exigir reconexao. Isso e comportamento esperado do ambiente de teste, nao falha do Plantel Listas. Antes do uso definitivo sera necessario configurar o OAuth para producao e cumprir o processo de verificacao aplicavel a esse scope.
 
-FASE 5 implementada na branch `fase/05-acervo` e pronta para validacao humana.
+FASE 5 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
+
+A Fase 6 ainda nao esta autorizada. Nenhum deploy foi realizado.
 
 A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
 
@@ -48,7 +50,7 @@ A implementacao aprovada da Fase 3 esta integrada na `main`.
 
 A implementacao aprovada da Fase 4 esta integrada na `main`.
 
-A implementacao da Fase 5 esta somente na branch `fase/05-acervo`, aguardando validacao e sem merge em `main`.
+A implementacao aprovada da Fase 5 esta integrada na `main`.
 
 ## Arquitetura fechada
 
@@ -163,6 +165,6 @@ Google Drive:
 
 ## Proxima acao
 
-1. Realizar a validacao humana da Fase 5 na branch `fase/05-acervo`.
-2. Nao fazer merge antes da aprovacao humana.
-3. Nao realizar deploy nem iniciar a Fase 6 sem autorizacao explicita.
+1. Aguardar autorizacao explicita para iniciar a Fase 6.
+2. Nao realizar deploy sem autorizacao explicita.
+3. Manter as pendencias de producao para a fase correspondente.

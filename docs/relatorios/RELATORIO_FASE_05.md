@@ -1,7 +1,7 @@
 # RELATORIO DA FASE 05 - CONSULTA E ENTREGA DO ACERVO
 
 Data: 27/08/2026
-Estado: **PRONTA PARA VALIDACAO**
+Estado: **APROVADA E CONCLUIDA**
 
 ## 1. Resumo
 
@@ -21,7 +21,7 @@ Nao foram implementados upload, edicao, movimentacao, substituicao, lixeira oper
 - Ajustes antes da validacao final: `57ed909` - `fix: reconcilia subarvores do google drive`.
 - Classificacao completa em escala: `7137d9d` - `fix: organiza classificacao do acervo em escala`.
 - A documentacao de fechamento esta consolidada na mesma branch.
-- Nenhum merge em `main` foi realizado.
+- A validacao humana aprovou a fase e autorizou o merge seguro em `main` neste fechamento.
 - Nenhum deploy foi realizado.
 
 ## 3. Corpus real analisado
@@ -229,19 +229,24 @@ O navegador integrado nao estava conectado. Por isso nao foi declarada validacao
 - o scope permanece exclusivamente `drive.readonly`;
 - nenhum arquivo do Drive foi escrito ou excluido.
 
-## 14. Pendencias para validacao humana
+## 14. Validacao humana
 
-- navegar por diferentes profundidades de pasta;
-- pesquisar e combinar filtros;
-- abrir PDFs e videos representativos no navegador;
-- testar seek e retomada em video local;
-- baixar PDF e video;
-- confirmar com o responsavel que DOCX, ODT e PNG permanecem fora do escopo funcional da V1;
-- revisar no navegador a experiencia responsiva e confirmar a mensagem `Todo o acervo esta organizado`;
-- em producao, depois de URL e deploy autorizados, validar webhook HTTPS, renovacao real do canal e videos grandes sob os limites da Hostinger.
+A validacao humana da Fase 5 foi concluida com sucesso. Foram confirmados no navegador:
+
+- navegacao por pastas e breadcrumb;
+- busca e combinacao de filtros;
+- abertura de PDF e download;
+- reproducao de video e seek;
+- experiencia mobile;
+- classificacao do acervo;
+- mensagem `Todo o acervo esta organizado`;
+- 0 materiais pendentes e 0 pastas pendentes;
+- permanencia de DOCX, ODT e PNG fora do escopo funcional da V1.
+
+Permanecem somente pendencias de producao ja documentadas, dependentes de URL e deploy futuramente autorizados: webhook HTTPS real, renovacao do canal e validacao operacional sob os limites da Hostinger.
 
 ## 15. Estado final
 
-**PRONTA PARA VALIDACAO**
+**APROVADA E CONCLUIDA**
 
-A Fase 5 permanece somente na branch `fase/05-acervo`. Nao houve merge, deploy nem inicio da Fase 6.
+A Fase 5 foi aprovada pelo responsavel humano e integrada na `main` pelo fechamento autorizado. Nao houve deploy nem inicio da Fase 6.
