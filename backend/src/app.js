@@ -26,6 +26,11 @@ const criarPermissaoRepository = require("./modules/permissoes/permissaoReposito
 const criarPermissaoService = require("./modules/permissoes/permissaoService");
 const criarPermissaoController = require("./modules/permissoes/permissaoController");
 const criarPermissaoRoutes = require("./modules/permissoes/permissaoRoutes");
+const { criarGoogleDriveProvider } = require("./shared/providers/googleDriveProvider");
+const criarIntegracaoGoogleDriveRepository = require("./modules/materiais/integracaoGoogleDriveRepository");
+const criarIntegracaoGoogleDriveService = require("./modules/materiais/integracaoGoogleDriveService");
+const criarIntegracaoGoogleDriveController = require("./modules/materiais/integracaoGoogleDriveController");
+const criarIntegracaoGoogleDriveRoutes = require("./modules/materiais/integracaoGoogleDriveRoutes");
 const {
   criarAutenticacaoMiddleware,
   autorizarAdmin
@@ -43,6 +48,24 @@ function criarConfiguracaoCors(configuracao) {
       callback(new AppError("Origem nao permitida", 403, "ORIGEM_NAO_PERMITIDA"));
     }
   };
+}
+
+function criarProviderGoogleDrivePadrao(configuracao) {
+  const googleDrive = configuracao.googleDrive || {};
+  const configurado = googleDrive.clientId
+    && googleDrive.clientSecret
+    && googleDrive.pastaRaizId
+    && googleDrive.redirectUri;
+  return configurado ? criarGoogleDriveProvider(googleDrive) : null;
+}
+
+function serializarRequisicaoParaLog(requisicao) {
+  const requisicaoSegura = Object.assign({}, requisicao);
+  if (typeof requisicaoSegura.url === "string") {
+    requisicaoSegura.url = requisicaoSegura.url.split("?")[0];
+  }
+  delete requisicaoSegura.query;
+  return requisicaoSegura;
 }
 
 function registrarModulos(aplicacao, configuracao, logger, dependencias) {
@@ -81,6 +104,17 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     usuarioRepository: usuarioRepository,
     estruturaRepository: estruturaRepository
   });
+  const googleDriveProvider = dependencias.googleDriveProvider
+    || criarProviderGoogleDrivePadrao(configuracao);
+  const integracaoGoogleDriveRepository = criarIntegracaoGoogleDriveRepository(pool);
+  const integracaoGoogleDriveService = criarIntegracaoGoogleDriveService({
+    repository: integracaoGoogleDriveRepository,
+    provider: googleDriveProvider,
+    configuracao: configuracao,
+    logger: logger,
+    agendarTarefa: dependencias.agendarTarefaGoogleDrive
+  });
+  aplicacao.locals.integracaoGoogleDriveService = integracaoGoogleDriveService;
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
     controller: criarAutenticacaoController(serviceAutenticacao, configuracao),
@@ -101,6 +135,14 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
   }));
+  aplicacao.use("/api/integracoes/google-drive", criarIntegracaoGoogleDriveRoutes({
+    controller: criarIntegracaoGoogleDriveController(
+      integracaoGoogleDriveService,
+      configuracao
+    ),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin
+  }));
 }
 
 function criarAplicacao(configuracao, logger, dependenciasInformadas) {
@@ -113,6 +155,9 @@ function criarAplicacao(configuracao, logger, dependenciasInformadas) {
   aplicacao.locals.logger = logger;
   aplicacao.use(pinoHttp({
     logger: logger,
+    serializers: {
+      req: serializarRequisicaoParaLog
+    },
     genReqId: function gerarIdDaRequisicao() {
       return crypto.randomUUID();
     }

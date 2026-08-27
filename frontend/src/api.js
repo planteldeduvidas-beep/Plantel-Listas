@@ -155,6 +155,24 @@ function revogarPermissao(permissaoId) {
   return requisitar("/permissoes/" + permissaoId, { method: "DELETE" });
 }
 
+function obterStatusGoogleDrive() {
+  return requisitar("/integracoes/google-drive/status", { method: "GET" });
+}
+
+function iniciarOAuthGoogleDrive() {
+  return requisitar("/integracoes/google-drive/oauth/iniciar", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+function sincronizarGoogleDrive() {
+  return requisitar("/integracoes/google-drive/sincronizar", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
 export {
   cadastrar,
   entrar,
@@ -170,6 +188,9 @@ export {
   listarPermissoes,
   listarMinhasPermissoes,
   concederPermissao,
-  revogarPermissao
+  revogarPermissao,
+  obterStatusGoogleDrive,
+  iniciarOAuthGoogleDrive,
+  sincronizarGoogleDrive
 };
 

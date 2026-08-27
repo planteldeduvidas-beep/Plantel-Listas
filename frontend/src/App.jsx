@@ -13,8 +13,9 @@ function App() {
   const [tokenRecuperacao] = useState(function lerTokenRecuperacao() {
     const parametros = new URLSearchParams(window.location.search);
     const token = parametros.get("tokenRecuperacao");
+    const retornoGoogleDrive = parametros.get("googleDrive");
 
-    if (token) {
+    if (token || retornoGoogleDrive) {
       window.history.replaceState({}, "", window.location.pathname);
     }
 

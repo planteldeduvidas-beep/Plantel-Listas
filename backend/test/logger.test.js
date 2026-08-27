@@ -64,3 +64,26 @@ test("nao registra senha enviada no corpo", async function testarCorpoForaDoLog(
   assert.equal(conteudo.includes("senha-do-corpo-que-nao-pode-vazar"), false);
 });
 
+test("remove codigo e estado OAuth da URL registrada", async function testarOAuthForaDoLog() {
+  const destino = new PassThrough();
+  let conteudo = "";
+  destino.on("data", function acumularDados(parte) {
+    conteudo += parte.toString("utf8");
+  });
+  const configuracao = {
+    ambiente: "test",
+    nivelDeLog: "info",
+    origensCors: ["http://localhost:5173"],
+    confiarProxy: false
+  };
+  const logger = criarLogger(configuracao, destino);
+  const app = criarAplicacao(configuracao, logger);
+  await request(app).get(
+    "/api/integracoes/google-drive/oauth/callback?code=codigo-oauth-secreto&state=estado-oauth-secreto"
+  );
+
+  assert.equal(conteudo.includes("codigo-oauth-secreto"), false);
+  assert.equal(conteudo.includes("estado-oauth-secreto"), false);
+  assert.equal(conteudo.includes("/api/integracoes/google-drive/oauth/callback"), true);
+});
+

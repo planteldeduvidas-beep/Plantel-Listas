@@ -1,7 +1,7 @@
 # ESTADO ATUAL DO PROJETO - PLANTEL LISTAS
 
 Versao da documentacao: 1.1
-Atualizado em: 26/08/2026
+Atualizado em: 27/08/2026
 
 ## Status
 
@@ -17,6 +17,12 @@ FASE 3 aprovada pelo responsavel humano e integrada na branch `main`.
 
 Categorias, disciplinas, concursos, acessos de professor por pasta e a revisao de UX foram aprovados. Nenhum deploy foi realizado.
 
+FASE 4 aprovada pelo responsavel humano e integrada na branch `main`.
+
+A integracao OAuth server-side, a indexacao administrativa e a sincronizacao idempotente do Google Drive foram validadas localmente com o acervo real. A sincronizacao longa foi desacoplada da requisicao HTTP, possui status persistido, polling no frontend e recuperacao de interrupcoes. Nenhum deploy foi realizado.
+
+O Google OAuth esta atualmente em modo `Testing`. Como o sistema utiliza `drive.readonly`, a autorizacao e o refresh token da conta de teste expiram apos aproximadamente sete dias e podem exigir reconexao. Isso e comportamento esperado do ambiente de teste, nao falha do Plantel Listas. Antes do uso definitivo sera necessario configurar o OAuth para producao e cumprir o processo de verificacao aplicavel a esse scope.
+
 A V1 esta funcionalmente congelada.
 
 ## Repositorio
@@ -31,6 +37,8 @@ A documentacao 1.1 e a fundacao tecnica da Fase 1 estao integradas na `main`.
 A implementacao aprovada da Fase 2 esta integrada na `main`.
 
 A implementacao aprovada da Fase 3 esta integrada na `main`.
+
+A implementacao aprovada da Fase 4 esta integrada na `main`.
 
 ## Arquitetura fechada
 
@@ -52,10 +60,21 @@ Banco:
 - MySQL Hostinger em producao.
 
 Arquivos:
-- Google Drive via Drive API.
+- Google Drive via Drive API, com OAuth server-side e indexacao de metadados no MySQL implementados na Fase 4;
+- arquivos continuam armazenados exclusivamente no Drive.
 
 Producao:
 - Hostinger Business Web Hosting.
+
+## Regra obrigatoria para arquivos na Fase 5
+
+O frontend nunca devera enviar `driveFileId` arbitrario para visualizar ou baixar arquivos.
+
+Fluxo obrigatorio:
+
+`materialId` -> MySQL -> validar disponibilidade e autorizacao -> obter `drive_file_id` internamente -> Google Drive.
+
+Download e player ainda nao foram implementados.
 
 ## Regra operacional
 
@@ -124,12 +143,15 @@ Google Drive:
 
 - definir URL/subdominio final do sistema;
 - definir o remetente definitivo de producao para recuperacao de senha;
-- configurar Google Cloud/Drive API na Fase 4;
-- validar escopo OAuth e status de producao na Fase 4/9;
+- definir a URL de producao para cadastrar a redirect URI OAuth definitiva;
+- configurar o OAuth para producao e cumprir a verificacao aplicavel ao scope `drive.readonly`;
+- validar o fluxo OAuth e a indexacao no ambiente de producao somente na fase de deploy autorizada;
+- avaliar otimizacao controlada da leitura de arvores muito grandes, preservando limites da API;
 - validar limite pratico de videos na Hostinger antes do go-live;
 - definir estrategia exata de migration no deploy Hostinger antes da Fase 9.
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para iniciar a Fase 4.
-2. Nao realizar deploy sem autorizacao explicita.
+1. Aguardar autorizacao explicita para iniciar a Fase 5.
+2. Nao iniciar a Fase 5 sem autorizacao explicita.
+3. Nao realizar deploy sem autorizacao explicita.

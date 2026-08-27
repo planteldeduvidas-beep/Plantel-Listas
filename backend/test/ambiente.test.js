@@ -70,3 +70,30 @@ test("recusa CORS irrestrito", function testarCorsIrrestrito() {
   }, /nao pode liberar/);
 });
 
+test("valida configuracao Google Drive sem expor ou exigir segredo opcional", function testarGoogleDrive() {
+  const variaveis = criarVariaveisValidas();
+  variaveis.GOOGLE_DRIVE_CLIENT_ID = "cliente.apps.googleusercontent.com";
+  variaveis.GOOGLE_DRIVE_CLIENT_SECRET = "segredo-google-de-teste";
+  variaveis.GOOGLE_DRIVE_PASTA_RAIZ_ID = "pastaRaizTeste12345";
+  variaveis.GOOGLE_DRIVE_REDIRECT_URI = "http://localhost:3000/api/integracoes/google-drive/oauth/callback";
+
+  const configuracao = validarVariaveisDeAmbiente(variaveis);
+  assert.equal(configuracao.googleDrive.clientId, "cliente.apps.googleusercontent.com");
+  assert.equal(configuracao.googleDrive.clientSecret, "segredo-google-de-teste");
+  assert.equal(configuracao.googleDrive.refreshToken, "");
+  assert.equal(
+    configuracao.googleDrive.escopoLeitura,
+    "https://www.googleapis.com/auth/drive.readonly"
+  );
+});
+
+test("exige HTTPS na redirect URI Google Drive em producao", function testarRedirectProducao() {
+  const variaveis = criarVariaveisValidas();
+  variaveis.NODE_ENV = "production";
+  variaveis.GOOGLE_DRIVE_REDIRECT_URI = "http://localhost:3000/api/integracoes/google-drive/oauth/callback";
+
+  assert.throws(function validar() {
+    validarVariaveisDeAmbiente(variaveis);
+  }, /GOOGLE_DRIVE_REDIRECT_URI/);
+});
+
