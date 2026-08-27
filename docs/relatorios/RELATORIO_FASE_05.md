@@ -19,6 +19,7 @@ Nao foram implementados upload, edicao, movimentacao, substituicao, lixeira oper
 - Base: `main` no commit `ed968f5`.
 - Commit tecnico: `2225fb9` - `feat: implementa consulta segura do acervo`.
 - Ajustes antes da validacao final: `57ed909` - `fix: reconcilia subarvores do google drive`.
+- Classificacao completa em escala: `7137d9d` - `fix: organiza classificacao do acervo em escala`.
 - A documentacao de fechamento esta consolidada na mesma branch.
 - Nenhum merge em `main` foi realizado.
 - Nenhum deploy foi realizado.
@@ -61,16 +62,34 @@ Foram adicionados indices compostos para disponibilidade, pasta, tipo e nome, al
 
 ## 5. Classificacao
 
-As pastas agora podem possuir disciplina e concurso proprios. A classificacao e herdada pelos descendentes e pode ser substituida manualmente pelo administrador.
+As pastas possuem estados independentes para disciplina e concurso: `herdar`, `definida` e `nao_se_aplica`. Um descendente pode substituir somente a dimensao necessaria. Assim, uma pasta `Fisica` dentro de `EFOMM` resulta simultaneamente em disciplina Fisica e concurso EFOMM.
 
-A classificacao automatica foi limitada a nomes inequivocos observados no acervo real, como disciplinas explicitas sob `LISTAS` e concursos explicitos sob `PROVAS ANTIGAS`. Nao foi codificada a arvore inteira do Drive e nao houve inferencia baseada em nomes ambiguos.
+As regras automaticas sao deterministicas, versionadas e auditadas por pasta, dimensao e codigo da regra. Elas usam contexto estrutural e nomes inequivocos, com normalizacao segura de maiusculas, minusculas e acentos, sem codificar a arvore inteira nem analisar arquivo por arquivo.
 
-Resultado inicial:
+Regras aplicadas ao acervo real:
 
-- 1.692 materiais classificados com alta confianca por heranca;
-- 5.061 materiais mantidos como nao classificados para revisao humana.
+- nomes explicitos das oito disciplinas encontradas, incluindo Biologia;
+- pastas dos 18 concursos militares sob `PROVAS ANTIGAS`;
+- 207 instituicoes encontradas diretamente sob `Vestibulares / Publica` e `Vestibulares / Privada`;
+- pastas compostas `Fisica IME` e `Quimica IME`, que transmitem disciplina e concurso;
+- raizes e pastas comprovadamente mistas ou administrativas, marcadas como `nao_se_aplica` na dimensao correta;
+- pastas do Prof. JP confirmadas como Fisica pelos nomes e pelo conteudo real observado.
 
-O painel administrativo informa a quantidade pendente e permite identificar cada pasta com linguagem simples.
+Ambiguidades verificadas incluíram `Listas de Fisica e Matematica`, `Professores variados` e provas que reúnem varias disciplinas ou concursos. Esses grupos nao receberam uma classificacao unica artificial: foram marcados como multidisciplinares/`nao_se_aplica`, enquanto subpastas especificas continuam sobrescrevendo a heranca. Nenhuma pasta exigiu revisao humana adicional nesta correcao; a verificacao estrutural e as regras de alta confianca resolveram todas as pastas que possuem materiais funcionais diretos.
+
+Resultado final sobre os 6.741 materiais funcionais da V1:
+
+- 623 com disciplina definida;
+- 6.231 com concurso definido;
+- 123 com disciplina e concurso definidos simultaneamente;
+- 6.618 com `nao_se_aplica` em pelo menos uma das duas dimensoes;
+- 0 materiais realmente pendentes;
+- 0 pastas pendentes;
+- 0 pastas que exigiram revisao humana individual nesta correcao.
+
+O painel informa `Todo o acervo esta organizado` quando nao ha pendencias. Se uma mudanca futura introduzir ambiguidade, mostra a quantidade de pastas, seus caminhos e a contagem de materiais diretos. O admin pode organizar uma pasta ou selecionar ate 100 pastas e aplicar disciplina, concurso, ambos, heranca ou `nao se aplica` em lote, sem ver IDs ou conceitos de banco.
+
+Uma segunda execucao das regras terminou com zero ajustes, confirmando idempotencia. Sincronizacoes completas e incrementais reaplicam as regras antes do commit. Novos materiais herdam a classificacao da subarvore; movimentacoes recalculam a heranca pelo novo caminho; overrides manuais sao preservados; e uma regra automatica que deixa de valer apos renomeacao ou movimentacao retorna de forma auditada ao estado herdado.
 
 ## 6. Seguranca dos arquivos
 
@@ -137,7 +156,9 @@ Referencias oficiais consultadas:
 
 `008_reconciliacao_subarvore.sql` adicionou o estado transitorio seguro `preparando` e permitiu persistir o canal antes de o Google informar o resource ID.
 
-As tres migrations da fase foram aplicadas no MySQL local e no banco isolado de testes. O executor reconheceu as migrations aplicadas nas execucoes seguintes sem duplicacao.
+`009_classificacao_acervo.sql` separou os estados de disciplina e concurso, adicionou origem e codigo de regra por dimensao, criou a auditoria de alteracoes, acrescentou Biologia ao catalogo e preparou os indices da organizacao em escala.
+
+As quatro migrations da fase foram aplicadas no MySQL local e no banco isolado de testes. O executor reconheceu as migrations aplicadas nas execucoes seguintes sem duplicacao.
 
 ## 10. Endpoints
 
@@ -146,7 +167,9 @@ Biblioteca autenticada:
 - `GET /api/acervo`;
 - `GET /api/acervo/materiais/:materialId/conteudo`;
 - `GET /api/acervo/materiais/:materialId/download`;
-- `PATCH /api/acervo/pastas/:categoriaId/classificacao` - somente admin e CSRF.
+- `GET /api/acervo/organizacao` - somente admin;
+- `PATCH /api/acervo/pastas/:categoriaId/classificacao` - somente admin e CSRF;
+- `PATCH /api/acervo/organizacao` - classificacao de ate 100 pastas, somente admin e CSRF.
 
 Atualizacoes do Drive:
 
@@ -156,9 +179,9 @@ Atualizacoes do Drive:
 
 ## 11. Testes
 
-Resultado final: **72 testes aprovados, 0 falhas**.
+Resultado final: **74 testes aprovados, 0 falhas**.
 
-Os 18 testes adicionados na Fase 5 cobrem:
+Os 20 testes adicionados na Fase 5 cobrem:
 
 - navegacao, breadcrumb, busca, filtros e paginacao;
 - SQL injection e parametros fora da allowlist;
@@ -174,13 +197,19 @@ Os 18 testes adicionados na Fase 5 cobrem:
 - `sync` sem processamento de material;
 - criacao, renomeacao, movimentacao, remocao e repeticao idempotente de subarvore;
 - atualizacao de caminho e classificacao herdada depois de movimentacao;
+- classificacao por pasta e em lote;
+- heranca independente de disciplina e concurso, combinacao das duas dimensoes e override;
+- `nao_se_aplica` distinto de pendencia;
+- nova pasta/material herdando a classificacao da subarvore;
+- filtros isolados e combinados imediatamente apos classificacao;
+- regras compostas e ausencia de inferencia para nome ambiguo;
 - entrada e saida da raiz, atalhos, page token perdido, fallback seguro e renovacao do canal.
 
 Os 54 testes das Fases 1 a 4 permaneceram aprovados.
 
 ## 12. Checks finais
 
-- `npm run check`: aprovado, 72 testes e build Vite com 27 modulos;
+- `npm run check`: aprovado, 74 testes e build Vite com 27 modulos;
 - `npm audit`: 0 vulnerabilidades;
 - `npm audit --omit=dev`: 0 vulnerabilidades;
 - `git diff --check`: aprovado;
@@ -208,7 +237,7 @@ O navegador integrado nao estava conectado. Por isso nao foi declarada validacao
 - testar seek e retomada em video local;
 - baixar PDF e video;
 - confirmar com o responsavel que DOCX, ODT e PNG permanecem fora do escopo funcional da V1;
-- revisar a experiencia responsiva e as classificacoes propostas;
+- revisar no navegador a experiencia responsiva e confirmar a mensagem `Todo o acervo esta organizado`;
 - em producao, depois de URL e deploy autorizados, validar webhook HTTPS, renovacao real do canal e videos grandes sob os limites da Hostinger.
 
 ## 15. Estado final
