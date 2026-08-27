@@ -282,6 +282,14 @@ textarea:focus {
   gap: 7px;
 }
 
+.organizacao-lote { gap: 14px; padding: 18px; border: 1px solid #bfe8e4; border-radius: 12px; background: #f4fbfa; }
+.organizacao-lote h3 { margin: 0 0 4px; }
+.lista-pastas-pendentes { display: grid; max-height: 280px; gap: 8px; overflow: auto; }
+.lista-pastas-pendentes label { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 8px; background: #ffffff; }
+.lista-pastas-pendentes input { width: 18px; margin-top: 3px; }
+.lista-pastas-pendentes span { display: grid; gap: 3px; }
+.campos-lote { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)) auto; align-items: end; gap: 10px; }
+
 .item-material {
   display: flex;
   flex-direction: column;
@@ -666,7 +674,8 @@ button:disabled {
   }
 
   .busca-acervo,
-  .filtros-acervo {
+  .filtros-acervo,
+  .campos-lote {
     grid-template-columns: 1fr;
   }
 

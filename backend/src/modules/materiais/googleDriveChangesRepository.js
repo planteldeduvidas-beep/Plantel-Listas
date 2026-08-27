@@ -1,4 +1,5 @@
 const AppError = require("../../shared/errors/AppError");
+const { aplicarClassificacaoAutomatica } = require("./classificacaoAutomatica");
 
 function identificarTipo(mimeType) {
   if (mimeType === "application/pdf") {
@@ -333,6 +334,7 @@ function criarGoogleDriveChangesRepository(pool) {
         + "reconciliacao_necessaria=IF(reconciliacao_necessaria=1 OR ?,1,0) WHERE id=1",
         [novoPageToken, reconciliacao ? 1 : 0]
       );
+      await aplicarClassificacaoAutomatica(conexao);
       await conexao.commit();
       return { atualizados: atualizados, indisponiveis: indisponiveis, reconciliacaoNecessaria: reconciliacao };
     } catch (erro) {

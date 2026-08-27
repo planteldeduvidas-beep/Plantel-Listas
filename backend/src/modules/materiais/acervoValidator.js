@@ -61,24 +61,55 @@ function validarMaterialId(valor) {
 
 function validarClassificacao(corpo) {
   const dados = corpo || {};
-  const permitidos = ["disciplinaId", "concursoId"];
+  const permitidos = ["disciplina", "concurso"];
   Object.keys(dados).forEach(function validarCampo(campo) {
     if (!permitidos.includes(campo)) {
       throw new AppError("Campo nao permitido", 400, "MASS_ASSIGNMENT_RECUSADO");
     }
   });
-  if (!Object.prototype.hasOwnProperty.call(dados, "disciplinaId")
-      || !Object.prototype.hasOwnProperty.call(dados, "concursoId")) {
+  if (!dados.disciplina && !dados.concurso) {
     throw new AppError("Classificacao incompleta", 400, "DADOS_INVALIDOS");
   }
-  return {
-    disciplinaId: dados.disciplinaId === null ? null : lerInteiroPositivo(dados.disciplinaId, "Disciplina", false),
-    concursoId: dados.concursoId === null ? null : lerInteiroPositivo(dados.concursoId, "Concurso", false)
-  };
+  const resultado = {};
+  ["disciplina", "concurso"].forEach(function validarDimensao(dimensao) {
+    if (!dados[dimensao]) {
+      return;
+    }
+    const valor = dados[dimensao];
+    if (typeof valor !== "object" || Array.isArray(valor)
+        || Object.keys(valor).some(function campo(chave) { return !["estado", "id"].includes(chave); })
+        || !["herdar", "definida", "nao_se_aplica"].includes(valor.estado)) {
+      throw new AppError("Classificacao invalida", 400, "DADOS_INVALIDOS");
+    }
+    if (valor.estado === "definida") {
+      resultado[dimensao] = { estado: valor.estado, id: lerInteiroPositivo(valor.id, dimensao, false) };
+    } else {
+      if (Object.prototype.hasOwnProperty.call(valor, "id") && valor.id !== null) {
+        throw new AppError("Classificacao invalida", 400, "DADOS_INVALIDOS");
+      }
+      resultado[dimensao] = { estado: valor.estado, id: null };
+    }
+  });
+  return resultado;
+}
+
+function validarClassificacaoEmLote(corpo) {
+  const dados = corpo || {};
+  if (Object.keys(dados).some(function campo(chave) {
+    return !["categoriaIds", "disciplina", "concurso"].includes(chave);
+  }) || !Array.isArray(dados.categoriaIds) || dados.categoriaIds.length < 1 || dados.categoriaIds.length > 100) {
+    throw new AppError("Selecao de pastas invalida", 400, "DADOS_INVALIDOS");
+  }
+  const ids = [...new Set(dados.categoriaIds.map(function mapear(id) {
+    return lerInteiroPositivo(id, "Pasta", false);
+  }))];
+  const classificacao = validarClassificacao({ disciplina: dados.disciplina, concurso: dados.concurso });
+  return { categoriaIds: ids, disciplina: classificacao.disciplina, concurso: classificacao.concurso };
 }
 
 module.exports = {
   validarConsulta: validarConsulta,
   validarMaterialId: validarMaterialId,
-  validarClassificacao: validarClassificacao
+  validarClassificacao: validarClassificacao,
+  validarClassificacaoEmLote: validarClassificacaoEmLote
 };

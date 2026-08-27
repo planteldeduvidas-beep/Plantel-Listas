@@ -1,15 +1,18 @@
 function criarArvoreSql() {
   return "WITH RECURSIVE arvore AS ("
     + "SELECT c.id,c.nome,c.descricao,c.categoria_pai_id,c.drive_pasta_id,c.ativo,"
-    + "c.disciplina_id,c.concurso_id,c.classificacao_origem,"
-    + "c.disciplina_id AS disciplina_efetiva_id,c.concurso_id AS concurso_efetivo_id,"
+    + "c.disciplina_id,c.disciplina_estado,c.disciplina_origem,c.concurso_id,c.concurso_estado,c.concurso_origem,c.classificacao_origem,"
+    + "IF(c.disciplina_estado='definida',c.disciplina_id,NULL) AS disciplina_efetiva_id,IF(c.disciplina_estado='herdar','pendente',c.disciplina_estado) AS disciplina_efetiva_estado,"
+    + "IF(c.concurso_estado='definida',c.concurso_id,NULL) AS concurso_efetivo_id,IF(c.concurso_estado='herdar','pendente',c.concurso_estado) AS concurso_efetivo_estado,"
     + "CAST(c.nome AS CHAR(4000)) AS caminho_texto,0 AS nivel "
     + "FROM categorias c WHERE c.categoria_pai_id IS NULL "
     + "UNION ALL "
     + "SELECT f.id,f.nome,f.descricao,f.categoria_pai_id,f.drive_pasta_id,f.ativo,"
-    + "f.disciplina_id,f.concurso_id,f.classificacao_origem,"
-    + "COALESCE(f.disciplina_id,p.disciplina_efetiva_id),"
-    + "COALESCE(f.concurso_id,p.concurso_efetivo_id),"
+    + "f.disciplina_id,f.disciplina_estado,f.disciplina_origem,f.concurso_id,f.concurso_estado,f.concurso_origem,f.classificacao_origem,"
+    + "IF(f.disciplina_estado='herdar',p.disciplina_efetiva_id,f.disciplina_id),"
+    + "IF(f.disciplina_estado='herdar',p.disciplina_efetiva_estado,f.disciplina_estado),"
+    + "IF(f.concurso_estado='herdar',p.concurso_efetivo_id,f.concurso_id),"
+    + "IF(f.concurso_estado='herdar',p.concurso_efetivo_estado,f.concurso_estado),"
     + "CONCAT(p.caminho_texto,' / ',f.nome),p.nivel+1 "
     + "FROM categorias f INNER JOIN arvore p ON f.categoria_pai_id=p.id) ";
 }
@@ -23,7 +26,9 @@ function mapearPasta(registro) {
     quantidadeMateriais: Number(registro.quantidade_materiais || 0),
     disciplina: registro.disciplina_nome ? { id: Number(registro.disciplina_efetiva_id), nome: registro.disciplina_nome } : null,
     concurso: registro.concurso_nome ? { id: Number(registro.concurso_efetivo_id), nome: registro.concurso_nome } : null,
-    classificacaoDireta: Boolean(registro.disciplina_id || registro.concurso_id),
+    classificacaoDireta: registro.disciplina_estado !== "herdar" || registro.concurso_estado !== "herdar",
+    disciplinaEstado: registro.disciplina_estado,
+    concursoEstado: registro.concurso_estado,
     classificacaoOrigem: registro.classificacao_origem
   };
 }
@@ -123,7 +128,7 @@ function criarAcervoRepository(pool) {
       + "LEFT JOIN disciplinas d ON d.id=COALESCE(m.disciplina_id,a.disciplina_efetiva_id) AND d.ativo=1 "
       + "LEFT JOIN concursos c ON c.id=COALESCE(m.concurso_id,a.concurso_efetivo_id) AND c.ativo=1 "
       + "WHERE " + consulta.sql;
-    const [totais] = await pool.execute("WITH RECURSIVE arvore AS (SELECT c.id,c.nome,c.categoria_pai_id,c.ativo,c.disciplina_id AS disciplina_efetiva_id,c.concurso_id AS concurso_efetivo_id,CAST(c.nome AS CHAR(4000)) AS caminho_texto FROM categorias c WHERE c.categoria_pai_id IS NULL UNION ALL SELECT f.id,f.nome,f.categoria_pai_id,f.ativo,COALESCE(f.disciplina_id,p.disciplina_efetiva_id),COALESCE(f.concurso_id,p.concurso_efetivo_id),CONCAT(p.caminho_texto,' / ',f.nome) FROM categorias f INNER JOIN arvore p ON f.categoria_pai_id=p.id) SELECT COUNT(*) AS total FROM materiais m INNER JOIN arvore a ON a.id=m.categoria_id WHERE " + consulta.sql, consulta.parametros);
+    const [totais] = await pool.execute(criarArvoreSql() + "SELECT COUNT(*) AS total FROM materiais m INNER JOIN arvore a ON a.id=m.categoria_id WHERE " + consulta.sql, consulta.parametros);
     const deslocamento = (filtros.pagina - 1) * filtros.limite;
     const [registros] = await pool.execute(
       criarArvoreSql() + "SELECT m.id,m.nome,m.tipo,m.extensao,m.tamanho_bytes,m.drive_modificado_em,"
@@ -155,21 +160,99 @@ function criarAcervoRepository(pool) {
     return registros[0] || null;
   }
 
-  async function atualizarClassificacaoCategoria(id, dados) {
-    await pool.execute(
-      "UPDATE categorias SET disciplina_id=?,concurso_id=?,classificacao_origem='manual' WHERE id=?",
-      [dados.disciplinaId, dados.concursoId, id]
-    );
-    return buscarCategoria(id);
+  async function referenciaExiste(tabela, id, conexao) {
+    if (!id) {
+      return true;
+    }
+    const [registros] = await conexao.execute("SELECT id FROM " + tabela + " WHERE id=? AND ativo=1 LIMIT 1", [id]);
+    return registros.length === 1;
   }
 
-  async function contarNaoClassificados() {
+  async function atualizarClassificacaoCategorias(ids, dados, usuarioId) {
+    const conexao = await pool.getConnection();
+    try {
+      await conexao.beginTransaction();
+      if (dados.disciplina && dados.disciplina.estado === "definida"
+          && !await referenciaExiste("disciplinas", dados.disciplina.id, conexao)) {
+        throw new Error("DISCIPLINA_INEXISTENTE");
+      }
+      if (dados.concurso && dados.concurso.estado === "definida"
+          && !await referenciaExiste("concursos", dados.concurso.id, conexao)) {
+        throw new Error("CONCURSO_INEXISTENTE");
+      }
+      for (const id of ids) {
+        const [atuais] = await conexao.execute(
+          "SELECT disciplina_id,disciplina_estado,concurso_id,concurso_estado FROM categorias WHERE id=? AND ativo=1 FOR UPDATE",
+          [id]
+        );
+        if (!atuais[0]) {
+          throw new Error("CATEGORIA_INEXISTENTE");
+        }
+        for (const dimensao of ["disciplina", "concurso"]) {
+          const nova = dados[dimensao];
+          if (!nova) {
+            continue;
+          }
+          const referencia = nova.estado === "definida" ? nova.id : null;
+          await conexao.execute(
+            "INSERT INTO auditoria_classificacao_categorias "
+            + "(categoria_id,dimensao,estado_anterior,referencia_anterior_id,estado_novo,referencia_nova_id,origem,usuario_id) "
+            + "VALUES (?,?,?,?,?,?,'manual',?)",
+            [id, dimensao, atuais[0][dimensao + "_estado"], atuais[0][dimensao + "_id"], nova.estado, referencia, usuarioId]
+          );
+          await conexao.execute(
+            "UPDATE categorias SET " + dimensao + "_id=?," + dimensao + "_estado=?,"
+            + dimensao + "_origem='manual'," + dimensao + "_regra_codigo=NULL,classificacao_origem='manual' WHERE id=?",
+            [referencia, nova.estado, id]
+          );
+        }
+      }
+      await conexao.commit();
+    } catch (erro) {
+      await conexao.rollback();
+      throw erro;
+    } finally {
+      conexao.release();
+    }
+  }
+
+  async function obterOrganizacao() {
     const [registros] = await pool.execute(
-      criarArvoreSql() + "SELECT COUNT(*) AS total FROM materiais m INNER JOIN arvore a ON a.id=m.categoria_id "
-      + "WHERE m.disponivel=1 AND m.tipo IN ('pdf','video') "
-      + "AND a.disciplina_efetiva_id IS NULL AND a.concurso_efetivo_id IS NULL"
+      criarArvoreSql() + "SELECT COUNT(*) AS total,"
+      + "SUM(IF(COALESCE(m.disciplina_id,a.disciplina_efetiva_id) IS NOT NULL,1,0)) AS com_disciplina,"
+      + "SUM(IF(COALESCE(m.concurso_id,a.concurso_efetivo_id) IS NOT NULL,1,0)) AS com_concurso,"
+      + "SUM(IF(COALESCE(m.disciplina_id,a.disciplina_efetiva_id) IS NOT NULL AND COALESCE(m.concurso_id,a.concurso_efetivo_id) IS NOT NULL,1,0)) AS com_ambos,"
+      + "SUM(IF(a.disciplina_efetiva_estado='nao_se_aplica' OR a.concurso_efetivo_estado='nao_se_aplica',1,0)) AS nao_se_aplica,"
+      + "SUM(IF((m.disciplina_id IS NULL AND a.disciplina_efetiva_estado='pendente') OR (m.concurso_id IS NULL AND a.concurso_efetivo_estado='pendente'),1,0)) AS materiais_pendentes "
+      + "FROM materiais m INNER JOIN arvore a ON a.id=m.categoria_id "
+      + "WHERE m.disponivel=1 AND m.tipo IN ('pdf','video') AND a.ativo=1"
     );
-    return Number(registros[0].total);
+    const [pastas] = await pool.execute(
+      criarArvoreSql() + "SELECT a.id,a.caminho_texto,a.disciplina_efetiva_estado,a.concurso_efetivo_estado,"
+      + "COUNT(m.id) AS quantidade_materiais FROM arvore a INNER JOIN materiais m ON m.categoria_id=a.id "
+      + "WHERE a.ativo=1 AND m.disponivel=1 AND m.tipo IN ('pdf','video') "
+      + "AND ((m.disciplina_id IS NULL AND a.disciplina_efetiva_estado='pendente') "
+      + "OR (m.concurso_id IS NULL AND a.concurso_efetivo_estado='pendente')) "
+      + "GROUP BY a.id,a.caminho_texto,a.disciplina_efetiva_estado,a.concurso_efetivo_estado ORDER BY a.caminho_texto"
+    );
+    const resumo = registros[0];
+    return {
+      totalMateriais: Number(resumo.total || 0),
+      comDisciplina: Number(resumo.com_disciplina || 0),
+      comConcurso: Number(resumo.com_concurso || 0),
+      comAmbos: Number(resumo.com_ambos || 0),
+      naoSeAplica: Number(resumo.nao_se_aplica || 0),
+      materiaisPendentes: Number(resumo.materiais_pendentes || 0),
+      pastasPendentes: pastas.map(function mapear(item) {
+        return {
+          id: Number(item.id),
+          caminho: item.caminho_texto,
+          quantidadeMateriais: Number(item.quantidade_materiais),
+          disciplinaPendente: item.disciplina_efetiva_estado === "pendente",
+          concursoPendente: item.concurso_efetivo_estado === "pendente"
+        };
+      })
+    };
   }
 
   return {
@@ -179,8 +262,8 @@ function criarAcervoRepository(pool) {
     listarMateriais: listarMateriais,
     listarFiltros: listarFiltros,
     buscarMaterialDisponivel: buscarMaterialDisponivel,
-    atualizarClassificacaoCategoria: atualizarClassificacaoCategoria,
-    contarNaoClassificados: contarNaoClassificados
+    atualizarClassificacaoCategorias: atualizarClassificacaoCategorias,
+    obterOrganizacao: obterOrganizacao
   };
 }
 

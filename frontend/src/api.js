@@ -197,14 +197,22 @@ function obterUrlDoMaterial(materialId, baixar) {
   return API_BASE + "/acervo/materiais/" + id + (baixar ? "/download" : "/conteudo");
 }
 
-function classificarPasta(categoriaId, disciplinaId, concursoId) {
+function classificarPasta(categoriaId, disciplina, concurso) {
   return requisitar("/acervo/pastas/" + categoriaId + "/classificacao", {
     method: "PATCH",
-    body: JSON.stringify({
-      disciplinaId: disciplinaId || null,
-      concursoId: concursoId || null
-    })
+    body: JSON.stringify({ disciplina: disciplina, concurso: concurso })
   });
+}
+
+function obterOrganizacaoAcervo() {
+  return requisitar("/acervo/organizacao", { method: "GET" });
+}
+
+function classificarPastas(categoriaIds, disciplina, concurso) {
+  const corpo = { categoriaIds: categoriaIds };
+  if (disciplina) corpo.disciplina = disciplina;
+  if (concurso) corpo.concurso = concurso;
+  return requisitar("/acervo/organizacao", { method: "PATCH", body: JSON.stringify(corpo) });
 }
 
 export {
@@ -229,6 +237,8 @@ export {
   obterStatusDasAtualizacoesGoogleDrive,
   consultarAcervo,
   obterUrlDoMaterial,
-  classificarPasta
+  classificarPasta,
+  obterOrganizacaoAcervo,
+  classificarPastas
 };
 

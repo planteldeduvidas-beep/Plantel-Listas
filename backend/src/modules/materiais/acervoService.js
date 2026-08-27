@@ -2,7 +2,8 @@ const AppError = require("../../shared/errors/AppError");
 const {
   validarConsulta,
   validarMaterialId,
-  validarClassificacao
+  validarClassificacao,
+  validarClassificacaoEmLote
 } = require("./acervoValidator");
 
 function criarAcervoService(dependencias) {
@@ -22,8 +23,7 @@ function criarAcervoService(dependencias) {
       repository.listarBreadcrumb(filtros.categoriaId),
       filtros.busca ? Promise.resolve([]) : repository.listarPastas(filtros.categoriaId),
       repository.listarMateriais(filtros),
-      repository.listarFiltros(),
-      repository.contarNaoClassificados()
+      repository.listarFiltros()
     ]);
     const totalPaginas = Math.max(1, Math.ceil(resultados[2].total / filtros.limite));
     return {
@@ -36,8 +36,7 @@ function criarAcervoService(dependencias) {
         totalItens: resultados[2].total,
         totalPaginas: totalPaginas
       },
-      filtros: resultados[3],
-      naoClassificados: resultados[4]
+      filtros: resultados[3]
     };
   }
 
@@ -92,21 +91,47 @@ function criarAcervoService(dependencias) {
     }
   }
 
-  async function classificarPasta(categoriaIdInformado, corpo) {
+  async function classificarPasta(categoriaIdInformado, corpo, usuarioId) {
     const categoriaId = validarMaterialId(categoriaIdInformado);
     const dados = validarClassificacao(corpo);
     const categoria = await repository.buscarCategoria(categoriaId);
     if (!categoria) {
       throw new AppError("Pasta nao encontrada", 404, "PASTA_NAO_ENCONTRADA");
     }
-    await repository.atualizarClassificacaoCategoria(categoriaId, dados);
+    try {
+      await repository.atualizarClassificacaoCategorias([categoriaId], dados, usuarioId);
+    } catch (erro) {
+      if (["DISCIPLINA_INEXISTENTE", "CONCURSO_INEXISTENTE", "CATEGORIA_INEXISTENTE"].includes(erro.message)) {
+        throw new AppError("Opcao de organizacao invalida", 400, "DADOS_INVALIDOS");
+      }
+      throw erro;
+    }
     return { atualizada: true };
+  }
+
+  async function obterOrganizacao() {
+    return repository.obterOrganizacao();
+  }
+
+  async function classificarPastas(corpo, usuarioId) {
+    const dados = validarClassificacaoEmLote(corpo);
+    try {
+      await repository.atualizarClassificacaoCategorias(dados.categoriaIds, dados, usuarioId);
+    } catch (erro) {
+      if (["DISCIPLINA_INEXISTENTE", "CONCURSO_INEXISTENTE", "CATEGORIA_INEXISTENTE"].includes(erro.message)) {
+        throw new AppError("Opcao de organizacao invalida", 400, "DADOS_INVALIDOS");
+      }
+      throw erro;
+    }
+    return { atualizadas: dados.categoriaIds.length };
   }
 
   return {
     consultar: consultar,
     obterArquivo: obterArquivo,
-    classificarPasta: classificarPasta
+    classificarPasta: classificarPasta,
+    obterOrganizacao: obterOrganizacao,
+    classificarPastas: classificarPastas
   };
 }
 

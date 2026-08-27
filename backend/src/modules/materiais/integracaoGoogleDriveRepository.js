@@ -1,4 +1,5 @@
 const AppError = require("../../shared/errors/AppError");
+const { aplicarClassificacaoAutomatica } = require("./classificacaoAutomatica");
 
 function mapearSincronizacao(registro) {
   if (!registro) {
@@ -376,6 +377,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
         + "WHERE drive_pasta_id IS NOT NULL AND ultima_sincronizacao_drive_id <> ?",
         [sincronizacaoId]
       );
+      await aplicarClassificacaoAutomatica(conexao);
       await conexao.commit();
 
       return {

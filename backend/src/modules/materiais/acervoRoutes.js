@@ -7,6 +7,7 @@ function criarAcervoRoutes(dependencias) {
   router.use(impedirCachePrivado);
   router.use(dependencias.autenticar);
   router.get("/", dependencias.controller.consultar);
+  router.get("/organizacao", dependencias.autorizarAdmin, dependencias.controller.obterOrganizacao);
   router.get("/materiais/:materialId/conteudo", dependencias.controller.visualizar);
   router.get("/materiais/:materialId/download", dependencias.controller.baixar);
   router.patch(
@@ -14,6 +15,12 @@ function criarAcervoRoutes(dependencias) {
     dependencias.autorizarAdmin,
     protegerContraCsrf,
     dependencias.controller.classificarPasta
+  );
+  router.patch(
+    "/organizacao",
+    dependencias.autorizarAdmin,
+    protegerContraCsrf,
+    dependencias.controller.classificarPastas
   );
   return router;
 }

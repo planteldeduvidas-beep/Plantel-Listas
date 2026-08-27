@@ -11,6 +11,7 @@ const { ESCOPO_LEITURA } = require("../src/shared/providers/googleDriveProvider"
 const { gerarHashDoToken } = require("../src/shared/utils/tokens");
 const criarChangesRepository = require("../src/modules/materiais/googleDriveChangesRepository");
 const criarAcervoRepository = require("../src/modules/materiais/acervoRepository");
+const { recomendacaoDaCategoria } = require("../src/modules/materiais/classificacaoAutomatica");
 
 const base = obterConfiguracao();
 const nomeBanco = process.env.DB_TEST_NAME || base.banco.nome + "_test";
@@ -86,6 +87,7 @@ async function limpar() {
   await pool.execute("DELETE FROM canais_google_drive");
   await pool.execute("DELETE FROM estado_changes_google_drive");
   await pool.execute("DELETE FROM materiais");
+  await pool.execute("DELETE FROM auditoria_classificacao_categorias");
   await limparCategorias();
   await pool.execute("DELETE FROM disciplinas");
   await pool.execute("DELETE FROM concursos");
@@ -125,7 +127,8 @@ test.beforeEach(async function preparar() {
   const [disciplina] = await pool.execute("INSERT INTO disciplinas (nome) VALUES ('Matemática')");
   disciplinaId = Number(disciplina.insertId);
   const [categoria] = await pool.execute(
-    "INSERT INTO categorias (nome,drive_pasta_id,disciplina_id,classificacao_origem) VALUES ('Listas','drivePastaFase5',?,'manual')",
+    "INSERT INTO categorias (nome,drive_pasta_id,disciplina_id,disciplina_estado,disciplina_origem,classificacao_origem) "
+    + "VALUES ('Listas','drivePastaFase5',?,'definida','manual','manual')",
     [disciplinaId]
   );
   categoriaId = Number(categoria.insertId);
@@ -166,6 +169,18 @@ test("navega com breadcrumb, busca parametrizada, filtros e paginacao", async fu
   assert.equal(injecao.body.paginacao.totalItens, 0);
 });
 
+test("regras automaticas usam nomes e contextos inequivocos sem classificar pasta ambigua", function testarRegrasAutomaticas() {
+  const raiz = { id: 1, nome: "LISTAS", categoria_pai_id: null };
+  const mapas = new Map([[1, raiz]]);
+  const composta = recomendacaoDaCategoria({ id: 2, nome: "Física IME", categoria_pai_id: 1 }, mapas);
+  assert.equal(composta.disciplina.nome, "Física");
+  assert.equal(composta.concurso.nome, "IME");
+  const multidisciplinar = recomendacaoDaCategoria({ id: 3, nome: "Física e Matemática", categoria_pai_id: 1 }, mapas);
+  assert.equal(multidisciplinar.disciplina.estado, "nao_se_aplica");
+  const ambigua = recomendacaoDaCategoria({ id: 4, nome: "Materiais novos", categoria_pai_id: 1 }, mapas);
+  assert.equal(ambigua.disciplina, undefined);
+});
+
 test("entrega PDF e Range por materialId sem aceitar driveFileId do cliente", async function testarArquivo() {
   const autenticado = await autenticar("aluno");
   const pdf = await autenticado.agente.get("/api/acervo/materiais/" + materialId + "/conteudo");
@@ -200,15 +215,19 @@ test("download usa anexo e nome seguro e material indisponivel nao e entregue", 
 test("classificacao e exclusiva de admin, exige CSRF e bloqueia mass assignment", async function testarClassificacao() {
   const aluno = await autenticar("aluno");
   const proibido = await aluno.agente.patch("/api/acervo/pastas/" + categoriaId + "/classificacao")
-    .set("X-CSRF-Token", aluno.csrf).send({ disciplinaId: null, concursoId: null });
+    .set("X-CSRF-Token", aluno.csrf).send({ disciplina: { estado: "herdar", id: null } });
   assert.equal(proibido.status, 403);
+  assert.equal((await aluno.agente.get("/api/acervo/organizacao")).status, 403);
 
   const admin = await autenticar("admin");
   const semCsrf = await admin.agente.patch("/api/acervo/pastas/" + categoriaId + "/classificacao")
-    .send({ disciplinaId: null, concursoId: null });
+    .send({ disciplina: { estado: "herdar", id: null } });
   assert.equal(semCsrf.status, 403);
+  const loteSemCsrf = await admin.agente.patch("/api/acervo/organizacao")
+    .send({ categoriaIds: [categoriaId], concurso: { estado: "nao_se_aplica", id: null } });
+  assert.equal(loteSemCsrf.status, 403);
   const excesso = await admin.agente.patch("/api/acervo/pastas/" + categoriaId + "/classificacao")
-    .set("X-CSRF-Token", admin.csrf).send({ disciplinaId: null, concursoId: null, driveFileId: "nao" });
+    .set("X-CSRF-Token", admin.csrf).send({ disciplina: { estado: "herdar", id: null }, driveFileId: "nao" });
   assert.equal(excesso.status, 400);
 });
 
@@ -239,6 +258,62 @@ test("arquivos fora dos tipos aprovados nao aparecem nem sao entregues", async f
     "/api/acervo/materiais/" + Number(outro.insertId) + "/download"
   )).status, 404);
   assert.equal((await autenticado.agente.get("/api/acervo?tipo=outro")).status, 400);
+});
+
+test("classifica subarvores em lote com heranca, override, nao se aplica e filtros imediatos", async function testarOrganizacaoEmEscala() {
+  const [fisica] = await pool.execute("INSERT INTO disciplinas (nome) VALUES ('Física')");
+  const [efomm] = await pool.execute("INSERT INTO concursos (nome) VALUES ('EFOMM')");
+  const [provas] = await pool.execute(
+    "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id,concurso_id,concurso_estado,concurso_origem) "
+    + "VALUES ('EFOMM',?,'driveEfommOrganizacao',?,'definida','manual')",
+    [categoriaId, Number(efomm.insertId)]
+  );
+  const [fisicaPasta] = await pool.execute(
+    "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id,disciplina_id,disciplina_estado,disciplina_origem) "
+    + "VALUES ('Física',?,'driveFisicaOrganizacao',?,'definida','manual')",
+    [Number(provas.insertId), Number(fisica.insertId)]
+  );
+  const [novaPasta] = await pool.execute(
+    "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id) VALUES ('2026',?,'driveNovaOrganizacao')",
+    [Number(fisicaPasta.insertId)]
+  );
+  const [sync] = await pool.execute("SELECT id FROM sincronizacoes_google_drive ORDER BY id DESC LIMIT 1");
+  await pool.execute(
+    "INSERT INTO materiais (drive_file_id,categoria_id,nome,mime_type,tipo,extensao,ultima_sincronizacao_drive_id) "
+    + "VALUES ('driveHerdadoOrganizacao',?,'fisica-efomm.pdf','application/pdf','pdf','pdf',?)",
+    [Number(novaPasta.insertId), Number(sync[0].id)]
+  );
+  const repository = criarAcervoRepository(pool);
+  const combinados = await repository.listarMateriais({
+    categoriaId: null, pagina: 1, limite: 20, busca: "fisica-efomm.pdf", tipo: null,
+    disciplinaId: Number(fisica.insertId), concursoId: Number(efomm.insertId), ordenar: "nome_asc"
+  });
+  assert.equal(combinados.total, 1);
+  assert.equal(combinados.itens[0].disciplina.id, Number(fisica.insertId));
+  assert.equal(combinados.itens[0].concurso.id, Number(efomm.insertId));
+
+  const admin = await autenticar("admin");
+  const lote = await admin.agente.patch("/api/acervo/organizacao")
+    .set("X-CSRF-Token", admin.csrf)
+    .send({ categoriaIds: [categoriaId], concurso: { estado: "nao_se_aplica", id: null } });
+  assert.equal(lote.status, 200);
+  assert.equal(lote.body.atualizadas, 1);
+  const organizacao = await admin.agente.get("/api/acervo/organizacao");
+  assert.equal(organizacao.status, 200);
+  assert.equal(organizacao.body.pastasPendentes.length, 0);
+
+  const [destino] = await pool.execute(
+    "INSERT INTO categorias (nome,drive_pasta_id,concurso_estado,concurso_origem) "
+    + "VALUES ('Sem concurso','driveDestinoSemConcurso','nao_se_aplica','manual')"
+  );
+  await pool.execute("UPDATE categorias SET categoria_pai_id=? WHERE id=?", [Number(destino.insertId), Number(fisicaPasta.insertId)]);
+  const movido = await repository.listarMateriais({
+    categoriaId: Number(destino.insertId), pagina: 1, limite: 20, busca: "fisica-efomm.pdf", tipo: null,
+    disciplinaId: Number(fisica.insertId), concursoId: null, ordenar: "nome_asc"
+  });
+  assert.equal(movido.total, 1);
+  assert.equal(movido.itens[0].disciplina.id, Number(fisica.insertId));
+  assert.equal(movido.itens[0].concurso, null);
 });
 
 test("webhook valida canal e token, aceita chamada publica e ignora duplicata", async function testarWebhook() {
@@ -296,8 +371,8 @@ test("sync inicial pode chegar com canal ainda em preparacao e nao processa mate
 
 test("reconcilia renomeacao, movimentacao e remocao de subarvore sem full sync", async function testarSubarvore() {
   const [destino] = await pool.execute(
-    "INSERT INTO categorias (nome,drive_pasta_id,disciplina_id,classificacao_origem) "
-    + "VALUES ('Destino','driveDestinoFase5',?,'manual')",
+    "INSERT INTO categorias (nome,drive_pasta_id,disciplina_id,disciplina_estado,disciplina_origem,classificacao_origem) "
+    + "VALUES ('Destino','driveDestinoFase5',?,'definida','manual','manual')",
     [disciplinaId]
   );
   const [afetada] = await pool.execute(

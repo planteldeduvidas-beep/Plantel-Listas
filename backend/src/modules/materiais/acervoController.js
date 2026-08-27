@@ -77,8 +77,24 @@ function criarAcervoController(service) {
 
   async function classificarPasta(req, res, next) {
     try {
-      const resultado = await service.classificarPasta(req.params.categoriaId, req.body);
+      const resultado = await service.classificarPasta(req.params.categoriaId, req.body, req.usuario.id);
       res.status(200).json(resultado);
+    } catch (erro) {
+      next(erro);
+    }
+  }
+
+  async function obterOrganizacao(req, res, next) {
+    try {
+      res.status(200).json(await service.obterOrganizacao());
+    } catch (erro) {
+      next(erro);
+    }
+  }
+
+  async function classificarPastas(req, res, next) {
+    try {
+      res.status(200).json(await service.classificarPastas(req.body, req.usuario.id));
     } catch (erro) {
       next(erro);
     }
@@ -88,7 +104,9 @@ function criarAcervoController(service) {
     consultar: consultar,
     visualizar: visualizar,
     baixar: baixar,
-    classificarPasta: classificarPasta
+    classificarPasta: classificarPasta,
+    obterOrganizacao: obterOrganizacao,
+    classificarPastas: classificarPastas
   };
 }
 
