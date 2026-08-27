@@ -71,7 +71,7 @@ function criarGoogleDriveChangesRepository(pool) {
       + "ON DUPLICATE KEY UPDATE drive_parent_file_id=novo.drive_parent_file_id,categoria_id=novo.categoria_id,"
       + "nome=novo.nome,mime_type=novo.mime_type,tipo=novo.tipo,extensao=novo.extensao,"
       + "tamanho_bytes=novo.tamanho_bytes,checksum_md5=novo.checksum_md5,drive_criado_em=novo.drive_criado_em,"
-      + "drive_modificado_em=novo.drive_modificado_em,resource_key=novo.resource_key,disponivel=1,"
+      + "drive_modificado_em=novo.drive_modificado_em,resource_key=novo.resource_key,disponivel=IF(materiais.estado_gestao='disponivel',1,materiais.disponivel),"
       + "ultima_sincronizacao_drive_id=novo.ultima_sincronizacao_drive_id",
       [
         item.id, item.parentId, categoriaId, item.name, item.mimeType,

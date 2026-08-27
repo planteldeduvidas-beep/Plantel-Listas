@@ -39,6 +39,10 @@ const criarGoogleDriveChangesRepository = require("./modules/materiais/googleDri
 const criarGoogleDriveChangesService = require("./modules/materiais/googleDriveChangesService");
 const criarGoogleDriveChangesController = require("./modules/materiais/googleDriveChangesController");
 const criarGoogleDriveChangesRoutes = require("./modules/materiais/googleDriveChangesRoutes");
+const criarGestaoMateriaisRepository = require("./modules/materiais/gestaoMateriaisRepository");
+const criarGestaoMateriaisService = require("./modules/materiais/gestaoMateriaisService");
+const criarGestaoMateriaisController = require("./modules/materiais/gestaoMateriaisController");
+const criarGestaoMateriaisRoutes = require("./modules/materiais/gestaoMateriaisRoutes");
 const {
   criarAutenticacaoMiddleware,
   autorizarAdmin
@@ -144,6 +148,12 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     provider: googleDriveProvider,
     integracaoService: integracaoGoogleDriveService
   });
+  const gestaoMateriaisService = criarGestaoMateriaisService({
+    repository: criarGestaoMateriaisRepository(pool),
+    provider: googleDriveProvider,
+    integracaoService: integracaoGoogleDriveService,
+    configuracao: configuracao
+  });
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
     controller: criarAutenticacaoController(serviceAutenticacao, configuracao),
@@ -178,6 +188,13 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     controller: criarAcervoController(acervoService),
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
+  }));
+  aplicacao.use("/api/gestao-materiais", criarGestaoMateriaisRoutes({
+    controller: criarGestaoMateriaisController(gestaoMateriaisService),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin,
+    rateLimiter: rateLimiters.upload,
+    configuracao: configuracao
   }));
 }
 

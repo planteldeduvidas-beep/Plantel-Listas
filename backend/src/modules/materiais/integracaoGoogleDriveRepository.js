@@ -313,7 +313,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
       + "tipo = novo.tipo, extensao = novo.extensao, tamanho_bytes = novo.tamanho_bytes, "
       + "checksum_md5 = novo.checksum_md5, drive_criado_em = novo.drive_criado_em, "
       + "drive_modificado_em = novo.drive_modificado_em, web_view_link = novo.web_view_link, "
-      + "resource_key = novo.resource_key, disponivel = 1, "
+      + "resource_key = novo.resource_key, disponivel = IF(materiais.estado_gestao='disponivel',1,materiais.disponivel), "
       + "ultima_sincronizacao_drive_id = novo.ultima_sincronizacao_drive_id",
       valores
     );

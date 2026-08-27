@@ -34,7 +34,8 @@ function criarRateLimiters(configuracao) {
       janelaMs,
       configuracao.seguranca.limiteRecuperacao,
       "LIMITE_RECUPERACAO"
-    )
+    ),
+    upload: criarLimitador(janelaMs, configuracao.seguranca.limiteUpload, "LIMITE_UPLOAD")
   };
 }
 
