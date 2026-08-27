@@ -1,7 +1,7 @@
 # RELATORIO DA FASE 04 - GOOGLE DRIVE E INDEXACAO INICIAL
 
 Data: 27/08/2026
-Estado: **PRONTA PARA VALIDACAO**
+Estado: **APROVADA E INTEGRADA**
 
 ## 1. Resumo
 
@@ -19,7 +19,7 @@ Nao foram implementados upload de professor, edicao, movimentacao, substituicao,
 - Validacao real e relatorio: `2476aef` - `docs: conclui validacao real da fase 4`.
 - Ajuste de formatacao: `bafb357` - `docs: ajusta formatacao do relatorio da fase 4`.
 - A sincronizacao assincrona, a renovacao OAuth e a presente atualizacao documental ficam no commit tecnico seguinte da branch.
-- Nenhum merge em `main` foi realizado.
+- Merge seguro em `main` autorizado e realizado no fechamento.
 - Nenhum deploy foi realizado.
 
 ## 3. Implementacao
@@ -59,6 +59,10 @@ O pacote possui uma dependencia transitiva marcada como deprecated, mas as audit
 - codigo e estado OAuth sao removidos das URLs registradas nos logs.
 
 A URL de producao nao foi inventada porque o subdominio final ainda nao foi definido. Ela devera ser cadastrada exatamente quando a URL oficial for aprovada.
+
+O projeto OAuth esta atualmente com status de publicacao `Testing`. Nesse modo, como a aplicacao solicita `drive.readonly` e nao somente scopes basicos de identidade, a autorizacao e o refresh token da conta de teste expiram apos aproximadamente sete dias e podem exigir uma nova conexao pelo painel. Esse comportamento e esperado no ambiente de teste do Google e nao representa falha do Plantel Listas.
+
+Antes do uso definitivo, sera necessario configurar o OAuth para producao e cumprir o processo de verificacao aplicavel ao scope restrito `drive.readonly`, conforme as exigencias vigentes do Google.
 
 ## 6. Acesso ao Drive
 
@@ -244,13 +248,14 @@ Riscos operacionais:
 - uma otimizacao futura pode avaliar concorrencia limitada e retentativas com backoff, respeitando quotas da API;
 - o worker e intencionalmente local e sem infraestrutura adicional; em eventual operacao com multiplas instancias, as travas MySQL continuam sendo obrigatorias;
 - a URL e as credenciais de producao ainda dependem da definicao do subdominio e da fase de deploy;
+- enquanto o OAuth permanecer em `Testing`, a conta de teste podera exigir reconexao aproximadamente a cada sete dias;
 - alteracoes reais no Drive entre duas leituras podem modificar contagens, como esperado em uma sincronizacao;
 - o scope `drive.readonly` permite leitura do Drive autorizado, enquanto a limitacao a pasta raiz e garantida pelo provider da aplicacao.
 
 ## 21. Pendencias
 
-- validacao humana da Fase 4;
 - definir URL/subdominio final e redirect URI de producao;
+- configurar o status de publicacao OAuth para producao e cumprir a verificacao aplicavel ao scope `drive.readonly`;
 - validar OAuth e indexacao no ambiente Hostinger somente quando o deploy for autorizado;
 - manter tokens e secrets nas variaveis protegidas do ambiente de producao;
 - decidir eventual otimizacao de desempenho como backlog, sem ampliar o escopo atual.
@@ -267,6 +272,6 @@ Essa regra impede que um identificador do Drive fornecido pelo cliente contorne 
 
 ## 23. Estado final
 
-**PRONTA PARA VALIDACAO**
+**APROVADA E INTEGRADA**
 
-A Fase 4 permanece somente na branch `fase/04-google-drive`. Nao houve merge, deploy ou inicio da Fase 5.
+A Fase 4 foi integrada na `main` no fechamento autorizado. Nao houve deploy nem inicio da Fase 5.
