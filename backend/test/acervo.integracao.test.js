@@ -391,6 +391,28 @@ test("reconcilia renomeacao, movimentacao e remocao de subarvore sem full sync",
   assert.equal(Number(duplicados[0].total), 1);
   assert.equal(Number(duplicados[0].distintos), 1);
 
+  const conexaoInsegura = await repository.adquirirTrava();
+  const insegura = await repository.aplicarAlteracoes(conexaoInsegura, [{
+    fileId: "driveSubarvoreInsegura",
+    pastaRaizId: configuracao.googleDrive.pastaRaizId,
+    subarvore: {
+      pastas: [{
+        id: "driveSubarvoreInsegura",
+        name: "Insegura",
+        mimeType: "application/vnd.google-apps.folder",
+        parentId: "driveSubarvoreInsegura",
+        nivel: 0
+      }],
+      arquivos: []
+    }
+  }], "pagina-insegura");
+  await repository.liberarTrava(conexaoInsegura);
+  assert.equal(insegura.reconciliacaoNecessaria, true);
+  const [naoCriada] = await pool.execute(
+    "SELECT COUNT(*) AS total FROM categorias WHERE drive_pasta_id='driveSubarvoreInsegura'"
+  );
+  assert.equal(Number(naoCriada[0].total), 0);
+
   const conexaoRemocao = await repository.adquirirTrava();
   const removida = await repository.aplicarAlteracoes(conexaoRemocao, [{
     fileId: "driveSubarvoreFase5",

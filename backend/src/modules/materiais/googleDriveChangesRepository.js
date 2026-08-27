@@ -23,7 +23,7 @@ function dataOuNula(valor) {
 function criarGoogleDriveChangesRepository(pool) {
   async function buscarCategoriaDrive(conexao, drivePastaId) {
     const [registros] = await conexao.execute(
-      "SELECT id,drive_pasta_id FROM categorias WHERE drive_pasta_id=? LIMIT 1",
+      "SELECT id,drive_pasta_id,ativo FROM categorias WHERE drive_pasta_id=? LIMIT 1",
       [drivePastaId]
     );
     return registros[0] || null;
@@ -127,11 +127,22 @@ function criarGoogleDriveChangesRepository(pool) {
 
   async function aplicarSubarvore(conexao, alteracao, sincronizacaoId) {
     const subarvore = alteracao.subarvore;
-    const pastaRaiz = subarvore.pastas[0];
+    const pastaRaiz = subarvore && Array.isArray(subarvore.pastas)
+      ? subarvore.pastas[0]
+      : null;
+    if (!pastaRaiz) {
+      return { segura: false, atualizados: 0, indisponiveis: 0 };
+    }
+    const idsDaSubarvore = new Set(subarvore.pastas.map(function obterId(pasta) {
+      return pasta.id;
+    }));
+    if (idsDaSubarvore.has(pastaRaiz.parentId)) {
+      return { segura: false, atualizados: 0, indisponiveis: 0 };
+    }
     let categoriaPaiId = null;
     if (pastaRaiz.parentId !== alteracao.pastaRaizId) {
       const categoriaPai = await buscarCategoriaDrive(conexao, pastaRaiz.parentId);
-      if (!categoriaPai) {
+      if (!categoriaPai || Number(categoriaPai.ativo) !== 1) {
         return { segura: false, atualizados: 0, indisponiveis: 0 };
       }
       categoriaPaiId = Number(categoriaPai.id);
