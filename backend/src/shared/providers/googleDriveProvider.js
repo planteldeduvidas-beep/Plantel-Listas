@@ -133,7 +133,7 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     const cliente = criarClienteOAuth(configuracao, fabricaOAuth);
     return cliente.generateAuthUrl({
       access_type: "offline",
-      scope: [ESCOPO_LEITURA],
+      scope: [ESCOPO_GESTAO],
       state: estado,
       include_granted_scopes: true,
       prompt: "consent"
@@ -584,7 +584,7 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
   }
 
   return {
-    escopo: ESCOPO_LEITURA,
+    escopo: ESCOPO_GESTAO,
     escopoGestaoNecessario: ESCOPO_GESTAO,
     pastaRaizId: configuracao.pastaRaizId,
     gerarUrlAutorizacao: gerarUrlAutorizacao,

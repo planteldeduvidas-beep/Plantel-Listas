@@ -285,7 +285,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
         && !renovacaoNecessaria
       ),
       renovacaoNecessaria: renovacaoNecessaria,
-      escopo: provider ? provider.escopo : configuracao.googleDrive.escopoLeitura,
+      escopo: provider ? provider.escopo : configuracao.googleDrive.escopo,
       ultimaSincronizacao: ultimaSincronizacao
     };
   }

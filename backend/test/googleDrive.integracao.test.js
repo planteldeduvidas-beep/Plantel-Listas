@@ -26,7 +26,7 @@ const configuracaoTeste = Object.assign({}, configuracaoBase, {
     pastaRaizId: "pastaRaizIntegracao12345",
     redirectUri: "http://localhost:3000/api/integracoes/google-drive/oauth/callback",
     refreshToken: "refresh-token-configurado-no-backend",
-    escopoLeitura: ESCOPO_LEITURA
+    escopo: ESCOPO_LEITURA
   }
 });
 const pool = criarPool(configuracaoTeste.banco);

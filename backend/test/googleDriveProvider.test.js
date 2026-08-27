@@ -62,15 +62,15 @@ function criarResposta(dados) {
   };
 }
 
-test("gera OAuth server-side com escopo unico de leitura e acesso offline", async function testarOAuth() {
+test("gera OAuth server-side com escopo unico de gestao e acesso offline", async function testarOAuth() {
   const provider = criarGoogleDriveProvider(criarConfiguracao(), {
     OAuth2Client: OAuth2ClientFake,
     fetch: async function buscarNaoUtilizado() { throw new Error("nao esperado"); }
   });
   const url = provider.gerarUrlAutorizacao("estado-seguro-de-teste");
   assert.equal(url.includes("estado-seguro-de-teste"), true);
-  assert.deepEqual(OAuth2ClientFake.ultimaInstancia.opcoesAutorizacao.scope, [ESCOPO_LEITURA]);
-  assert.equal(provider.escopo, ESCOPO_LEITURA);
+  assert.deepEqual(OAuth2ClientFake.ultimaInstancia.opcoesAutorizacao.scope, [ESCOPO_GESTAO]);
+  assert.equal(provider.escopo, ESCOPO_GESTAO);
   assert.equal(provider.escopoGestaoNecessario, ESCOPO_GESTAO);
   assert.equal(OAuth2ClientFake.ultimaInstancia.opcoesAutorizacao.access_type, "offline");
   assert.equal(OAuth2ClientFake.ultimaInstancia.opcoesAutorizacao.prompt, "consent");

@@ -82,8 +82,8 @@ test("valida configuracao Google Drive sem expor ou exigir segredo opcional", fu
   assert.equal(configuracao.googleDrive.clientSecret, "segredo-google-de-teste");
   assert.equal(configuracao.googleDrive.refreshToken, "");
   assert.equal(
-    configuracao.googleDrive.escopoLeitura,
-    "https://www.googleapis.com/auth/drive.readonly"
+    configuracao.googleDrive.escopo,
+    "https://www.googleapis.com/auth/drive"
   );
 });
 

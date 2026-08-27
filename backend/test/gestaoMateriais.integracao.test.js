@@ -11,7 +11,7 @@ const {ESCOPO_LEITURA,ESCOPO_GESTAO}=require("../src/shared/providers/googleDriv
 const criarChangesRepository=require("../src/modules/materiais/googleDriveChangesRepository");
 
 const base=obterConfiguracao();
-const configuracao=Object.assign({},base,{ambiente:"test",nivelDeLog:"silent",banco:Object.assign({},base.banco,{nome:process.env.DB_TEST_NAME||base.banco.nome+"_test"}),googleDrive:{clientId:"fase6.apps.googleusercontent.com",clientSecret:"segredo-fase6",pastaRaizId:"pastaRaizFaseSeis123",redirectUri:"http://localhost:3000/api/integracoes/google-drive/oauth/callback",refreshToken:"refresh-token-fase-seis",webhookUrl:"",intervaloChangesMs:60000,escopoLeitura:"https://www.googleapis.com/auth/drive.readonly"}});
+const configuracao=Object.assign({},base,{ambiente:"test",nivelDeLog:"silent",banco:Object.assign({},base.banco,{nome:process.env.DB_TEST_NAME||base.banco.nome+"_test"}),googleDrive:{clientId:"fase6.apps.googleusercontent.com",clientSecret:"segredo-fase6",pastaRaizId:"pastaRaizFaseSeis123",redirectUri:"http://localhost:3000/api/integracoes/google-drive/oauth/callback",refreshToken:"refresh-token-fase-seis",webhookUrl:"",intervaloChangesMs:60000,escopo:"https://www.googleapis.com/auth/drive"}});
 configuracao.seguranca=Object.assign({},base.seguranca,{limiteAutenticacao:100,limiteUpload:100});
 const pool=criarPool(configuracao.banco);
 let sequencia=0;

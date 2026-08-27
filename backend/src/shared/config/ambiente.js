@@ -220,7 +220,7 @@ function validarVariaveisDeAmbiente(variaveis) {
         15000,
         3600000
       ),
-      escopoLeitura: "https://www.googleapis.com/auth/drive.readonly"
+      escopo: "https://www.googleapis.com/auth/drive"
     })
   });
 }
