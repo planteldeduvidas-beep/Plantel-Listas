@@ -237,6 +237,22 @@ function criarIntegracaoGoogleDriveService(dependencias) {
     return { id: sincronizacaoId, status: "aguardando" };
   }
 
+  async function solicitarSincronizacaoAutomatica() {
+    exigirProvider();
+    const credencial = await repository.buscarCredencial();
+    if (!credencial || !credencial.autorizado_por_usuario_id) {
+      return null;
+    }
+    const sincronizacaoId = await repository.criarSincronizacaoAguardando(
+      Number(credencial.autorizado_por_usuario_id)
+    );
+    if (!sincronizacaoId) {
+      return null;
+    }
+    agendarSincronizacao(sincronizacaoId, Number(credencial.autorizado_por_usuario_id));
+    return sincronizacaoId;
+  }
+
   async function recuperarSincronizacoesInterrompidas() {
     const conexao = await repository.adquirirTravaDeSincronizacao();
     if (!conexao) {
@@ -279,7 +295,16 @@ function criarIntegracaoGoogleDriveService(dependencias) {
     concluirOAuth: concluirOAuth,
     obterStatus: obterStatus,
     solicitarSincronizacao: solicitarSincronizacao,
-    recuperarSincronizacoesInterrompidas: recuperarSincronizacoesInterrompidas
+    recuperarSincronizacoesInterrompidas: recuperarSincronizacoesInterrompidas,
+    obterRefreshTokenParaUso: async function obterRefreshTokenParaUso() {
+      exigirProvider();
+      const credencial = await obterCredencialDeUso();
+      return credencial.refreshToken;
+    },
+    registrarFalhaDeAutorizacao: async function registrarFalhaDeAutorizacao(codigo) {
+      await repository.marcarCredencialParaRenovacao(codigo);
+    },
+    solicitarSincronizacaoAutomatica: solicitarSincronizacaoAutomatica
   };
 }
 

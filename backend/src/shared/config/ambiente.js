@@ -92,6 +92,25 @@ function validarUrlOpcional(valor, nome, ambiente) {
   return url.toString();
 }
 
+function validarWebhookGoogleDrive(valor) {
+  if (!valor) {
+    return "";
+  }
+  let url;
+  try {
+    url = new URL(valor);
+  } catch (erro) {
+    throw new Error("Variavel de ambiente invalida: GOOGLE_DRIVE_WEBHOOK_URL");
+  }
+  if (url.protocol !== "https:"
+      || url.search
+      || url.hash
+      || url.pathname !== "/api/integracoes/google-drive/webhook") {
+    throw new Error("Variavel de ambiente invalida: GOOGLE_DRIVE_WEBHOOK_URL");
+  }
+  return url.toString();
+}
+
 function lerOrigensCors(variaveis) {
   const textoDasOrigens = exigirTexto(variaveis, "CORS_ORIGENS");
   const origens = textoDasOrigens.split(",").map(function limparOrigem(origem) {
@@ -188,6 +207,16 @@ function validarVariaveisDeAmbiente(variaveis) {
         ambiente
       ),
       refreshToken: lerTextoOpcional(variaveis, "GOOGLE_DRIVE_REFRESH_TOKEN"),
+      webhookUrl: validarWebhookGoogleDrive(
+        lerTextoOpcional(variaveis, "GOOGLE_DRIVE_WEBHOOK_URL")
+      ),
+      intervaloChangesMs: lerInteiro(
+        variaveis,
+        "GOOGLE_DRIVE_CHANGES_INTERVAL_MS",
+        60000,
+        15000,
+        3600000
+      ),
       escopoLeitura: "https://www.googleapis.com/auth/drive.readonly"
     })
   });

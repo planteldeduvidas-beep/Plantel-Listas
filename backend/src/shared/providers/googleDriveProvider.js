@@ -5,6 +5,9 @@ const AppError = require("../errors/AppError");
 const MIME_PASTA = "application/vnd.google-apps.folder";
 const ESCOPO_LEITURA = "https://www.googleapis.com/auth/drive.readonly";
 const URL_API_DRIVE = "https://www.googleapis.com/drive/v3/files";
+const URL_CHANGES_DRIVE = "https://www.googleapis.com/drive/v3/changes";
+const URL_CHANNELS_DRIVE = "https://www.googleapis.com/drive/v3/channels/stop";
+const MIME_ATALHO = "application/vnd.google-apps.shortcut";
 const TEMPO_LIMITE_REQUISICAO_MS = 30000;
 
 async function executarComTempoLimite(tarefa, tempoLimite) {
@@ -222,6 +225,144 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     return resposta.json();
   }
 
+  async function obterConteudoArquivo(refreshToken, arquivoId, intervalo) {
+    const tokenDeAcesso = await obterTokenDeAcesso(refreshToken);
+    const url = new URL(URL_API_DRIVE + "/" + encodeURIComponent(arquivoId));
+    url.searchParams.set("alt", "media");
+    url.searchParams.set("supportsAllDrives", "true");
+    const headers = { Authorization: "Bearer " + tokenDeAcesso };
+    if (intervalo) {
+      headers.Range = intervalo;
+    }
+
+    let resposta;
+    try {
+      resposta = await buscar(url, {
+        method: "GET",
+        headers: headers,
+        signal: AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS)
+      });
+    } catch (erro) {
+      throw new AppError(
+        "Google Drive temporariamente indisponivel",
+        503,
+        "GOOGLE_DRIVE_INDISPONIVEL"
+      );
+    }
+
+    if (![200, 206, 416].includes(resposta.status)) {
+      const codigo = resposta.status === 401 || resposta.status === 403
+        ? "GOOGLE_AUTORIZACAO_INVALIDA"
+        : "GOOGLE_DRIVE_INDISPONIVEL";
+      throw new AppError("Nao foi possivel obter o arquivo", 503, codigo);
+    }
+    return resposta;
+  }
+
+  async function requisitarJson(url, opcoes, tokenDeAcesso) {
+    const configuracaoFetch = Object.assign({}, opcoes || {});
+    configuracaoFetch.headers = Object.assign({}, configuracaoFetch.headers || {}, {
+      Authorization: "Bearer " + tokenDeAcesso,
+      "Content-Type": "application/json"
+    });
+    configuracaoFetch.signal = AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS);
+    let resposta;
+    try {
+      resposta = await buscar(url, configuracaoFetch);
+    } catch (erro) {
+      throw new AppError("Google Drive temporariamente indisponivel", 503, "GOOGLE_DRIVE_INDISPONIVEL");
+    }
+    if (!resposta.ok) {
+      const codigo = resposta.status === 401 || resposta.status === 403
+        ? "GOOGLE_AUTORIZACAO_INVALIDA"
+        : resposta.status === 410
+          ? "GOOGLE_PAGE_TOKEN_EXPIRADO"
+          : "GOOGLE_DRIVE_INDISPONIVEL";
+      throw new AppError("Nao foi possivel consultar alteracoes do Google Drive", 503, codigo);
+    }
+    if (resposta.status === 204) {
+      return {};
+    }
+    return resposta.json();
+  }
+
+  async function obterInicioDasAlteracoes(refreshToken) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const url = new URL(URL_CHANGES_DRIVE + "/startPageToken");
+    url.searchParams.set("supportsAllDrives", "true");
+    const resposta = await requisitarJson(url, { method: "GET" }, token);
+    return resposta.startPageToken;
+  }
+
+  async function listarAlteracoes(refreshToken, pageToken) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const url = new URL(URL_CHANGES_DRIVE);
+    url.searchParams.set("pageToken", pageToken);
+    url.searchParams.set("pageSize", "1000");
+    url.searchParams.set("spaces", "drive");
+    url.searchParams.set("includeRemoved", "true");
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("includeItemsFromAllDrives", "true");
+    url.searchParams.set("fields", "nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,trashed,resourceKey))");
+    return requisitarJson(url, { method: "GET" }, token);
+  }
+
+  async function observarAlteracoes(refreshToken, pageToken, canal) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const url = new URL(URL_CHANGES_DRIVE + "/watch");
+    url.searchParams.set("pageToken", pageToken);
+    url.searchParams.set("supportsAllDrives", "true");
+    return requisitarJson(url, {
+      method: "POST",
+      body: JSON.stringify({
+        id: canal.id,
+        type: "web_hook",
+        address: canal.address,
+        token: canal.token,
+        expiration: String(canal.expiration)
+      })
+    }, token);
+  }
+
+  async function encerrarCanal(refreshToken, canalId, resourceId) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    return requisitarJson(new URL(URL_CHANNELS_DRIVE), {
+      method: "POST",
+      body: JSON.stringify({ id: canalId, resourceId: resourceId })
+    }, token);
+  }
+
+  async function obterItem(refreshToken, arquivoId) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    return requisitarDrive("/" + encodeURIComponent(arquivoId), {
+      supportsAllDrives: true,
+      fields: "id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,trashed,resourceKey"
+    }, token);
+  }
+
+  async function verificarDescendenteDaRaiz(refreshToken, item) {
+    if (!item || item.trashed || item.mimeType === MIME_ATALHO) {
+      return false;
+    }
+    const visitados = new Set();
+    let atual = item;
+    for (let nivel = 0; nivel < 50; nivel += 1) {
+      const pais = atual.parents || [];
+      if (pais.includes(configuracao.pastaRaizId)) {
+        return true;
+      }
+      if (pais.length !== 1 || visitados.has(pais[0])) {
+        return false;
+      }
+      visitados.add(pais[0]);
+      atual = await obterItem(refreshToken, pais[0]);
+      if (atual.mimeType === MIME_ATALHO || atual.trashed) {
+        return false;
+      }
+    }
+    return false;
+  }
+
   async function listarFilhos(pastaId, tokenDeAcesso) {
     const itens = [];
     let pageToken = "";
@@ -293,7 +434,15 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     pastaRaizId: configuracao.pastaRaizId,
     gerarUrlAutorizacao: gerarUrlAutorizacao,
     trocarCodigoPorRefreshToken: trocarCodigoPorRefreshToken,
-    listarArvore: listarArvore
+    listarArvore: listarArvore,
+    obterConteudoArquivo: obterConteudoArquivo,
+    obterTokenDeAcesso: obterTokenDeAcesso,
+    obterInicioDasAlteracoes: obterInicioDasAlteracoes,
+    listarAlteracoes: listarAlteracoes,
+    observarAlteracoes: observarAlteracoes,
+    encerrarCanal: encerrarCanal,
+    obterItem: obterItem,
+    verificarDescendenteDaRaiz: verificarDescendenteDaRaiz
   };
 }
 

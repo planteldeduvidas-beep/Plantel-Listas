@@ -173,6 +173,40 @@ function sincronizarGoogleDrive() {
   });
 }
 
+function obterStatusDasAtualizacoesGoogleDrive() {
+  return requisitar("/integracoes/google-drive/changes/status", { method: "GET" });
+}
+
+function consultarAcervo(filtros) {
+  const parametros = new URLSearchParams();
+  Object.keys(filtros || {}).forEach(function adicionar(chave) {
+    const valor = filtros[chave];
+    if (valor !== null && valor !== undefined && valor !== "") {
+      parametros.set(chave, String(valor));
+    }
+  });
+  const query = parametros.toString();
+  return requisitar("/acervo" + (query ? "?" + query : ""), { method: "GET" });
+}
+
+function obterUrlDoMaterial(materialId, baixar) {
+  const id = Number(materialId);
+  if (!Number.isInteger(id) || id < 1) {
+    throw new Error("Material invalido");
+  }
+  return API_BASE + "/acervo/materiais/" + id + (baixar ? "/download" : "/conteudo");
+}
+
+function classificarPasta(categoriaId, disciplinaId, concursoId) {
+  return requisitar("/acervo/pastas/" + categoriaId + "/classificacao", {
+    method: "PATCH",
+    body: JSON.stringify({
+      disciplinaId: disciplinaId || null,
+      concursoId: concursoId || null
+    })
+  });
+}
+
 export {
   cadastrar,
   entrar,
@@ -191,6 +225,10 @@ export {
   revogarPermissao,
   obterStatusGoogleDrive,
   iniciarOAuthGoogleDrive,
-  sincronizarGoogleDrive
+  sincronizarGoogleDrive,
+  obterStatusDasAtualizacoesGoogleDrive,
+  consultarAcervo,
+  obterUrlDoMaterial,
+  classificarPasta
 };
 

@@ -31,6 +31,14 @@ const criarIntegracaoGoogleDriveRepository = require("./modules/materiais/integr
 const criarIntegracaoGoogleDriveService = require("./modules/materiais/integracaoGoogleDriveService");
 const criarIntegracaoGoogleDriveController = require("./modules/materiais/integracaoGoogleDriveController");
 const criarIntegracaoGoogleDriveRoutes = require("./modules/materiais/integracaoGoogleDriveRoutes");
+const criarAcervoRepository = require("./modules/materiais/acervoRepository");
+const criarAcervoService = require("./modules/materiais/acervoService");
+const criarAcervoController = require("./modules/materiais/acervoController");
+const criarAcervoRoutes = require("./modules/materiais/acervoRoutes");
+const criarGoogleDriveChangesRepository = require("./modules/materiais/googleDriveChangesRepository");
+const criarGoogleDriveChangesService = require("./modules/materiais/googleDriveChangesService");
+const criarGoogleDriveChangesController = require("./modules/materiais/googleDriveChangesController");
+const criarGoogleDriveChangesRoutes = require("./modules/materiais/googleDriveChangesRoutes");
 const {
   criarAutenticacaoMiddleware,
   autorizarAdmin
@@ -115,6 +123,27 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     agendarTarefa: dependencias.agendarTarefaGoogleDrive
   });
   aplicacao.locals.integracaoGoogleDriveService = integracaoGoogleDriveService;
+  const changesRepository = criarGoogleDriveChangesRepository(pool);
+  const changesService = criarGoogleDriveChangesService({
+    repository: changesRepository,
+    provider: googleDriveProvider,
+    integracaoService: integracaoGoogleDriveService,
+    configuracao: configuracao,
+    logger: logger,
+    agendarTarefa: dependencias.agendarTarefaGoogleDriveChanges
+  });
+  aplicacao.locals.googleDriveChangesService = changesService;
+  const changesRoutes = criarGoogleDriveChangesRoutes({
+    controller: criarGoogleDriveChangesController(changesService),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin
+  });
+  const acervoRepository = criarAcervoRepository(pool);
+  const acervoService = criarAcervoService({
+    repository: acervoRepository,
+    provider: googleDriveProvider,
+    integracaoService: integracaoGoogleDriveService
+  });
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
     controller: criarAutenticacaoController(serviceAutenticacao, configuracao),
@@ -135,11 +164,18 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
   }));
+  aplicacao.use("/api/integracoes/google-drive", changesRoutes.publico);
   aplicacao.use("/api/integracoes/google-drive", criarIntegracaoGoogleDriveRoutes({
     controller: criarIntegracaoGoogleDriveController(
       integracaoGoogleDriveService,
       configuracao
     ),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin
+  }));
+  aplicacao.use("/api/integracoes/google-drive", changesRoutes.administrativo);
+  aplicacao.use("/api/acervo", criarAcervoRoutes({
+    controller: criarAcervoController(acervoService),
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
   }));

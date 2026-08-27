@@ -11,8 +11,10 @@ import {
   revogarPermissao,
   obterStatusGoogleDrive,
   iniciarOAuthGoogleDrive,
-  sincronizarGoogleDrive
+  sincronizarGoogleDrive,
+  obterStatusDasAtualizacoesGoogleDrive
 } from "./api.js";
+import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
 
 function obterTipoDeUsuario(papel) {
   const tipos = { admin: "Administrador", professor: "Professor", aluno: "Aluno" };
@@ -179,6 +181,7 @@ function PainelAcervo({ usuario, aoSair }) {
   const [professorId, definirProfessorId] = useState("");
   const [pastasSelecionadas, definirPastasSelecionadas] = useState([]);
   const [googleDrive, definirGoogleDrive] = useState(null);
+  const [acompanhamentoDrive, definirAcompanhamentoDrive] = useState(null);
   const [processandoGoogleDrive, definirProcessandoGoogleDrive] = useState(false);
   const [mensagem, definirMensagem] = useState("");
   const [erro, definirErro] = useState("");
@@ -197,7 +200,8 @@ function PainelAcervo({ usuario, aoSair }) {
       if (usuario.papel === "admin") {
         const resultados = await Promise.all([
           apiCategorias.listar(), apiDisciplinas.listar(), apiConcursos.listar(),
-          listarUsuarios(), listarPermissoes(), obterStatusGoogleDrive()
+          listarUsuarios(), listarPermissoes(), obterStatusGoogleDrive(),
+          obterStatusDasAtualizacoesGoogleDrive()
         ]);
         definirCategorias(resultados[0].categorias);
         definirDisciplinas(resultados[1].disciplinas);
@@ -205,6 +209,7 @@ function PainelAcervo({ usuario, aoSair }) {
         definirUsuarios(resultados[3].usuarios);
         definirPermissoes(resultados[4].permissoes);
         definirGoogleDrive(resultados[5].googleDrive);
+        definirAcompanhamentoDrive(resultados[6].acompanhamento);
       } else if (usuario.papel === "professor") {
         const proprias = await listarMinhasPermissoes();
         definirMinhasPermissoes(proprias.permissoes);
@@ -419,11 +424,7 @@ function PainelAcervo({ usuario, aoSair }) {
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       {erro && <p className="aviso erro" role="alert">{erro}</p>}
 
-      <section className="grade-publica">
-        <article className="cartao-painel cartao-pastas"><h2>Pastas disponíveis</h2><ListaDePastas categorias={estrutura.categorias} /></article>
-        <article className="cartao-painel"><h2>Disciplinas</h2><p>{estrutura.disciplinas.map(function obter(item) { return item.nome; }).join(", ") || "Nenhuma disciplina disponível."}</p></article>
-        <article className="cartao-painel"><h2>Concursos</h2><p>{estrutura.concursos.map(function obter(item) { return item.nome; }).join(", ") || "Nenhum concurso disponível."}</p></article>
-      </section>
+      <BibliotecaAcervo usuario={usuario} />
 
       {usuario.papel === "professor" && (
         <section className="cartao-painel">
@@ -465,6 +466,12 @@ function PainelAcervo({ usuario, aoSair }) {
             {googleDrive && googleDrive.ultimaSincronizacao && (
               <p className="resumo-sincronizacao">
                 Última sincronização: {obterTextoDaSincronizacao(googleDrive.ultimaSincronizacao)}. {googleDrive.ultimaSincronizacao.arquivosEncontrados} arquivos encontrados.
+              </p>
+            )}
+            {acompanhamentoDrive && (
+              <p className="resumo-sincronizacao">
+                Atualizações automáticas: {acompanhamentoDrive.acompanhamentoAtivo ? "ativas" : "preparando"}.
+                {acompanhamentoDrive.reconciliacaoNecessaria && " Uma conferência completa do acervo foi agendada."}
               </p>
             )}
           </section>

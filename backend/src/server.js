@@ -22,6 +22,7 @@ async function iniciarServidor() {
     });
     await aplicacao.locals.integracaoGoogleDriveService
       .recuperarSincronizacoesInterrompidas();
+    aplicacao.locals.googleDriveChangesService.iniciarMonitor();
     const servidor = http.createServer(aplicacao);
 
     servidor.listen(configuracao.porta, function informarInicio() {
