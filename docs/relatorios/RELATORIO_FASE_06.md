@@ -9,7 +9,7 @@ A Fase 6 implementou upload, edicao, movimentacao, substituicao, lixeira, restau
 
 O OAuth foi ampliado conscientemente para o scope unico `https://www.googleapis.com/auth/drive`, a conta de teste foi reconectada e a nova credencial foi confirmada sem expor tokens. As operacoes foram validadas no Drive real exclusivamente com pasta, usuarios, categorias e arquivos temporarios criados pelo teste controlado da Fase 6. Nenhum arquivo legado foi alterado ou excluido.
 
-Nao houve merge, deploy ou inicio da Fase 7.
+A Fase 6 foi integrada na `main` no fechamento autorizado. Nao houve deploy nem inicio da Fase 7.
 
 ## 2. Branch e commits
 
@@ -19,8 +19,9 @@ Nao houve merge, deploy ou inicio da Fase 7.
 - Alteracao consciente do scope para gestao: `d7ba776`.
 - Correcao da renderizacao do frontend: `07e0eba`.
 - Validacao real, barreira da raiz e testes adicionais: `e6c8d5a` - `test: valida gestao real segura no google drive`.
-- Documentacao de validacao consolidada na mesma branch.
-- Nenhum merge em `main` foi realizado.
+- Commit documental final: `54f1b4a` - `docs: registra aprovacao da fase 6`.
+- Merge seguro em `main`: `679880f` - `merge: integra gestao de materiais da fase 6`.
+- Push de `main` para `origin/main` confirmado no fechamento.
 
 ## 3. OAuth e escopo
 
@@ -141,7 +142,7 @@ Os testes incluem escopo antigo exigindo reconexao, substituicao segura da crede
 
 **APROVADA E CONCLUIDA**
 
-A implementacao, a reconexao OAuth, os testes reais temporarios, a regressao e a validacao humana foram concluidos. O merge seguro em `main` foi autorizado para este fechamento. Nao houve deploy nem inicio da Fase 7.
+A implementacao, a reconexao OAuth, os testes reais temporarios, a regressao e a validacao humana foram concluidos. A Fase 6 foi integrada na `main` pelo merge `679880f`, enviado para `origin/main`. Nao houve deploy nem inicio da Fase 7.
 
 ## 13. Validacao humana
 
