@@ -466,6 +466,111 @@ button.perigo {
   margin-top: 34px;
 }
 
+.administracao-fase7 {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.abas-admin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.abas-admin button {
+  background: #fff;
+  border: 1px solid #d7dcdf;
+  color: #303234;
+}
+
+.abas-admin button.ativo {
+  background: #303234;
+  border-color: #303234;
+  color: #fff;
+}
+
+.filtros-admin {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) repeat(2, minmax(140px, 1fr)) auto;
+  gap: .75rem;
+  align-items: end;
+  margin: 1rem 0;
+}
+
+.lista-usuarios select {
+  min-width: 140px;
+}
+
+.grade-estatisticas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: .75rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.cartao-estatistica {
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #45c9c1;
+  border-radius: 10px;
+  padding: 1rem;
+  background: #f9fafb;
+}
+
+.cartao-estatistica span,
+.cartao-estatistica strong {
+  display: block;
+}
+
+.cartao-estatistica strong {
+  font-size: 1.7rem;
+  margin-top: .25rem;
+}
+
+.periodo-estatisticas {
+  max-width: 180px;
+}
+
+.lista-historico {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.lista-historico li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .9rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.lista-historico span,
+.lista-historico small {
+  display: block;
+}
+
+.lista-historico time {
+  white-space: nowrap;
+  color: #6b7280;
+  font-size: .85rem;
+}
+
+@media (max-width: 760px) {
+  .filtros-admin {
+    grid-template-columns: 1fr;
+  }
+
+  .lista-historico li {
+    display: block;
+  }
+
+  .lista-historico time {
+    display: block;
+    margin-top: .4rem;
+  }
+}
+
 .introducao-admin {
   margin-bottom: 20px;
 }

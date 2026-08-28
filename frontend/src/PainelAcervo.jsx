@@ -7,14 +7,14 @@ import {
   concursos as apiConcursos,
   listarPermissoes,
   listarMinhasPermissoes,
-  concederPermissao,
-  revogarPermissao,
+  salvarAcessosProfessor,
   obterStatusGoogleDrive,
   iniciarOAuthGoogleDrive,
   sincronizarGoogleDrive,
   obterStatusDasAtualizacoesGoogleDrive
 } from "./api.js";
 import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
+import AdministracaoFase7 from "./AdministracaoFase7.jsx";
 
 function obterTipoDeUsuario(papel) {
   const tipos = { admin: "Administrador", professor: "Professor", aluno: "Aluno" };
@@ -200,7 +200,7 @@ function PainelAcervo({ usuario, aoSair }) {
       if (usuario.papel === "admin") {
         const resultados = await Promise.all([
           apiCategorias.listar(), apiDisciplinas.listar(), apiConcursos.listar(),
-          listarUsuarios(), listarPermissoes(), obterStatusGoogleDrive(),
+          listarUsuarios({ papel: "professor", ativo: true, limite: 100 }), listarPermissoes(), obterStatusGoogleDrive(),
           obterStatusDasAtualizacoesGoogleDrive()
         ]);
         definirCategorias(resultados[0].categorias);
@@ -345,21 +345,8 @@ function PainelAcervo({ usuario, aoSair }) {
   async function salvarAcessos(evento) {
     evento.preventDefault();
     const professorIdNumerico = Number(professorId);
-    const acessosAtuais = permissoes.filter(function filtrar(item) {
-      return item.ativa && item.professor.id === professorIdNumerico;
-    });
-    const idsAtuais = acessosAtuais.map(function obterId(item) { return item.categoria.id; });
-    const novosAcessos = pastasSelecionadas.filter(function filtrar(id) { return !idsAtuais.includes(id); });
-    const acessosRemovidos = acessosAtuais.filter(function filtrar(item) { return !pastasSelecionadas.includes(item.categoria.id); });
-
     try {
-      await Promise.all(
-        novosAcessos.map(function liberar(categoriaId) {
-          return concederPermissao(professorIdNumerico, categoriaId);
-        }).concat(acessosRemovidos.map(function remover(item) {
-          return revogarPermissao(item.id);
-        }))
-      );
+      await salvarAcessosProfessor(professorIdNumerico, pastasSelecionadas);
       await carregar("Acessos do professor salvos com sucesso.");
     } catch (falha) {
       mostrarErro(falha.message);
@@ -437,6 +424,7 @@ function PainelAcervo({ usuario, aoSair }) {
 
       {usuario.papel === "admin" && (
         <section className="area-administrativa">
+          <AdministracaoFase7 usuario={usuario} aoMensagem={definirMensagem} aoErro={mostrarErro} />
           <div className="introducao-admin"><h2>Organizar o acervo</h2><p>Crie as opções que alunos e professores usarão para encontrar os conteúdos.</p></div>
 
           <section className="bloco-admin integracao-drive">

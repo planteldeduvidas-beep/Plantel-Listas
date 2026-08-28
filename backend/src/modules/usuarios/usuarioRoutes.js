@@ -12,11 +12,14 @@ function criarUsuarioRoutes(dependencias) {
   router.use(autenticar);
   router.use(autorizarAdmin);
   router.get("/", controller.listar);
+  router.post("/", protegerContraCsrf, controller.criar);
+  router.patch("/:usuarioId", protegerContraCsrf, controller.editar);
   router.patch(
     "/:usuarioId/ativo",
     protegerContraCsrf,
     controller.alterarAtivo
   );
+  router.post("/:usuarioId/redefinicao-senha", protegerContraCsrf, controller.iniciarRedefinicao);
   router.patch(
     "/:usuarioId/papel",
     protegerContraCsrf,

@@ -43,6 +43,14 @@ const criarGestaoMateriaisRepository = require("./modules/materiais/gestaoMateri
 const criarGestaoMateriaisService = require("./modules/materiais/gestaoMateriaisService");
 const criarGestaoMateriaisController = require("./modules/materiais/gestaoMateriaisController");
 const criarGestaoMateriaisRoutes = require("./modules/materiais/gestaoMateriaisRoutes");
+const criarAnalyticsRepository = require("./modules/analytics/analyticsRepository");
+const criarAnalyticsService = require("./modules/analytics/analyticsService");
+const criarAnalyticsController = require("./modules/analytics/analyticsController");
+const criarAnalyticsRoutes = require("./modules/analytics/analyticsRoutes");
+const criarAuditoriaRepository = require("./modules/auditoria/auditoriaRepository");
+const criarAuditoriaService = require("./modules/auditoria/auditoriaService");
+const criarAuditoriaController = require("./modules/auditoria/auditoriaController");
+const criarAuditoriaRoutes = require("./modules/auditoria/auditoriaRoutes");
 const {
   criarAutenticacaoMiddleware,
   autorizarAdmin
@@ -92,10 +100,13 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     emailProvider: emailProvider,
     configuracao: configuracao
   });
+  const auditoriaRepository = criarAuditoriaRepository(pool);
   const serviceUsuario = criarUsuarioService({
     usuarioRepository: usuarioRepository,
     autenticacaoRepository: autenticacaoRepository,
-    logger: logger
+    logger: logger,
+    auditoriaRepository: auditoriaRepository,
+    autenticacaoService: serviceAutenticacao
   });
   const autenticar = criarAutenticacaoMiddleware(
     autenticacaoRepository,
@@ -114,7 +125,8 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   const permissaoService = criarPermissaoService({
     repository: permissaoRepository,
     usuarioRepository: usuarioRepository,
-    estruturaRepository: estruturaRepository
+    estruturaRepository: estruturaRepository,
+    auditoriaRepository: auditoriaRepository
   });
   const googleDriveProvider = dependencias.googleDriveProvider
     || criarProviderGoogleDrivePadrao(configuracao);
@@ -143,10 +155,12 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     autorizarAdmin: autorizarAdmin
   });
   const acervoRepository = criarAcervoRepository(pool);
+  const analyticsService = criarAnalyticsService(criarAnalyticsRepository(pool));
   const acervoService = criarAcervoService({
     repository: acervoRepository,
     provider: googleDriveProvider,
-    integracaoService: integracaoGoogleDriveService
+    integracaoService: integracaoGoogleDriveService,
+    analyticsService: analyticsService
   });
   const gestaoMateriaisService = criarGestaoMateriaisService({
     repository: criarGestaoMateriaisRepository(pool),
@@ -195,6 +209,16 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     autorizarAdmin: autorizarAdmin,
     rateLimiter: rateLimiters.upload,
     configuracao: configuracao
+  }));
+  aplicacao.use("/api/analytics", criarAnalyticsRoutes({
+    controller: criarAnalyticsController(analyticsService),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin
+  }));
+  aplicacao.use("/api/auditoria", criarAuditoriaRoutes({
+    controller: criarAuditoriaController(criarAuditoriaService(auditoriaRepository)),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin
   }));
 }
 

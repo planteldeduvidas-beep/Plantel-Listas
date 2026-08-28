@@ -21,6 +21,7 @@ function criarPermissaoRoutes(dependencias) {
     protegerContraCsrf,
     dependencias.controller.revogar
   );
+  router.put("/professores/:professorId", dependencias.autorizarAdmin, protegerContraCsrf, dependencias.controller.salvarLote);
   return router;
 }
 

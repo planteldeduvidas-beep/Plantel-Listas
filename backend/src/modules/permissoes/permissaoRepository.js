@@ -86,13 +86,38 @@ function criarPermissaoRepository(pool) {
     return buscarPorId(permissaoId);
   }
 
+  async function salvarLote(professorId, categoriaIds, administradorId) {
+    const conexao = await pool.getConnection();
+    try {
+      await conexao.beginTransaction();
+      await conexao.execute(
+        "UPDATE permissoes_professor_categoria SET revogada_em=CURRENT_TIMESTAMP(3),revogada_por_usuario_id=? "
+        + "WHERE professor_id=? AND revogada_em IS NULL",
+        [administradorId, professorId]
+      );
+      for (const categoriaId of categoriaIds) {
+        await conexao.execute(
+          "INSERT INTO permissoes_professor_categoria (professor_id,categoria_id,concedida_por_usuario_id) VALUES (?,?,?) "
+          + "ON DUPLICATE KEY UPDATE concedida_por_usuario_id=?,concedida_em=CURRENT_TIMESTAMP(3),revogada_por_usuario_id=NULL,revogada_em=NULL",
+          [professorId, categoriaId, administradorId, administradorId]
+        );
+      }
+      await conexao.commit();
+    } catch (erro) {
+      await conexao.rollback();
+      throw erro;
+    } finally { conexao.release(); }
+    return listarAtivasDoProfessor(professorId);
+  }
+
   return {
     buscarPorId: buscarPorId,
     buscarPorProfessorCategoria: buscarPorProfessorCategoria,
     listarTodas: listarTodas,
     listarAtivasDoProfessor: listarAtivasDoProfessor,
     conceder: conceder,
-    revogar: revogar
+    revogar: revogar,
+    salvarLote: salvarLote
   };
 }
 

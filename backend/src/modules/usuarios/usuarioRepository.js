@@ -67,12 +67,20 @@ function criarUsuarioRepository(pool) {
     return Number(registros[0].quantidade);
   }
 
-  async function listar() {
+  async function listar(filtros) {
+    const condicoes = [];
+    const parametros = [];
+    if (filtros.busca) { condicoes.push("email LIKE ?"); parametros.push("%" + filtros.busca + "%"); }
+    if (filtros.papel) { condicoes.push("papel=?"); parametros.push(filtros.papel); }
+    if (filtros.ativo !== null) { condicoes.push("ativo=?"); parametros.push(filtros.ativo ? 1 : 0); }
+    const onde = condicoes.length ? " WHERE " + condicoes.join(" AND ") : "";
+    const [totais] = await pool.execute("SELECT COUNT(*) AS total FROM usuarios" + onde, parametros);
     const [registros] = await pool.execute(
       "SELECT id, email, senha_hash, papel, ativo, criado_em, atualizado_em "
-      + "FROM usuarios ORDER BY id ASC"
+      + "FROM usuarios" + onde + " ORDER BY email ASC,id ASC LIMIT ? OFFSET ?",
+      parametros.concat([filtros.limite, (filtros.pagina - 1) * filtros.limite])
     );
-    return registros.map(mapearUsuario);
+    return { itens: registros.map(mapearUsuario), total: Number(totais[0].total) };
   }
 
   async function atualizarAtivo(usuarioId, ativo) {
@@ -91,15 +99,55 @@ function criarUsuarioRepository(pool) {
     return resultado.affectedRows > 0;
   }
 
+  async function atualizarEmail(usuarioId, email) {
+    try {
+      const [resultado] = await pool.execute("UPDATE usuarios SET email=? WHERE id=?", [email, usuarioId]);
+      return resultado.affectedRows > 0;
+    } catch (erro) {
+      if (erro && erro.code === "ER_DUP_ENTRY") throw new AppError("Email ja cadastrado", 409, "EMAIL_JA_CADASTRADO");
+      throw erro;
+    }
+  }
+
+  async function contarAdminsAtivos() {
+    const [registros] = await pool.execute("SELECT COUNT(*) AS quantidade FROM usuarios WHERE papel='admin' AND ativo=1");
+    return Number(registros[0].quantidade);
+  }
+
+  async function revogarPermissoesDoProfessor(usuarioId, administradorId) {
+    await pool.execute(
+      "UPDATE permissoes_professor_categoria SET revogada_em=CURRENT_TIMESTAMP(3),revogada_por_usuario_id=? "
+      + "WHERE professor_id=? AND revogada_em IS NULL",
+      [administradorId, usuarioId]
+    );
+  }
+
+  async function comTravaAdministrativa(funcao) {
+    const conexao = await pool.getConnection();
+    try {
+      const [travas] = await conexao.execute("SELECT GET_LOCK('plantel_admin_usuarios',5) AS obtida");
+      if (Number(travas[0].obtida) !== 1) throw new AppError("Outra alteracao administrativa esta em andamento", 409, "ALTERACAO_CONCORRENTE");
+      return await funcao();
+    } finally {
+      await conexao.execute("SELECT RELEASE_LOCK('plantel_admin_usuarios')").catch(function ignorar() {});
+      conexao.release();
+    }
+  }
+
   return {
     buscarPorEmail: buscarPorEmail,
     buscarPorId: buscarPorId,
     criarAluno: criarAluno,
     criarAdmin: criarAdmin,
+    criar: criar,
     contarAdmins: contarAdmins,
     listar: listar,
     atualizarAtivo: atualizarAtivo,
-    atualizarPapel: atualizarPapel
+    atualizarPapel: atualizarPapel,
+    atualizarEmail: atualizarEmail,
+    contarAdminsAtivos: contarAdminsAtivos,
+    revogarPermissoesDoProfessor: revogarPermissoesDoProfessor,
+    comTravaAdministrativa: comTravaAdministrativa
   };
 }
 

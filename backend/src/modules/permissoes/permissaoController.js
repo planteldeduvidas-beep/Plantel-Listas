@@ -32,12 +32,16 @@ function criarPermissaoController(service) {
       next(erro);
     }
   }
+  async function salvarLote(req, res, next) {
+    try { res.status(200).json({ permissoes: await service.salvarLote(req.params.professorId, req.body, req.usuario) }); } catch (erro) { next(erro); }
+  }
 
   return {
     listarTodas: listarTodas,
     listarMinhas: listarMinhas,
     conceder: conceder,
-    revogar: revogar
+    revogar: revogar,
+    salvarLote: salvarLote
   };
 }
 

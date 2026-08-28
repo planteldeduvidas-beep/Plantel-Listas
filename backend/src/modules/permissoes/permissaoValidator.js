@@ -17,7 +17,18 @@ function validarConcessao(corpo) {
   };
 }
 
+function validarLote(corpo) {
+  validarCamposPermitidos(corpo, ["categoriaIds"]);
+  if (!Array.isArray(corpo.categoriaIds) || corpo.categoriaIds.length > 200) {
+    throw new AppError("Pastas invalidas", 400, "DADOS_INVALIDOS");
+  }
+  const ids = corpo.categoriaIds.map(function mapear(id) { return validarId(id, "Pasta"); });
+  if (new Set(ids).size !== ids.length) throw new AppError("Pastas repetidas", 400, "DADOS_INVALIDOS");
+  return ids;
+}
+
 module.exports = {
   validarConcessao: validarConcessao,
-  validarId: validarId
+  validarId: validarId,
+  validarLote: validarLote
 };
