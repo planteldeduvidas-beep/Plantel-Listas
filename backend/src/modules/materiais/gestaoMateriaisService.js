@@ -30,6 +30,43 @@ function criarGestaoMateriaisService(dependencias) {
     return integracaoService.obterRefreshTokenParaUso();
   }
 
+  async function exigirPastaDoAcervo(refreshToken, pastaDriveId) {
+    const pasta = await executarGoogle(function obterPasta() {
+      return provider.obterItem(refreshToken, pastaDriveId);
+    });
+    const dentroDaRaiz = pasta.id === provider.pastaRaizId
+      || await executarGoogle(function verificarPasta() {
+        return provider.verificarDescendenteDaRaiz(refreshToken, pasta);
+      });
+    if (!dentroDaRaiz || pasta.trashed
+        || pasta.mimeType !== "application/vnd.google-apps.folder") {
+      throw new AppError("Pasta fora do acervo autorizado", 403, "PASTA_FORA_DA_RAIZ");
+    }
+    return pasta;
+  }
+
+  async function exigirArquivoDoAcervo(refreshToken, material, deveEstarNaLixeira) {
+    await exigirPastaDoAcervo(refreshToken, material.categoriaDriveId);
+    const item = await executarGoogle(function obterArquivo() {
+      return provider.obterItem(refreshToken, material.driveFileId);
+    });
+    const paiCorreto = Array.isArray(item.parents)
+      && item.parents.includes(material.categoriaDriveId);
+    const lixeiraCorreta = deveEstarNaLixeira ? item.trashed : !item.trashed;
+    if (!paiCorreto || !lixeiraCorreta || item.mimeType === "application/vnd.google-apps.shortcut") {
+      throw new AppError("Material fora do acervo autorizado", 403, "MATERIAL_FORA_DA_RAIZ");
+    }
+    if (!deveEstarNaLixeira) {
+      const dentroDaRaiz = await executarGoogle(function verificarArquivo() {
+        return provider.verificarDescendenteDaRaiz(refreshToken, item);
+      });
+      if (!dentroDaRaiz) {
+        throw new AppError("Material fora do acervo autorizado", 403, "MATERIAL_FORA_DA_RAIZ");
+      }
+    }
+    return item;
+  }
+
   async function exigirCategoria(usuario, categoriaId) {
     const categoria = await repository.buscarCategoria(categoriaId);
     if (!categoria || !categoria.ativo || !categoria.drivePastaId) throw new AppError("Pasta indisponivel",404,"PASTA_NAO_ENCONTRADA");
@@ -75,6 +112,7 @@ function criarGestaoMateriaisService(dependencias) {
       const dados = await validarUpload(corpo || {},arquivo,configuracao);
       const categoria = await exigirCategoria(usuario,dados.categoriaId);
       const refreshToken = await token();
+      await exigirPastaDoAcervo(refreshToken, categoria.drivePastaId);
       const item = await executarGoogle(function enviar() { return provider.criarArquivo(refreshToken,{nome:dados.nome,mimeType:dados.mimeType,tamanho:arquivo.size,caminho:arquivo.path,pastaDriveId:categoria.drivePastaId}); });
       try { return publicar(await repository.criarMaterial(dadosDoDrive(item,Object.assign({},dados,{tamanho:arquivo.size}),categoria),usuario.id)); }
       catch (erroBanco) {
@@ -90,6 +128,7 @@ function criarGestaoMateriaisService(dependencias) {
     const dados = validarEdicao(corpo || {});
     const material = await exigirMaterial(usuario,id,["disponivel"]);
     const refreshToken = await token();
+    await exigirArquivoDoAcervo(refreshToken, material, false);
     let renomeado = false;
     if (dados.nome !== undefined && dados.nome !== material.nome) {
       await executarGoogle(function renomear() { return provider.renomearArquivo(refreshToken,material.driveFileId,dados.nome); });
@@ -113,6 +152,8 @@ function criarGestaoMateriaisService(dependencias) {
     const destino=await exigirCategoria(usuario,dados.categoriaId);
     if (material.categoriaId===destino.id) throw new AppError("O material ja esta nesta pasta",400,"DESTINO_IGUAL_ORIGEM");
     const refreshToken=await token();
+    await exigirArquivoDoAcervo(refreshToken,material,false);
+    await exigirPastaDoAcervo(refreshToken,destino.drivePastaId);
     await executarGoogle(function moverDrive(){return provider.moverArquivo(refreshToken,material.driveFileId,material.categoriaDriveId,destino.drivePastaId);});
     try { return publicar(await repository.atualizarMaterial(id,dados.versao,{categoriaId:destino.id,driveParentFileId:destino.drivePastaId},usuario.id,"movimentacao")); }
     catch(erro){await provider.moverArquivo(refreshToken,material.driveFileId,destino.drivePastaId,material.categoriaDriveId).catch(function ignorar(){});tratarConcorrencia(erro);}
@@ -126,6 +167,7 @@ function criarGestaoMateriaisService(dependencias) {
       const versao=validarVersao(corpo || {});
       const detectado=await identificarArquivo(arquivo,configuracao);
       const refreshToken=await token();
+      await exigirArquivoDoAcervo(refreshToken,material,false);
       const novo=await executarGoogle(function enviar(){return provider.criarArquivo(refreshToken,{nome:material.nome.replace(/\.[^.]+$/, "."+detectado.extensao),mimeType:detectado.mimeType,tamanho:arquivo.size,caminho:arquivo.path,pastaDriveId:material.categoriaDriveId});});
       try { await provider.alterarLixeira(refreshToken,material.driveFileId,true); }
       catch(erro){await provider.excluirArquivo(refreshToken,novo.id).catch(function ignorar(){});throw erro;}
@@ -136,14 +178,14 @@ function criarGestaoMateriaisService(dependencias) {
 
   async function enviarLixeira(usuario, materialIdInformado, corpo) {
     exigirPapelDeGestao(usuario); const id=inteiroPositivo(materialIdInformado,"Material");
-    const material=await exigirMaterial(usuario,id,["disponivel"]); const versao=validarVersao(corpo || {}); const refreshToken=await token();
+    const material=await exigirMaterial(usuario,id,["disponivel"]); const versao=validarVersao(corpo || {}); const refreshToken=await token();await exigirArquivoDoAcervo(refreshToken,material,false);
     await executarGoogle(function lixeira(){return provider.alterarLixeira(refreshToken,material.driveFileId,true);});
     try{await repository.enviarLixeira(id,versao,usuario.id);return{enviado:true};}catch(erro){await provider.alterarLixeira(refreshToken,material.driveFileId,false).catch(function ignorar(){});tratarConcorrencia(erro);}
   }
 
   async function listarLixeira(usuario){if(usuario.papel!=="admin")throw new AppError("Usuario sem permissao",403,"SEM_PERMISSAO");return repository.listarLixeira();}
-  async function restaurar(usuario,idInformado,corpo){if(usuario.papel!=="admin")throw new AppError("Usuario sem permissao",403,"SEM_PERMISSAO");const id=inteiroPositivo(idInformado,"Material");const versao=validarVersao(corpo || {});const material=await exigirMaterial(usuario,id,["lixeira"]);await exigirCategoria(usuario,material.categoriaAnteriorId);const refreshToken=await token();await executarGoogle(function restaurarDrive(){return provider.alterarLixeira(refreshToken,material.driveFileId,false);});try{await repository.restaurar(id,versao,usuario.id);return{restaurado:true};}catch(erro){await provider.alterarLixeira(refreshToken,material.driveFileId,true).catch(function ignorar(){});tratarConcorrencia(erro);}}
-  async function excluirDefinitivamente(usuario,idInformado,corpo){if(usuario.papel!=="admin")throw new AppError("Usuario sem permissao",403,"SEM_PERMISSAO");const id=inteiroPositivo(idInformado,"Material");const versao=validarVersao(corpo || {});const material=await exigirMaterial(usuario,id,["lixeira","exclusao_pendente"]);const refreshToken=await token();let pendente=material;let marcadaAgora=false;if(material.estado==="lixeira"){try{pendente=await repository.marcarExclusao(id,versao,usuario.id);marcadaAgora=true;}catch(erro){tratarConcorrencia(erro);}}try{await executarGoogle(function excluir(){return provider.excluirArquivo(refreshToken,pendente.driveFileId);});}catch(erro){if(erro.codigo!=="GOOGLE_ARQUIVO_NAO_ENCONTRADO"){if(marcadaAgora)await repository.reverterExclusao(id);throw erro;}}await repository.concluirExclusao(id,usuario.id);return{excluido:true};}
+  async function restaurar(usuario,idInformado,corpo){if(usuario.papel!=="admin")throw new AppError("Usuario sem permissao",403,"SEM_PERMISSAO");const id=inteiroPositivo(idInformado,"Material");const versao=validarVersao(corpo || {});const material=await exigirMaterial(usuario,id,["lixeira"]);const categoria=await exigirCategoria(usuario,material.categoriaAnteriorId);material.categoriaDriveId=categoria.drivePastaId;const refreshToken=await token();await exigirArquivoDoAcervo(refreshToken,material,true);await executarGoogle(function restaurarDrive(){return provider.alterarLixeira(refreshToken,material.driveFileId,false);});try{await repository.restaurar(id,versao,usuario.id);return{restaurado:true};}catch(erro){await provider.alterarLixeira(refreshToken,material.driveFileId,true).catch(function ignorar(){});tratarConcorrencia(erro);}}
+  async function excluirDefinitivamente(usuario,idInformado,corpo){if(usuario.papel!=="admin")throw new AppError("Usuario sem permissao",403,"SEM_PERMISSAO");const id=inteiroPositivo(idInformado,"Material");const versao=validarVersao(corpo || {});const material=await exigirMaterial(usuario,id,["lixeira","exclusao_pendente"]);const categoria=await exigirCategoria(usuario,material.categoriaAnteriorId);material.categoriaDriveId=categoria.drivePastaId;const refreshToken=await token();await exigirArquivoDoAcervo(refreshToken,material,true);let pendente=material;let marcadaAgora=false;if(material.estado==="lixeira"){try{pendente=await repository.marcarExclusao(id,versao,usuario.id);marcadaAgora=true;}catch(erro){tratarConcorrencia(erro);}}try{await executarGoogle(function excluir(){return provider.excluirArquivo(refreshToken,pendente.driveFileId);});}catch(erro){if(erro.codigo!=="GOOGLE_ARQUIVO_NAO_ENCONTRADO"){if(marcadaAgora)await repository.reverterExclusao(id);throw erro;}}await repository.concluirExclusao(id,usuario.id);return{excluido:true};}
   async function listarPastas(usuario){exigirPapelDeGestao(usuario);return repository.listarPastasGerenciaveis(usuario);}
 
   return {adicionar,editar,mover,substituir,enviarLixeira,listarLixeira,restaurar,excluirDefinitivamente,listarPastas};

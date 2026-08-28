@@ -7,7 +7,7 @@ const { obterConfiguracao } = require("../src/shared/config/ambiente");
 const { criarPool } = require("../src/shared/database/conexao");
 const { criarEmailProviderFake } = require("../src/shared/providers/emailProvider");
 const { criarHashDaSenha } = require("../src/modules/autenticacao/senha");
-const { ESCOPO_LEITURA } = require("../src/shared/providers/googleDriveProvider");
+const { ESCOPO_LEITURA, ESCOPO_GESTAO } = require("../src/shared/providers/googleDriveProvider");
 const AppError = require("../src/shared/errors/AppError");
 
 const configuracaoBase = obterConfiguracao();
@@ -26,7 +26,7 @@ const configuracaoTeste = Object.assign({}, configuracaoBase, {
     pastaRaizId: "pastaRaizIntegracao12345",
     redirectUri: "http://localhost:3000/api/integracoes/google-drive/oauth/callback",
     refreshToken: "refresh-token-configurado-no-backend",
-    escopo: ESCOPO_LEITURA
+    escopo: ESCOPO_GESTAO
   }
 });
 const pool = criarPool(configuracaoTeste.banco);
@@ -41,11 +41,11 @@ let tarefasAgendadas = [];
 let refreshTokenOAuthAtual;
 
 const providerFake = {
-  escopo: ESCOPO_LEITURA,
+  escopo: ESCOPO_GESTAO,
   pastaRaizId: configuracaoTeste.googleDrive.pastaRaizId,
   gerarUrlAutorizacao: function gerarUrlAutorizacao(estado) {
     return "https://accounts.google.test/authorize?scope="
-      + encodeURIComponent(ESCOPO_LEITURA) + "&state=" + encodeURIComponent(estado);
+      + encodeURIComponent(ESCOPO_GESTAO) + "&state=" + encodeURIComponent(estado);
   },
   trocarCodigoPorRefreshToken: async function trocarCodigoPorRefreshToken() {
     return refreshTokenOAuthAtual;
@@ -308,7 +308,7 @@ test("OAuth usa estado com hash, guarda token criptografado e bloqueia replay", 
     credenciais[0].refresh_token_criptografado.includes("refresh-token-retornado"),
     false
   );
-  assert.equal(credenciais[0].escopo, ESCOPO_LEITURA);
+  assert.equal(credenciais[0].escopo, ESCOPO_GESTAO);
 
   const replay = await admin.agente.get(
     "/api/integracoes/google-drive/oauth/callback?code=outro-codigo-teste&state="
@@ -316,6 +316,34 @@ test("OAuth usa estado com hash, guarda token criptografado e bloqueia replay", 
   );
   assert.equal(replay.status, 400);
   assert.equal(replay.body.erro.codigo, "GOOGLE_ESTADO_INVALIDO");
+});
+
+test("credencial do scope antigo exige reconexao antes de qualquer uso", async function testarScopeAntigo() {
+  const admin = await autenticar("admin");
+  const inicio = await admin.agente.post("/api/integracoes/google-drive/oauth/iniciar")
+    .set("X-CSRF-Token", admin.csrf)
+    .send({});
+  const estado = new URL(inicio.body.urlAutorizacao).searchParams.get("state");
+  await admin.agente.get(
+    "/api/integracoes/google-drive/oauth/callback?code=codigo-google-teste&state="
+    + encodeURIComponent(estado)
+  );
+  await pool.execute(
+    "UPDATE credenciais_google_drive SET escopo=?,renovacao_necessaria=0 WHERE id=1",
+    [ESCOPO_LEITURA]
+  );
+
+  const status = await admin.agente.get("/api/integracoes/google-drive/status");
+  assert.equal(status.status, 200);
+  assert.equal(status.body.googleDrive.conectado, false);
+  assert.equal(status.body.googleDrive.renovacaoNecessaria, true);
+  assert.equal(status.body.googleDrive.escopo, ESCOPO_GESTAO);
+
+  const sincronizacao = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
+    .set("X-CSRF-Token", admin.csrf)
+    .send({});
+  assert.equal(sincronizacao.status, 409);
+  assert.equal(sincronizacao.body.erro.codigo, "GOOGLE_RECONEXAO_NECESSARIA");
 });
 
 test("sincronizacao importa por Drive ID e permanece idempotente", async function testarSincronizacao() {

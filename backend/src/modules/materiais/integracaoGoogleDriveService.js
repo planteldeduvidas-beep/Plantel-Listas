@@ -65,7 +65,8 @@ function criarIntegracaoGoogleDriveService(dependencias) {
 
   async function obterCredencialDeUso(executor) {
     const credencial = await repository.buscarCredencial(executor);
-    if (credencial && credencial.renovacao_necessaria) {
+    if (credencial && (credencial.renovacao_necessaria
+        || (provider && credencial.escopo !== provider.escopo))) {
       throw new AppError(
         "A conexao com o Google Drive precisa ser renovada",
         409,
@@ -276,7 +277,8 @@ function criarIntegracaoGoogleDriveService(dependencias) {
     const credencial = await repository.buscarCredencial();
     const ultimaSincronizacao = await repository.buscarUltimaSincronizacao();
     const renovacaoNecessaria = Boolean(
-      credencial && credencial.renovacao_necessaria
+      credencial && (credencial.renovacao_necessaria
+        || (provider && credencial.escopo !== provider.escopo))
     );
     return {
       configurado: Boolean(provider),

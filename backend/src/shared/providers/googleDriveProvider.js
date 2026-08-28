@@ -365,6 +365,22 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     }, token);
   }
 
+  async function criarPasta(refreshToken, nome, pastaPaiDriveId) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const url = new URL(URL_API_DRIVE);
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("fields", "id,name,mimeType,parents,trashed,resourceKey");
+    return requisitarEscrita(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nome,
+        mimeType: MIME_PASTA,
+        parents: [pastaPaiDriveId]
+      })
+    }, token);
+  }
+
   async function atualizarMetadados(refreshToken, arquivoId, metadados, parametros) {
     const token = await obterTokenDeAcesso(refreshToken);
     const url = new URL(URL_API_DRIVE + "/" + encodeURIComponent(arquivoId));
@@ -599,6 +615,7 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     encerrarCanal: encerrarCanal,
     obterItem: obterItem,
     verificarDescendenteDaRaiz: verificarDescendenteDaRaiz,
+    criarPasta: criarPasta,
     criarArquivo: criarArquivo,
     renomearArquivo: renomearArquivo,
     moverArquivo: moverArquivo,

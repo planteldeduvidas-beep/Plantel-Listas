@@ -26,6 +26,9 @@ function criarDependencias(alteracoes) {
   };
   const provider = {
     escopo: ESCOPO_GESTAO,
+    pastaRaizId: "driveRaiz",
+    obterItem: async function obter(token, id) { return id.startsWith("drivePasta") ? { id: id, mimeType: "application/vnd.google-apps.folder", parents: ["driveRaiz"], trashed: false } : { id: id, mimeType: "application/pdf", parents: ["drivePasta"], trashed: false }; },
+    verificarDescendenteDaRaiz: async function verificar() { return true; },
     criarArquivo: async function criar() { chamadas.push("criar"); return { id: "driveNovo", name: "novo.pdf", mimeType: "application/pdf", size: "20" }; },
     excluirArquivo: async function excluir() { chamadas.push("excluir"); },
     renomearArquivo: async function renomear(token, id, nome) { chamadas.push("renomear:" + nome); },

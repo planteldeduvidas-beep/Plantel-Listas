@@ -124,6 +124,31 @@ test("prepara upload resumivel e alteracoes sem expor credenciais", async functi
   }
 });
 
+test("cria pasta controlada com pai explicito", async function testarCriacaoDePasta() {
+  let chamada;
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientFake,
+    fetch: async function buscar(urlInformada, opcoes) {
+      chamada = { url: new URL(urlInformada), opcoes: opcoes };
+      return new Response(JSON.stringify({
+        id: "pastaTemporaria123",
+        name: "TESTE FASE 6",
+        mimeType: "application/vnd.google-apps.folder",
+        parents: ["pastaRaizTeste12345"]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+  });
+  const pasta = await provider.criarPasta(
+    "refresh-token-secreto",
+    "TESTE FASE 6",
+    "pastaRaizTeste12345"
+  );
+  assert.equal(pasta.id, "pastaTemporaria123");
+  assert.equal(chamada.opcoes.method, "POST");
+  assert.equal(JSON.parse(chamada.opcoes.body).parents[0], "pastaRaizTeste12345");
+  assert.equal(JSON.stringify(chamada).includes("refresh-token-secreto"), false);
+});
+
 test("protege refresh token com criptografia autenticada", function testarCriptografia() {
   const segredo = "segredo-da-aplicacao-com-mais-de-trinta-e-dois-caracteres";
   const token = "refresh-token-que-nao-pode-ser-armazenado-em-texto";

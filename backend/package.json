@@ -10,6 +10,7 @@
     "start": "node src/server.js",
     "pretest": "node scripts/prepararBancoTeste.js",
     "test": "node --test --test-concurrency=1",
+    "test:drive:write": "node scripts/testarGestaoDriveReal.js",
     "db:create": "node scripts/criarBanco.js",
     "migrate": "node scripts/executarMigrations.js",
     "classify:archive": "node scripts/classificarAcervo.js",
