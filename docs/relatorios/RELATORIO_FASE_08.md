@@ -1,22 +1,23 @@
 # RELATORIO DA FASE 08 - FRONTEND, RESPONSIVIDADE E UX
 
 Data: 28/08/2026
-Estado: **PRONTA PARA VALIDACAO HUMANA FINAL**
+Estado: **APROVADA E CONCLUIDA**
 
 ## 1. Resumo
 
 A Fase 8 transformou a interface existente em um painel visualmente consistente, responsivo e orientado a usuarios leigos. Os quatro prints finais enviados na validacao passaram a ser a referencia visual definitiva para login e paineis de aluno, professor e administrador. O resultado usa fundo quase preto, superficies grafite, bordas finas e destaques verdes e turquesa do Plantel, alem de oferecer um modo claro equivalente.
 
-Nenhuma regra de permissao, endpoint, migration, estrutura de banco, autenticacao, autorizacao ou integracao externa foi alterada. A unica mudanca de leitura no backend foi autorizada durante a validacao para que os cards contem materiais funcionais em toda a subarvore. Nao houve merge, deploy ou inicio da Fase 9.
+Nenhuma regra de permissao, endpoint, migration, estrutura de banco, autenticacao, autorizacao ou integracao externa foi alterada. A unica mudanca de leitura no backend foi autorizada durante a validacao para que os cards contem materiais funcionais em toda a subarvore. A validacao humana final aprovou a experiencia depois das correcoes. Nao houve deploy ou inicio da Fase 9.
 
 ## 2. Branch e escopo
 
 - Branch: `fase/08-frontend-ux`.
 - Base: `main` no commit `905a2b1`, com as Fases 1 a 7 integradas.
 - Commit tecnico: `007e0a6` - `feat: aprimora frontend responsivo da fase 8`.
+- Correcao e validacao visual real: `33bc6d4` - `fix: conclui validacao visual da fase 8`.
 - Alteracoes concentradas no frontend e na documentacao, com ajuste pontual na consulta de leitura e no teste integrado da navegacao do acervo.
 - Nenhuma dependencia foi adicionada.
-- A branch sera enviada ao remoto sem force push e permanecera separada da `main`.
+- O merge seguro em `main` foi autorizado no fechamento final, sem force push.
 
 ## 3. Referencia e identidade visual
 
@@ -148,9 +149,9 @@ A validacao visual real foi concluida no Google Chrome conectado, com contas tem
 - mensagens tecnicas sao reduzidas antes de serem apresentadas;
 - nenhum deploy foi realizado.
 
-## 15. Pendencia para validacao humana final
+## 15. Validacao humana final
 
-A validacao tecnica e visual assistida foi concluida. Resta somente a aprovacao visual final do responsavel humano. Uma pagina real de PDF foi confirmada no Chrome em desktop e em 390 x 844 depois da correcao de mesma origem descrita neste relatorio.
+A validacao humana final foi concluida e aprovada depois das ultimas correcoes. Foram revalidados manualmente navegacao entre pastas, breadcrumb, botao `Voltar` do sistema, botao Voltar do navegador, PDF, video com seek, menu e drawer mobile, temas claro e escuro e o comportamento geral da interface. A pagina real de PDF permaneceu aprovada em desktop e celular depois da correcao de mesma origem.
 
 ## 16. Correcao apos a primeira validacao visual
 
@@ -278,6 +279,6 @@ Depois dos ajustes, nao foi detectada rolagem horizontal indevida nos tamanhos r
 
 ## 20. Estado final
 
-**PRONTA PARA VALIDACAO HUMANA FINAL**
+**APROVADA E CONCLUIDA**
 
-A Fase 8 permanece somente na branch `fase/08-frontend-ux`. Nao houve merge, deploy nem inicio da Fase 9.
+A Fase 8 foi aprovada na validacao humana final e integrada com merge seguro em `main` no fechamento autorizado. Nao houve deploy nem inicio da Fase 9.
