@@ -27,7 +27,7 @@ const configuracao = Object.assign({}, base, {
     refreshToken: "refresh-token-fase-cinco",
     webhookUrl: "",
     intervaloChangesMs: 60000,
-    escopoLeitura: ESCOPO_LEITURA
+    escopo: ESCOPO_LEITURA
   }
 });
 const pool = criarPool(configuracao.banco);

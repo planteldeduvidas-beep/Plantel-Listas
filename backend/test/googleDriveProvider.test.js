@@ -1,7 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs/promises");
+const os = require("node:os");
+const path = require("node:path");
 const {
   ESCOPO_LEITURA,
+  ESCOPO_GESTAO,
   criarGoogleDriveProvider,
   criptografarRefreshToken,
   descriptografarRefreshToken
@@ -58,19 +62,91 @@ function criarResposta(dados) {
   };
 }
 
-test("gera OAuth server-side com escopo unico de leitura e acesso offline", async function testarOAuth() {
+test("gera OAuth server-side com escopo unico de gestao e acesso offline", async function testarOAuth() {
   const provider = criarGoogleDriveProvider(criarConfiguracao(), {
     OAuth2Client: OAuth2ClientFake,
     fetch: async function buscarNaoUtilizado() { throw new Error("nao esperado"); }
   });
   const url = provider.gerarUrlAutorizacao("estado-seguro-de-teste");
   assert.equal(url.includes("estado-seguro-de-teste"), true);
-  assert.deepEqual(OAuth2ClientFake.ultimaInstancia.opcoesAutorizacao.scope, [ESCOPO_LEITURA]);
+  assert.deepEqual(OAuth2ClientFake.ultimaInstancia.opcoesAutorizacao.scope, [ESCOPO_GESTAO]);
+  assert.equal(provider.escopo, ESCOPO_GESTAO);
+  assert.equal(provider.escopoGestaoNecessario, ESCOPO_GESTAO);
   assert.equal(OAuth2ClientFake.ultimaInstancia.opcoesAutorizacao.access_type, "offline");
   assert.equal(OAuth2ClientFake.ultimaInstancia.opcoesAutorizacao.prompt, "consent");
 
   const token = await provider.trocarCodigoPorRefreshToken("codigo-valido-de-teste");
   assert.equal(token, "refresh-token-de-teste-seguro");
+});
+
+test("prepara upload resumivel e alteracoes sem expor credenciais", async function testarEscritas() {
+  const chamadas = [];
+  const caminho = path.join(os.tmpdir(), "plantel-listas-provider-" + process.pid + ".pdf");
+  await fs.writeFile(caminho, Buffer.from("%PDF-1.7\nteste"));
+  try {
+    const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+      OAuth2Client: OAuth2ClientFake,
+      fetch: async function buscar(urlInformada, opcoes) {
+        const url = new URL(urlInformada);
+        let corpo = opcoes.body;
+        if (corpo && typeof corpo[Symbol.asyncIterator] === "function") {
+          const partes = [];
+          for await (const parte of corpo) partes.push(parte);
+          corpo = Buffer.concat(partes).toString("utf8");
+        }
+        chamadas.push({ url: url, metodo: opcoes.method, corpo: corpo, autorizacao: opcoes.headers.Authorization });
+        if (url.pathname === "/upload/drive/v3/files") {
+          return new Response(null, { status: 200, headers: { location: "https://upload.google.test/sessao-segura" } });
+        }
+        if (url.hostname === "upload.google.test") {
+          return new Response(JSON.stringify({ id: "arquivoNovo123", name: "novo.pdf", mimeType: "application/pdf", size: "15" }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        if (opcoes.method === "DELETE") return new Response(null, { status: 204 });
+        return new Response(JSON.stringify({ id: "arquivoNovo123" }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    await provider.criarArquivo("refresh-token-secreto", { nome: "novo.pdf", mimeType: "application/pdf", tamanho: 15, caminho: caminho, pastaDriveId: "pastaDestino123" });
+    await provider.renomearArquivo("refresh-token-secreto", "arquivoNovo123", "renomeado.pdf");
+    await provider.moverArquivo("refresh-token-secreto", "arquivoNovo123", "pastaOrigem123", "pastaDestino123");
+    await provider.alterarLixeira("refresh-token-secreto", "arquivoNovo123", true);
+    await provider.excluirArquivo("refresh-token-secreto", "arquivoNovo123");
+    assert.deepEqual(chamadas.map(function metodo(item) { return item.metodo; }), ["POST", "PUT", "PATCH", "PATCH", "PATCH", "DELETE"]);
+    assert.equal(chamadas[0].corpo.includes("pastaDestino123"), true);
+    assert.equal(String(chamadas[2].corpo).includes("renomeado.pdf"), true);
+    assert.equal(chamadas[3].url.searchParams.get("addParents"), "pastaDestino123");
+    assert.equal(String(chamadas[4].corpo).includes("true"), true);
+    chamadas.forEach(function semSegredo(chamada) {
+      assert.equal(JSON.stringify(chamada).includes("refresh-token-secreto"), false);
+      assert.equal(chamada.autorizacao, "Bearer access-token-de-teste");
+    });
+  } finally {
+    await fs.unlink(caminho).catch(function ignorar() {});
+  }
+});
+
+test("cria pasta controlada com pai explicito", async function testarCriacaoDePasta() {
+  let chamada;
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientFake,
+    fetch: async function buscar(urlInformada, opcoes) {
+      chamada = { url: new URL(urlInformada), opcoes: opcoes };
+      return new Response(JSON.stringify({
+        id: "pastaTemporaria123",
+        name: "TESTE FASE 6",
+        mimeType: "application/vnd.google-apps.folder",
+        parents: ["pastaRaizTeste12345"]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+  });
+  const pasta = await provider.criarPasta(
+    "refresh-token-secreto",
+    "TESTE FASE 6",
+    "pastaRaizTeste12345"
+  );
+  assert.equal(pasta.id, "pastaTemporaria123");
+  assert.equal(chamada.opcoes.method, "POST");
+  assert.equal(JSON.parse(chamada.opcoes.body).parents[0], "pastaRaizTeste12345");
+  assert.equal(JSON.stringify(chamada).includes("refresh-token-secreto"), false);
 });
 
 test("protege refresh token com criptografia autenticada", function testarCriptografia() {

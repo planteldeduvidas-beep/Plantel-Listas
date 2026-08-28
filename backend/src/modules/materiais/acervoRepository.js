@@ -41,6 +41,7 @@ function mapearMaterial(registro) {
     extensao: registro.extensao,
     tamanhoBytes: registro.tamanho_bytes === null ? null : Number(registro.tamanho_bytes),
     modificadoEm: registro.drive_modificado_em,
+    versao: Number(registro.versao || 1),
     pasta: registro.categoria_nome ? { id: Number(registro.categoria_id), nome: registro.categoria_nome } : null,
     caminho: registro.caminho_texto || "",
     disciplina: registro.disciplina_nome ? { id: Number(registro.disciplina_efetiva_id), nome: registro.disciplina_nome } : null,
@@ -79,7 +80,7 @@ function criarAcervoRepository(pool) {
       criarArvoreSql()
       + "SELECT a.*,d.nome AS disciplina_nome,c.nome AS concurso_nome,"
       + "(SELECT COUNT(*) FROM categorias f WHERE f.categoria_pai_id=a.id AND f.ativo=1) AS quantidade_pastas,"
-      + "(SELECT COUNT(*) FROM materiais m WHERE m.categoria_id=a.id AND m.disponivel=1 AND m.tipo IN ('pdf','video')) AS quantidade_materiais "
+      + "(SELECT COUNT(*) FROM materiais m WHERE m.categoria_id=a.id AND m.disponivel=1 AND m.estado_gestao='disponivel' AND m.tipo IN ('pdf','video')) AS quantidade_materiais "
       + "FROM arvore a LEFT JOIN disciplinas d ON d.id=a.disciplina_efetiva_id AND d.ativo=1 "
       + "LEFT JOIN concursos c ON c.id=a.concurso_efetivo_id AND c.ativo=1 "
       + "WHERE a.ativo=1 AND a.categoria_pai_id <=> ? ORDER BY a.nome ASC",
@@ -89,7 +90,7 @@ function criarAcervoRepository(pool) {
   }
 
   function criarCondicoes(filtros) {
-    const condicoes = ["m.disponivel=1", "m.tipo IN ('pdf','video')", "a.ativo=1"];
+    const condicoes = ["m.disponivel=1", "m.estado_gestao='disponivel'", "m.tipo IN ('pdf','video')", "a.ativo=1"];
     const parametros = [];
     if (filtros.categoriaId && !filtros.busca && !filtros.disciplinaId && !filtros.concursoId && !filtros.tipo) {
       condicoes.push("m.categoria_id=?");
@@ -132,7 +133,7 @@ function criarAcervoRepository(pool) {
     const deslocamento = (filtros.pagina - 1) * filtros.limite;
     const [registros] = await pool.execute(
       criarArvoreSql() + "SELECT m.id,m.nome,m.tipo,m.extensao,m.tamanho_bytes,m.drive_modificado_em,"
-      + "m.categoria_id,a.nome AS categoria_nome,a.caminho_texto,"
+      + "m.categoria_id,m.versao,a.nome AS categoria_nome,a.caminho_texto,"
       + "COALESCE(m.disciplina_id,a.disciplina_efetiva_id) AS disciplina_efetiva_id,d.nome AS disciplina_nome,"
       + "COALESCE(m.concurso_id,a.concurso_efetivo_id) AS concurso_efetivo_id,c.nome AS concurso_nome "
       + base + " ORDER BY " + ordens[filtros.ordenar] + " LIMIT ? OFFSET ?",
@@ -154,7 +155,7 @@ function criarAcervoRepository(pool) {
     const [registros] = await pool.execute(
       "SELECT m.id,m.drive_file_id,m.nome,m.mime_type,m.tipo,m.extensao,m.tamanho_bytes,m.resource_key "
       + "FROM materiais m INNER JOIN categorias c ON c.id=m.categoria_id "
-      + "WHERE m.id=? AND m.disponivel=1 AND m.tipo IN ('pdf','video') AND c.ativo=1 LIMIT 1",
+      + "WHERE m.id=? AND m.disponivel=1 AND m.estado_gestao='disponivel' AND m.tipo IN ('pdf','video') AND c.ativo=1 LIMIT 1",
       [id]
     );
     return registros[0] || null;
@@ -225,12 +226,12 @@ function criarAcervoRepository(pool) {
       + "SUM(IF(a.disciplina_efetiva_estado='nao_se_aplica' OR a.concurso_efetivo_estado='nao_se_aplica',1,0)) AS nao_se_aplica,"
       + "SUM(IF((m.disciplina_id IS NULL AND a.disciplina_efetiva_estado='pendente') OR (m.concurso_id IS NULL AND a.concurso_efetivo_estado='pendente'),1,0)) AS materiais_pendentes "
       + "FROM materiais m INNER JOIN arvore a ON a.id=m.categoria_id "
-      + "WHERE m.disponivel=1 AND m.tipo IN ('pdf','video') AND a.ativo=1"
+      + "WHERE m.disponivel=1 AND m.estado_gestao='disponivel' AND m.tipo IN ('pdf','video') AND a.ativo=1"
     );
     const [pastas] = await pool.execute(
       criarArvoreSql() + "SELECT a.id,a.caminho_texto,a.disciplina_efetiva_estado,a.concurso_efetivo_estado,"
       + "COUNT(m.id) AS quantidade_materiais FROM arvore a INNER JOIN materiais m ON m.categoria_id=a.id "
-      + "WHERE a.ativo=1 AND m.disponivel=1 AND m.tipo IN ('pdf','video') "
+      + "WHERE a.ativo=1 AND m.disponivel=1 AND m.estado_gestao='disponivel' AND m.tipo IN ('pdf','video') "
       + "AND ((m.disciplina_id IS NULL AND a.disciplina_efetiva_estado='pendente') "
       + "OR (m.concurso_id IS NULL AND a.concurso_efetivo_estado='pendente')) "
       + "GROUP BY a.id,a.caminho_texto,a.disciplina_efetiva_estado,a.concurso_efetivo_estado ORDER BY a.caminho_texto"

@@ -179,7 +179,10 @@ function validarVariaveisDeAmbiente(variaveis) {
         5,
         1,
         1000
-      )
+      ),
+      limiteUpload: lerInteiro(variaveis, "UPLOAD_RATE_LIMIT_MAX", 20, 1, 1000),
+      tamanhoMaximoPdfBytes: lerInteiro(variaveis, "UPLOAD_MAX_PDF_MB", 50, 1, 500) * 1024 * 1024,
+      tamanhoMaximoVideoBytes: lerInteiro(variaveis, "UPLOAD_MAX_VIDEO_MB", 500, 1, 5000) * 1024 * 1024
     }),
     banco: Object.freeze({
       host: exigirTexto(variaveis, "DB_HOST"),
@@ -217,7 +220,7 @@ function validarVariaveisDeAmbiente(variaveis) {
         15000,
         3600000
       ),
-      escopoLeitura: "https://www.googleapis.com/auth/drive.readonly"
+      escopo: "https://www.googleapis.com/auth/drive"
     })
   });
 }

@@ -1,9 +1,11 @@
 const crypto = require("node:crypto");
+const fs = require("node:fs");
 const { OAuth2Client } = require("google-auth-library");
 const AppError = require("../errors/AppError");
 
 const MIME_PASTA = "application/vnd.google-apps.folder";
 const ESCOPO_LEITURA = "https://www.googleapis.com/auth/drive.readonly";
+const ESCOPO_GESTAO = "https://www.googleapis.com/auth/drive";
 const URL_API_DRIVE = "https://www.googleapis.com/drive/v3/files";
 const URL_CHANGES_DRIVE = "https://www.googleapis.com/drive/v3/changes";
 const URL_CHANNELS_DRIVE = "https://www.googleapis.com/drive/v3/channels/stop";
@@ -131,7 +133,7 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     const cliente = criarClienteOAuth(configuracao, fabricaOAuth);
     return cliente.generateAuthUrl({
       access_type: "offline",
-      scope: [ESCOPO_LEITURA],
+      scope: [ESCOPO_GESTAO],
       state: estado,
       include_granted_scopes: true,
       prompt: "consent"
@@ -303,6 +305,115 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       return {};
     }
     return resposta.json();
+  }
+
+  async function requisitarEscrita(url, opcoes, tokenDeAcesso) {
+    const configuracaoFetch = Object.assign({}, opcoes || {});
+    configuracaoFetch.headers = Object.assign({}, configuracaoFetch.headers || {}, {
+      Authorization: "Bearer " + tokenDeAcesso
+    });
+    configuracaoFetch.signal = AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS);
+    if (configuracaoFetch.body && typeof configuracaoFetch.body.pipe === "function") {
+      configuracaoFetch.duplex = "half";
+    }
+    let resposta;
+    try {
+      resposta = await buscar(url, configuracaoFetch);
+    } catch (erro) {
+      throw new AppError("Google Drive temporariamente indisponivel", 503, "GOOGLE_DRIVE_INDISPONIVEL");
+    }
+    if (!resposta.ok) {
+      const codigo = resposta.status === 401 || resposta.status === 403
+        ? "GOOGLE_AUTORIZACAO_INVALIDA"
+        : resposta.status === 404
+          ? "GOOGLE_ARQUIVO_NAO_ENCONTRADO"
+          : "GOOGLE_DRIVE_INDISPONIVEL";
+      throw new AppError("Nao foi possivel alterar o Google Drive", resposta.status === 404 ? 409 : 503, codigo);
+    }
+    return resposta.status === 204 ? {} : resposta.json();
+  }
+
+  async function criarArquivo(refreshToken, dados) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const iniciarUrl = new URL("https://www.googleapis.com/upload/drive/v3/files");
+    iniciarUrl.searchParams.set("uploadType", "resumable");
+    iniciarUrl.searchParams.set("supportsAllDrives", "true");
+    iniciarUrl.searchParams.set("fields", "id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,resourceKey");
+    let inicio;
+    try {
+      inicio = await buscar(iniciarUrl, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json; charset=UTF-8",
+          "X-Upload-Content-Type": dados.mimeType,
+          "X-Upload-Content-Length": String(dados.tamanho)
+        },
+        body: JSON.stringify({ name: dados.nome, mimeType: dados.mimeType, parents: [dados.pastaDriveId] }),
+        signal: AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS)
+      });
+    } catch (erro) {
+      throw new AppError("Google Drive temporariamente indisponivel", 503, "GOOGLE_DRIVE_INDISPONIVEL");
+    }
+    if (!inicio.ok || !inicio.headers.get("location")) {
+      throw new AppError("Nao foi possivel iniciar o envio ao Google Drive", 503, inicio.status === 401 || inicio.status === 403 ? "GOOGLE_AUTORIZACAO_INVALIDA" : "GOOGLE_DRIVE_INDISPONIVEL");
+    }
+    return requisitarEscrita(new URL(inicio.headers.get("location")), {
+      method: "PUT",
+      headers: { "Content-Type": dados.mimeType, "Content-Length": String(dados.tamanho) },
+      body: fs.createReadStream(dados.caminho)
+    }, token);
+  }
+
+  async function criarPasta(refreshToken, nome, pastaPaiDriveId) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const url = new URL(URL_API_DRIVE);
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("fields", "id,name,mimeType,parents,trashed,resourceKey");
+    return requisitarEscrita(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nome,
+        mimeType: MIME_PASTA,
+        parents: [pastaPaiDriveId]
+      })
+    }, token);
+  }
+
+  async function atualizarMetadados(refreshToken, arquivoId, metadados, parametros) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const url = new URL(URL_API_DRIVE + "/" + encodeURIComponent(arquivoId));
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("fields", "id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,trashed,resourceKey");
+    Object.keys(parametros || {}).forEach(function adicionar(chave) { url.searchParams.set(chave, parametros[chave]); });
+    return requisitarEscrita(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(metadados)
+    }, token);
+  }
+
+  function renomearArquivo(refreshToken, arquivoId, nome) {
+    return atualizarMetadados(refreshToken, arquivoId, { name: nome });
+  }
+
+  function moverArquivo(refreshToken, arquivoId, pastaAnteriorDriveId, pastaNovaDriveId) {
+    return atualizarMetadados(refreshToken, arquivoId, {}, {
+      addParents: pastaNovaDriveId,
+      removeParents: pastaAnteriorDriveId
+    });
+  }
+
+  function alterarLixeira(refreshToken, arquivoId, naLixeira) {
+    return atualizarMetadados(refreshToken, arquivoId, { trashed: Boolean(naLixeira) });
+  }
+
+  async function excluirArquivo(refreshToken, arquivoId) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const url = new URL(URL_API_DRIVE + "/" + encodeURIComponent(arquivoId));
+    url.searchParams.set("supportsAllDrives", "true");
+    return requisitarEscrita(url, { method: "DELETE" }, token);
   }
 
   async function obterInicioDasAlteracoes(refreshToken) {
@@ -489,7 +600,8 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
   }
 
   return {
-    escopo: ESCOPO_LEITURA,
+    escopo: ESCOPO_GESTAO,
+    escopoGestaoNecessario: ESCOPO_GESTAO,
     pastaRaizId: configuracao.pastaRaizId,
     gerarUrlAutorizacao: gerarUrlAutorizacao,
     trocarCodigoPorRefreshToken: trocarCodigoPorRefreshToken,
@@ -502,12 +614,19 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     observarAlteracoes: observarAlteracoes,
     encerrarCanal: encerrarCanal,
     obterItem: obterItem,
-    verificarDescendenteDaRaiz: verificarDescendenteDaRaiz
+    verificarDescendenteDaRaiz: verificarDescendenteDaRaiz,
+    criarPasta: criarPasta,
+    criarArquivo: criarArquivo,
+    renomearArquivo: renomearArquivo,
+    moverArquivo: moverArquivo,
+    alterarLixeira: alterarLixeira,
+    excluirArquivo: excluirArquivo
   };
 }
 
 module.exports = {
   ESCOPO_LEITURA: ESCOPO_LEITURA,
+  ESCOPO_GESTAO: ESCOPO_GESTAO,
   MIME_PASTA: MIME_PASTA,
   criarGoogleDriveProvider: criarGoogleDriveProvider,
   criptografarRefreshToken: criptografarRefreshToken,

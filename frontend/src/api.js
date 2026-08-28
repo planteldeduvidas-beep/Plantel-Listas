@@ -38,7 +38,7 @@ async function requisitar(caminho, opcoesInformadas) {
   opcoes.credentials = "include";
   opcoes.headers = Object.assign({}, opcoes.headers || {});
 
-  if (opcoes.body) {
+  if (opcoes.body && !(opcoes.body instanceof FormData)) {
     opcoes.headers["Content-Type"] = "application/json";
   }
 
@@ -215,6 +215,50 @@ function classificarPastas(categoriaIds, disciplina, concurso) {
   return requisitar("/acervo/organizacao", { method: "PATCH", body: JSON.stringify(corpo) });
 }
 
+function listarPastasGerenciaveis() {
+  return requisitar("/gestao-materiais/pastas", { method: "GET" });
+}
+
+function adicionarMaterial(formulario) {
+  return requisitar("/gestao-materiais", { method: "POST", body: formulario });
+}
+
+function editarMaterial(materialId, dados) {
+  return requisitar("/gestao-materiais/" + materialId, { method: "PATCH", body: JSON.stringify(dados) });
+}
+
+function moverMaterial(materialId, categoriaId, versao) {
+  return requisitar("/gestao-materiais/" + materialId + "/mover", {
+    method: "PATCH", body: JSON.stringify({ categoriaId: categoriaId, versao: versao })
+  });
+}
+
+function substituirMaterial(materialId, formulario) {
+  return requisitar("/gestao-materiais/" + materialId + "/substituir", { method: "POST", body: formulario });
+}
+
+function enviarMaterialLixeira(materialId, versao) {
+  return requisitar("/gestao-materiais/" + materialId + "/lixeira", {
+    method: "POST", body: JSON.stringify({ versao: versao })
+  });
+}
+
+function listarLixeira() {
+  return requisitar("/gestao-materiais/lixeira", { method: "GET" });
+}
+
+function restaurarMaterial(materialId, versao) {
+  return requisitar("/gestao-materiais/" + materialId + "/restaurar", {
+    method: "POST", body: JSON.stringify({ versao: versao })
+  });
+}
+
+function excluirMaterial(materialId, versao) {
+  return requisitar("/gestao-materiais/" + materialId, {
+    method: "DELETE", body: JSON.stringify({ versao: versao })
+  });
+}
+
 export {
   cadastrar,
   entrar,
@@ -239,6 +283,15 @@ export {
   obterUrlDoMaterial,
   classificarPasta,
   obterOrganizacaoAcervo,
-  classificarPastas
+  classificarPastas,
+  listarPastasGerenciaveis,
+  adicionarMaterial,
+  editarMaterial,
+  moverMaterial,
+  substituirMaterial,
+  enviarMaterialLixeira,
+  listarLixeira,
+  restaurarMaterial,
+  excluirMaterial
 };
 

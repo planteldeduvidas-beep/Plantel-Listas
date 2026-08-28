@@ -21,11 +21,13 @@ FASE 4 aprovada pelo responsavel humano e integrada na branch `main`.
 
 A integracao OAuth server-side, a indexacao administrativa e a sincronizacao idempotente do Google Drive foram validadas localmente com o acervo real. A sincronizacao longa foi desacoplada da requisicao HTTP, possui status persistido, polling no frontend e recuperacao de interrupcoes. Nenhum deploy foi realizado.
 
-O Google OAuth esta atualmente em modo `Testing`. Como o sistema utiliza `drive.readonly`, a autorizacao e o refresh token da conta de teste expiram apos aproximadamente sete dias e podem exigir reconexao. Isso e comportamento esperado do ambiente de teste, nao falha do Plantel Listas. Antes do uso definitivo sera necessario configurar o OAuth para producao e cumprir o processo de verificacao aplicavel a esse scope.
+O Google OAuth esta atualmente em modo `Testing`. Como o sistema utiliza o scope restrito `drive`, a autorizacao e o refresh token da conta de teste podem expirar apos aproximadamente sete dias e exigir reconexao. Isso e comportamento esperado do ambiente de teste, nao falha do Plantel Listas. Antes do uso definitivo sera necessario configurar o OAuth para producao e cumprir o processo de verificacao aplicavel a esse scope.
 
 FASE 5 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
 
-A Fase 6 ainda nao esta autorizada. Nenhum deploy foi realizado.
+FASE 6 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
+
+Upload, edicao, movimentacao, substituicao, lixeira, restauracao e exclusao administrativa foram implementados e aprovados em validacao humana. O OAuth foi ampliado conscientemente para `https://www.googleapis.com/auth/drive`, a conta de teste foi reconectada e as operacoes foram aprovadas no Drive real somente com pasta, usuarios e arquivos temporarios da Fase 6. As barreiras da pasta raiz e das permissoes foram validadas e toda a estrutura temporaria foi removida. Nenhum arquivo legado foi alterado ou excluido. Nenhum deploy foi realizado.
 
 A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
 
@@ -51,6 +53,8 @@ A implementacao aprovada da Fase 3 esta integrada na `main`.
 A implementacao aprovada da Fase 4 esta integrada na `main`.
 
 A implementacao aprovada da Fase 5 esta integrada na `main`.
+
+A implementacao aprovada da Fase 6 esta integrada na `main`.
 
 ## Arquitetura fechada
 
@@ -157,7 +161,8 @@ Google Drive:
 - cadastrar a URL HTTPS publica exata do webhook do Google Drive e validar o canal real em producao;
 - definir o remetente definitivo de producao para recuperacao de senha;
 - definir a URL de producao para cadastrar a redirect URI OAuth definitiva;
-- configurar o OAuth para producao e cumprir a verificacao aplicavel ao scope `drive.readonly`;
+- configurar o OAuth para producao e cumprir a verificacao aplicavel ao scope restrito `drive` depois da Fase 6;
+- avaliar a exigencia de seguranca independente vigente antes da producao;
 - validar o fluxo OAuth e a indexacao no ambiente de producao somente na fase de deploy autorizada;
 - avaliar otimizacao controlada da leitura de arvores muito grandes, preservando limites da API;
 - validar limite pratico de videos na Hostinger antes do go-live;
@@ -165,6 +170,5 @@ Google Drive:
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para iniciar a Fase 6.
-2. Nao realizar deploy sem autorizacao explicita.
-3. Manter as pendencias de producao para a fase correspondente.
+1. Aguardar autorizacao explicita para iniciar a Fase 7.
+2. Nao fazer deploy nem iniciar a Fase 7 antes dessa autorizacao.
