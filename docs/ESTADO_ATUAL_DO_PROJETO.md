@@ -1,7 +1,7 @@
 # ESTADO ATUAL DO PROJETO - PLANTEL LISTAS
 
 Versao da documentacao: 1.1
-Atualizado em: 27/08/2026
+Atualizado em: 28/08/2026
 
 ## Status
 
@@ -33,6 +33,10 @@ FASE 7 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
 
 A fase adicionou gestao administrativa de usuarios, protecao do ultimo administrador ativo, salvamento atomico dos acessos de professores, analytics de uso, relatorio CSV e historico geral imutavel pela interface. Os eventos de uso possuem deduplicacao controlada e nao armazenam tokens, secrets ou conteudo de arquivos. Os fluxos e a linguagem foram aprovados no navegador por um administrador leigo. Nenhum deploy foi realizado.
 
+FASE 8 implementada na branch `fase/08-frontend-ux` e pronta para validacao humana.
+
+O frontend recebeu acabamento visual responsivo inspirado na referencia aprovada, adaptado para a identidade grafite, verde e turquesa do Plantel. Login, acervo, professor e administracao agora compartilham sidebar, cards, formularios, botoes, alertas, estados e modais consistentes, com linguagem simplificada. O codigo preservou as regras funcionais e de seguranca das fases anteriores. Nenhum merge ou deploy foi realizado.
+
 A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
 
 O acompanhamento de mudancas do Drive usa Changes API com estado persistido, polling de recuperacao e suporte a canal webhook validado. Criacao, renomeacao, movimentacao e remocao de pastas usam reconciliacao incremental da subarvore quando a operacao pode ser comprovada com seguranca; a sincronizacao completa permanece como fallback. A URL publica HTTPS ainda nao foi definida, portanto a criacao e a renovacao de um canal real permanecem pendentes para o ambiente de producao.
@@ -61,6 +65,8 @@ A implementacao aprovada da Fase 5 esta integrada na `main`.
 A implementacao aprovada da Fase 6 esta integrada na `main`.
 
 A implementacao aprovada da Fase 7 esta integrada na `main`.
+
+A implementacao da Fase 8 permanece somente na branch `fase/08-frontend-ux`, aguardando validacao humana.
 
 ## Arquitetura fechada
 
@@ -178,5 +184,5 @@ Google Drive:
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para iniciar a Fase 8.
-2. Nao fazer deploy nem iniciar a Fase 8 antes dessa autorizacao.
+1. Realizar a validacao humana visual e responsiva da Fase 8.
+2. Nao integrar a Fase 8, fazer deploy ou iniciar a Fase 9 antes de nova autorizacao explicita.
