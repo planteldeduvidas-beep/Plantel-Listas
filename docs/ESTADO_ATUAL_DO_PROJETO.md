@@ -21,13 +21,13 @@ FASE 4 aprovada pelo responsavel humano e integrada na branch `main`.
 
 A integracao OAuth server-side, a indexacao administrativa e a sincronizacao idempotente do Google Drive foram validadas localmente com o acervo real. A sincronizacao longa foi desacoplada da requisicao HTTP, possui status persistido, polling no frontend e recuperacao de interrupcoes. Nenhum deploy foi realizado.
 
-O Google OAuth esta atualmente em modo `Testing`. Como o sistema utiliza `drive.readonly`, a autorizacao e o refresh token da conta de teste expiram apos aproximadamente sete dias e podem exigir reconexao. Isso e comportamento esperado do ambiente de teste, nao falha do Plantel Listas. Antes do uso definitivo sera necessario configurar o OAuth para producao e cumprir o processo de verificacao aplicavel a esse scope.
+O Google OAuth esta atualmente em modo `Testing`. Como o sistema utiliza o scope restrito `drive`, a autorizacao e o refresh token da conta de teste podem expirar apos aproximadamente sete dias e exigir reconexao. Isso e comportamento esperado do ambiente de teste, nao falha do Plantel Listas. Antes do uso definitivo sera necessario configurar o OAuth para producao e cumprir o processo de verificacao aplicavel a esse scope.
 
 FASE 5 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
 
-FASE 6 autorizada e em andamento na branch `fase/06-gestao-materiais`.
+FASE 6 implementada e pronta para validacao humana na branch `fase/06-gestao-materiais`.
 
-A preparacao local de upload, edicao, movimentacao, substituicao e lixeira foi implementada e aprovada por testes com mocks. A fase esta **NAO PRONTA** porque aguarda a ampliacao consciente do OAuth, a reconexao da conta e testes reais exclusivamente com pasta e arquivos temporarios. Nenhum deploy foi realizado.
+Upload, edicao, movimentacao, substituicao, lixeira, restauracao e exclusao administrativa foram implementados. O OAuth foi ampliado conscientemente para `https://www.googleapis.com/auth/drive`, a conta de teste foi reconectada e as operacoes foram aprovadas no Drive real somente com pasta, usuarios e arquivos temporarios da Fase 6. As barreiras da pasta raiz e das permissoes foram validadas e toda a estrutura temporaria foi removida. Nenhum arquivo legado foi alterado ou excluido. Nenhum deploy foi realizado.
 
 A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
 
@@ -162,7 +162,6 @@ Google Drive:
 - definir o remetente definitivo de producao para recuperacao de senha;
 - definir a URL de producao para cadastrar a redirect URI OAuth definitiva;
 - configurar o OAuth para producao e cumprir a verificacao aplicavel ao scope restrito `drive` depois da Fase 6;
-- cadastrar no projeto OAuth de teste o scope restrito `https://www.googleapis.com/auth/drive`, necessario para a gestao do acervo legado, e realizar nova autorizacao controlada;
 - avaliar a exigencia de seguranca independente vigente antes da producao;
 - validar o fluxo OAuth e a indexacao no ambiente de producao somente na fase de deploy autorizada;
 - avaliar otimizacao controlada da leitura de arvores muito grandes, preservando limites da API;
@@ -171,7 +170,6 @@ Google Drive:
 
 ## Proxima acao
 
-1. Aguardar a confirmacao humana de que o scope `https://www.googleapis.com/auth/drive` foi adicionado em Google Auth Platform -> Data Access.
-2. Alterar o backend para solicitar exatamente esse scope e orientar a reconexao OAuth segura.
-3. Validar escritas reais somente em pasta e arquivos temporarios criados para a Fase 6.
-4. Nao fazer merge, deploy ou iniciar a Fase 7 sem as autorizacoes correspondentes.
+1. Realizar a validacao humana da interface e dos fluxos da Fase 6.
+2. Manter a Fase 6 somente em `fase/06-gestao-materiais` ate aprovacao e autorizacao de merge.
+3. Nao fazer deploy nem iniciar a Fase 7 sem autorizacao explicita.

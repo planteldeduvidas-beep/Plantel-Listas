@@ -1,49 +1,52 @@
 # RELATORIO DA FASE 06 - GESTAO DE MATERIAIS
 
 Data: 27/08/2026
-Estado: **NAO PRONTA - AGUARDANDO AMPLIACAO OAUTH E TESTE REAL CONTROLADO**
+Estado: **PRONTA PARA VALIDACAO HUMANA**
 
 ## 1. Resumo
 
-A preparacao tecnica da Fase 6 implementou upload, edicao, movimentacao, substituicao, lixeira, restauracao e exclusao administrativa de materiais. As operacoes estao protegidas por sessao, papel, CSRF, permissao de pasta, validacao de entrada, controle de concorrencia e compensacoes entre Google Drive e MySQL.
+A Fase 6 implementou upload, edicao, movimentacao, substituicao, lixeira, restauracao e exclusao administrativa de materiais. As operacoes estao protegidas por sessao, papel, CSRF, permissao de pasta, validacao de entrada, controle de concorrencia e compensacoes entre Google Drive e MySQL.
 
-O codigo esta na branch `fase/06-gestao-materiais`, no commit tecnico `322315c` (`feat: prepara gestao segura de materiais da fase 6`). Nao houve merge, deploy ou inicio da Fase 7.
+O OAuth foi ampliado conscientemente para o scope unico `https://www.googleapis.com/auth/drive`, a conta de teste foi reconectada e a nova credencial foi confirmada sem expor tokens. As operacoes foram validadas no Drive real exclusivamente com pasta, usuarios, categorias e arquivos temporarios criados pelo teste controlado da Fase 6. Nenhum arquivo legado foi alterado ou excluido.
 
-A autorizacao real ainda permanece em `drive.readonly`. O backend bloqueia qualquer escrita com resposta controlada ate que o scope seja alterado conscientemente e a conta seja reconectada. Nenhuma escrita real foi executada no Drive nesta etapa.
+Nao houve merge, deploy ou inicio da Fase 7.
 
-## 2. Analise do menor scope OAuth
+## 2. Branch e commits
 
-O scope atual `https://www.googleapis.com/auth/drive.readonly` permite leitura, mas nao permite as operacoes da Fase 6.
+- Branch: `fase/06-gestao-materiais`.
+- Implementacao tecnica inicial: `322315c` - `feat: prepara gestao segura de materiais da fase 6`.
+- Registro da pausa para ampliacao OAuth: `1f9e28c`.
+- Alteracao consciente do scope para gestao: `d7ba776`.
+- Correcao da renderizacao do frontend: `07e0eba`.
+- Validacao real, barreira da raiz e testes adicionais: `e6c8d5a` - `test: valida gestao real segura no google drive`.
+- Documentacao de validacao consolidada na mesma branch.
+- Nenhum merge em `main` foi realizado.
 
-O scope `https://www.googleapis.com/auth/drive.file` foi avaliado e nao e suficiente para o acervo existente. Ele permite acesso por arquivo aos itens criados ou abertos/compartilhados com a aplicacao e e apropriado quando o usuario escolhe arquivos por mecanismos como Google Picker. Ele nao concede de forma confiavel a gestao da arvore legada ja existente e indexada pelo Plantel Listas.
+## 3. OAuth e escopo
 
-O menor scope funcional para upload, renomeacao, movimentacao, substituicao, lixeira, restauracao e exclusao sobre todo o acervo legado autorizado e:
+O scope anterior `drive.readonly` nao permitia as operacoes da fase. O scope `drive.file` tambem nao atende de forma confiavel a arvore legada existente, pois limita o acesso aos arquivos criados ou escolhidos pela aplicacao.
+
+O backend passou a solicitar exatamente:
 
 `https://www.googleapis.com/auth/drive`
 
-Esse scope e classificado pelo Google como restrito. A concessao OAuth e ampla para os arquivos da conta; a limitacao a pasta raiz continua sendo responsabilidade obrigatoria do backend. Antes da producao, o aplicativo devera passar pela verificacao aplicavel a scopes restritos e, por armazenar metadados e transmitir conteudo do Drive no servidor, pode ficar sujeito a avaliacao de seguranca independente periodica conforme a politica vigente.
+A credencial armazenada com o scope antigo e detectada como necessitando reconexao. A reconexao segura substitui a credencial anterior, mantem o refresh token criptografado no backend e nao envia tokens ao frontend ou aos logs.
 
-Fontes oficiais:
+O projeto OAuth continua em modo `Testing`. A autorizacao da conta de teste pode expirar aproximadamente a cada sete dias. Antes da producao, sera necessario publicar a configuracao OAuth e cumprir a verificacao aplicavel ao scope restrito `drive`, inclusive eventual avaliacao de seguranca exigida pelas politicas vigentes.
 
-- https://developers.google.com/workspace/drive/api/guides/api-specific-auth
-- https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification
-- https://developers.google.com/identity/protocols/oauth2/production-readiness/policy-compliance
-
-## 3. Operacoes implementadas
+## 4. Operacoes implementadas
 
 - upload resumivel e transmitido por stream para PDF, MP4/M4V e WebM;
 - edicao de nome, disciplina e concurso por allowlist;
 - renomeacao coerente no Drive e MySQL;
 - movimentacao com validacao da origem e do destino;
-- substituicao preservando o `materialId` e trocando o arquivo fisico de forma compensavel;
+- substituicao preservando o `materialId` e trocando o arquivo fisico com compensacao;
 - envio para lixeira por professor autorizado ou admin;
 - listagem e restauracao da lixeira somente por admin;
 - exclusao definitiva somente por admin, com estado intermediario recuperavel;
 - atualizacao imediata do MySQL, sem aguardar webhook ou sincronizacao.
 
-Na substituicao, foi priorizada a seguranca de compensacao: um novo arquivo e criado, o anterior e enviado para a lixeira e o mesmo `materialId` passa a apontar para o novo arquivo. Preservar o Drive file ID por sobrescrita direta dificultaria restaurar o conteudo anterior diante de falha parcial. O frontend nunca recebe nenhum desses IDs.
-
-## 4. Matriz de autorizacao
+## 5. Matriz de autorizacao
 
 | Operacao | Aluno | Professor | Admin |
 | --- | --- | --- | --- |
@@ -56,36 +59,49 @@ Na substituicao, foi priorizada a seguranca de compensacao: um novo arquivo e cr
 | Ver/restaurar lixeira | Nao | Nao | Sim |
 | Excluir definitivamente | Nao | Nao | Sim |
 
-Toda decisao e refeita no backend por usuario, material e hierarquia de pastas. IDs recebidos do frontend nao sao usados como prova de autorizacao.
+Toda decisao e refeita no backend. IDs recebidos do frontend nao sao usados como prova de autorizacao.
 
-## 5. Upload e seguranca
+## 6. Seguranca e consistencia
 
-- arquivos temporarios ficam fora do repositorio e sao removidos em sucesso ou falha;
-- videos nao sao carregados integralmente em memoria;
-- limites separados e configuraveis para PDF e video;
-- rate limit especifico para upload e substituicao;
-- assinatura magica, extensao e MIME informado pelo navegador sao comparados;
-- arquivo vazio, tipo proibido, MIME incompatível, extensao divergente e nome inseguro sao recusados;
-- DOCX, ODT, PNG e tipos genericos continuam fora do escopo funcional;
+- todas as pastas e arquivos sao revalidados no Drive como descendentes da pasta raiz configurada antes de qualquer escrita;
+- a barreira recusa categoria local que aponte para uma pasta externa, mesmo para admin;
+- origem e destino de movimentacao sao validados;
+- arquivos temporarios locais sao removidos em sucesso ou falha;
+- assinatura magica, extensao e MIME sao comparados;
+- arquivo vazio, tipo proibido, tamanho excedido e nome inseguro sao recusados;
+- DOCX, ODT, PNG e tipos genericos permanecem fora do escopo funcional;
 - CSRF cobre todas as rotas mutaveis;
 - SQL permanece parametrizado e mass assignment e recusado;
+- falhas entre Drive e MySQL acionam compensacoes;
+- versao otimista bloqueia alteracoes concorrentes;
 - tokens Google e IDs do Drive nao chegam ao frontend ou aos logs.
 
-## 6. Consistencia Drive e MySQL
+## 7. Validacao real controlada
 
-- Drive e alterado antes da confirmacao no MySQL quando a operacao exige escrita externa;
-- se o banco falha apos upload, o arquivo novo e excluido como compensacao;
-- se o banco falha apos renomeacao ou movimentacao, o Drive e revertido;
-- substituicao restaura o arquivo anterior e remove o novo quando o banco falha;
-- falha do Drive impede alteracao do MySQL;
-- token revogado marca a conexao como necessitando renovacao;
-- versao otimista do material bloqueia alteracoes concorrentes;
-- exclusao definitiva usa `exclusao_pendente` e pode ser retomada com seguranca se a confirmacao local falhar;
-- webhook ou Changes API posterior preserva lixeira e exclusao, evitando desfazer a operacao local.
+O comando `npm run test:drive:write` criou uma pasta temporaria unica dentro da raiz autorizada e executou pelas APIs reais do sistema:
 
-## 7. Banco e endpoints
+- upload real de PDF por professor autorizado;
+- bloqueio de upload por professor sem acesso;
+- bloqueio de aluno;
+- tentativa controlada de usar uma referencia externa a raiz, recusada antes de qualquer escrita externa;
+- edicao e renomeacao reais;
+- movimentacao real entre pastas autorizadas e bloqueio de destino sem permissao;
+- substituicao real de PDF por video, preservando o `materialId`;
+- envio real para lixeira e bloqueio imediato de leitura;
+- restauracao real por admin;
+- exclusao definitiva real somente do arquivo temporario.
 
-A migration `010_gestao_materiais.sql` adicionou estado de gestao, pasta anterior, autoria/data da lixeira, versao de concorrencia, indices, constraints e `auditoria_materiais`.
+Ao final, o teste removeu os arquivos, pastas, materiais, categorias, sessoes, permissoes e usuarios temporarios criados por ele. A ausencia de registros temporarios remanescentes foi confirmada no MySQL. Nenhum identificador do Drive, token ou credencial foi exibido.
+
+## 8. Frontend
+
+Professor e admin receberam uma area simples com `+ Adicionar material`, `Editar nome`, `Mover`, `Substituir arquivo` e `Enviar para lixeira`. O professor ve somente destinos gerenciaveis. O admin possui lixeira com restauracao e confirmacao forte antes da exclusao definitiva.
+
+Durante a preparacao para reconectar o Drive, foi encontrado um erro de renderizacao causado pelo callback de listagem usar a referencia da funcao em vez do item atual. A correcao foi commitada em `07e0eba`; o build voltou a ser aprovado e o usuario conseguiu acessar o painel e concluir a reconexao.
+
+## 9. Banco e endpoints
+
+A migration `010_gestao_materiais.sql` adicionou estado de gestao, pasta anterior, autoria e data da lixeira, versao de concorrencia, indices, constraints e `auditoria_materiais`.
 
 Endpoints autenticados em `/api/gestao-materiais`:
 
@@ -99,59 +115,30 @@ Endpoints autenticados em `/api/gestao-materiais`:
 - `POST /:materialId/restaurar` - admin;
 - `DELETE /:materialId` - admin.
 
-## 8. Frontend
+## 10. Testes e checks
 
-Professor e admin receberam uma area simples com:
+Resultado final automatizado: **88 testes aprovados, 0 falhas**.
 
-- `+ Adicionar material`;
-- `Editar nome`;
-- `Mover`;
-- `Substituir arquivo`;
-- `Enviar para lixeira`.
-
-O professor ve como destino somente pastas gerenciaveis e as acoes aparecem apenas nos materiais de suas pastas. O admin possui lixeira com restauracao e confirmacao forte por digitacao antes da exclusao definitiva. Nenhum conceito de Drive, MIME, banco, endpoint ou scope e exibido.
-
-O build e o smoke HTTP local foram aprovados: API 200 e frontend Vite 200. O navegador integrado nao estava conectado, portanto a validacao visual automatizada nao foi declarada.
-
-## 9. Testes e checks
-
-Resultado atual: **86 testes aprovados, 0 falhas**.
-
-Foram cobertos PDF, video, tipo proibido, MIME incompatível, tamanho, nome, aluno, professor autorizado e nao autorizado, admin, CSRF, mass assignment, IDOR, origem/destino, caminho e classificacao herdada apos movimentacao, substituicao PDF/video, identidade logica, lixeira, restauracao, exclusao de material temporario simulado, erro Google, erro MySQL, compensacao, token revogado, concorrencia e notificacao posterior idempotente.
-
-- `npm run check`: aprovado, com 86 testes e build Vite;
+- `npm run check`: aprovado, 88 testes e build Vite com 27 modulos;
 - `npm audit`: 0 vulnerabilidades;
 - `npm audit --omit=dev`: 0 vulnerabilidades;
 - `git diff --check`: aprovado;
+- `npm run test:drive:write`: aprovado com Drive real e limpeza confirmada;
 - regressao das Fases 1 a 5: aprovada.
 
-## 10. Secrets e limites da validacao
+Os testes incluem escopo antigo exigindo reconexao, substituicao segura da credencial, ausencia de tokens no contrato publico, barreira da raiz, permissoes de professor e aluno, upload, edicao, movimentacao, substituicao, lixeira, restauracao, exclusao, compensacoes e concorrencia.
 
-- `backend/.env` e `frontend/.env` permanecem ignorados e nunca apareceram no historico;
+## 11. Secrets e limites
+
+- `backend/.env` e `frontend/.env` permanecem ignorados;
 - nenhum `.env` real foi versionado;
-- ocorrencias de tokens nos testes sao valores artificiais e identificados como teste;
-- nenhum secret real foi adicionado ao Git, ao relatorio ou aos logs;
-- nenhuma operacao real de escrita foi feita no Drive;
-- nenhuma exclusao de material legado foi realizada;
-- o teste real com pasta e arquivos temporarios depende da nova autorizacao OAuth.
+- nenhum client secret, refresh token, access token, senha SMTP ou senha de usuario foi adicionado ao Git;
+- nenhuma credencial foi reproduzida neste relatorio;
+- nenhuma operacao destrutiva foi executada em material legado;
+- a validacao visual completa das telas permanece para o responsavel humano.
 
-## 11. Acao humana necessaria agora
+## 12. Estado final
 
-No mesmo projeto do Google Cloud usado pelo Plantel Listas:
+**PRONTA PARA VALIDACAO HUMANA**
 
-1. abrir **Google Auth Platform**;
-2. entrar em **Data Access**;
-3. escolher **Add or remove scopes**;
-4. adicionar exatamente `https://www.googleapis.com/auth/drive`;
-5. salvar a configuracao;
-6. manter a conta usada na validacao como usuario de teste enquanto o aplicativo estiver em `Testing`;
-7. nao enviar client secret, refresh token ou qualquer outra credencial ao Codex;
-8. informar apenas que a configuracao esta pronta.
-
-A redirect URI nao muda nesta etapa. Depois dessa confirmacao, o backend sera alterado para solicitar exatamente o novo scope e o administrador devera usar a reconexao segura no painel para conceder a nova autorizacao. Somente entao serao executados testes reais, exclusivamente em pasta e arquivos temporarios comprovadamente criados para a Fase 6.
-
-## 12. Estado final desta etapa
-
-**NAO PRONTA**
-
-A implementacao local e os testes com mocks estao aprovados, mas a Fase 6 aguarda ampliacao consciente do OAuth, reconexao, testes reais temporarios e validacao humana. Nao houve merge, deploy ou inicio da Fase 7.
+A implementacao, a reconexao OAuth, os testes reais temporarios e a regressao foram concluidos. A Fase 6 permanece somente na branch `fase/06-gestao-materiais`. Nao houve merge, deploy ou inicio da Fase 7.
