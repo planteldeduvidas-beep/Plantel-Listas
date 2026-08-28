@@ -1,7 +1,7 @@
 # RELATORIO DA FASE 07 - ADMINISTRACAO, ANALYTICS E AUDITORIA
 
 Data: 27/08/2026
-Estado: **PRONTA PARA VALIDACAO HUMANA**
+Estado: **APROVADA E CONCLUIDA**
 
 ## 1. Resumo
 
@@ -9,7 +9,9 @@ A Fase 7 completou o nucleo administrativo da V1 com gestao de usuarios, papeis,
 
 O painel usa linguagem simples e separa as areas `Usuarios`, `Estatisticas` e `Historico de atividades`. IDs, nomes de tabela, endpoints, hashes, tokens e outros conceitos internos nao sao exibidos.
 
-Nao houve alteracao destrutiva de usuarios ou materiais reais, merge em `main`, deploy ou inicio da Fase 8.
+A validacao humana confirmou no navegador a gestao de usuarios, acessos de professores, analytics, relatorio CSV, historico e a linguagem do painel. A interface foi considerada compreensivel para administrador leigo.
+
+Nao houve alteracao destrutiva de usuarios ou materiais reais, deploy ou inicio da Fase 8.
 
 ## 2. Branch e commits
 
@@ -17,7 +19,7 @@ Nao houve alteracao destrutiva de usuarios ou materiais reais, merge em `main`, 
 - Base: `main` no commit `2767bcf`, com as Fases 1 a 6 integradas e o fechamento documental da Fase 6 corrigido.
 - Commit tecnico: `33a046f` - `feat: implementa administracao e analytics da fase 7`.
 - A documentacao de estado e este relatorio estao versionados na mesma branch.
-- Nenhum merge em `main` foi realizado.
+- O merge seguro em `main` foi autorizado para este fechamento.
 - Nenhum deploy foi realizado.
 
 ## 3. Gestao de usuarios
@@ -199,11 +201,19 @@ Os 88 testes das Fases 1 a 6 permaneceram aprovados.
 
 Os checks foram executados sem servidores de desenvolvimento concorrentes. Uma execucao anterior sofreu interferencia de um Vite ainda ativo; depois de encerrar o processo, a regressao isolada passou integralmente e de forma repetivel.
 
-## 16. Testes com dados e validacao visual
+## 16. Testes com dados e validacao humana
 
 Os testes funcionais usam o banco isolado `plantel_listas_test`, recriam somente registros temporarios identificados pelo cenario e os removem ao encerrar. Nenhum usuario, material ou evento real foi alterado de forma destrutiva.
 
-O build e os contratos HTTP foram validados. Nao havia navegador integrado disponivel na sessao para uma verificacao visual automatizada; por isso a experiencia completa permanece explicitamente para validacao humana.
+O build e os contratos HTTP foram validados. A validacao humana posterior confirmou no navegador:
+
+- gestao, busca, filtros e criacao temporaria de usuarios;
+- alteracao de papel, bloqueio, desbloqueio e protecao do proprio administrador;
+- concessao e revogacao dos acessos de professores com efeito imediato;
+- analytics e registro de visualizacoes/downloads;
+- download do relatorio CSV;
+- historico de atividades;
+- experiencia geral e linguagem compreensivel para administrador leigo.
 
 ## 17. Secrets e Git
 
@@ -211,18 +221,16 @@ O build e os contratos HTTP foram validados. Nao havia navegador integrado dispo
 - nenhum `.env` real aparece no historico Git;
 - nenhum arquivo de credencial foi versionado;
 - senhas, hashes, refresh tokens, access tokens, client secret, senha SMTP e tokens de sessao nao aparecem no relatorio ou no frontend;
-- a branch da fase esta separada da `main` e sera enviada ao remoto sem force push.
+- a integracao em `main` foi autorizada para o fechamento e sera enviada ao remoto sem force push.
 
-## 18. Riscos e pendencias
+## 18. Riscos e pendencias futuras
 
-- validar no navegador os fluxos de usuario, acessos, estatisticas, CSV e historico;
-- confirmar a compreensao dos textos por um administrador leigo;
 - acompanhar o crescimento de `eventos_uso_acervo` e definir retencao operacional antes de uma escala que a exija; nenhuma limpeza foi criada sem regra explicita;
 - medir agregacoes no banco de producao quando o deploy for autorizado;
 - manter as pendencias de URL, OAuth, webhook e Hostinger ja registradas no estado do projeto.
 
 ## 19. Estado final
 
-**PRONTA PARA VALIDACAO HUMANA**
+**APROVADA E CONCLUIDA**
 
-A Fase 7 permanece somente na branch `fase/07-admin-analytics-auditoria`. Nao houve merge, deploy nem inicio da Fase 8.
+A Fase 7 foi aprovada na validacao humana e teve integracao segura em `main` autorizada neste fechamento. Nao houve deploy nem inicio da Fase 8.
