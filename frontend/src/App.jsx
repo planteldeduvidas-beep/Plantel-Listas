@@ -9,19 +9,29 @@ import {
 } from "./api.js";
 import PainelAcervo from "./PainelAcervo.jsx";
 import { Alerta, Carregando, Icone, mensagemHumana } from "./ComponentesInterface.jsx";
+import { criarUrlDaNavegacao, limparParametrosTemporarios } from "./navegacao.js";
 
 function App() {
-  const [tokenRecuperacao] = useState(function lerTokenRecuperacao() {
+  const [tema, definirTema] = useState(function lerTema() {
+    return window.localStorage.getItem("plantel-tema") === "claro" ? "claro" : "escuro";
+  });
+  const [retornoInicial] = useState(function lerRetornoInicial() {
     const parametros = new URLSearchParams(window.location.search);
     const token = parametros.get("tokenRecuperacao");
     const retornoGoogleDrive = parametros.get("googleDrive");
+    const retornoPopupOAuth = parametros.get("oauthPopup") === "1";
 
     if (token || retornoGoogleDrive) {
-      window.history.replaceState({}, "", window.location.pathname);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        limparParametrosTemporarios(window.location.pathname, window.location.search)
+      );
     }
 
-    return token;
+    return { tokenRecuperacao: token, googleDrive: retornoGoogleDrive, popupOAuth: retornoPopupOAuth };
   });
+  const tokenRecuperacao = retornoInicial.tokenRecuperacao;
   const [usuario, definirUsuario] = useState(null);
   const [carregando, definirCarregando] = useState(true);
   const [processando, definirProcessando] = useState(false);
@@ -41,6 +51,36 @@ function App() {
         definirCarregando(false);
       });
   }, []);
+
+  useEffect(function aplicarTema() {
+    document.documentElement.dataset.tema = tema;
+    window.localStorage.setItem("plantel-tema", tema);
+  }, [tema]);
+
+  useEffect(function concluirOAuthEmJanelaSeparada() {
+    if (!retornoInicial.googleDrive || !window.opener || window.opener.closed) {
+      return;
+    }
+    window.opener.postMessage({ tipo: "plantel-google-drive-conectado" }, window.location.origin);
+    window.close();
+  }, [retornoInicial]);
+
+  useEffect(function acompanharRetornoDoGoogleDrive() {
+    function receberRetorno(evento) {
+      if (evento.origin !== window.location.origin || !evento.data || evento.data.tipo !== "plantel-google-drive-conectado") {
+        return;
+      }
+      window.location.replace(criarUrlDaNavegacao(window.location.pathname, "drive"));
+    }
+    window.addEventListener("message", receberRetorno);
+    return function removerAcompanhamento() {
+      window.removeEventListener("message", receberRetorno);
+    };
+  }, []);
+
+  function alternarTema() {
+    definirTema(function trocar(atual) { return atual === "escuro" ? "claro" : "escuro"; });
+  }
 
   function prepararOperacao() {
     definirProcessando(true);
@@ -118,6 +158,7 @@ function App() {
     prepararOperacao();
     try {
       await sair();
+      window.history.replaceState({}, "", window.location.pathname);
       definirUsuario(null);
       definirTela("login");
       definirMensagem("Sessao encerrada com seguranca.");
@@ -140,7 +181,7 @@ function App() {
   }
 
   if (usuario) {
-    return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} />;
+    return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} tema={tema} aoAlternarTema={alternarTema} />;
   }
 
   const configuracoesDaTela = {
@@ -154,9 +195,10 @@ function App() {
 
   return (
     <main className="pagina-autenticacao">
+      <button type="button" className="alternar-tema alternar-tema-login" onClick={alternarTema} aria-label={tema === "escuro" ? "Usar modo claro" : "Usar modo escuro"}><Icone nome={tema === "escuro" ? "sol" : "lua"} /><span>{tema === "escuro" ? "Modo claro" : "Modo escuro"}</span></button>
       <section className="apresentacao-autenticacao" aria-label="Plantel Listas">
         <div className="marca-completa"><span className="simbolo-marca">PL</span><span><strong>Plantel Listas</strong><small>Plantel de Dúvidas</small></span></div>
-        <div className="chamada-autenticacao"><span className="selo">Seu acervo em um só lugar</span><h2>Estude com menos procura e mais foco.</h2><p>Pastas organizadas, busca rápida, PDFs e vídeos prontos para você.</p></div>
+        <div className="chamada-autenticacao"><span className="selo">Seu acervo em um só lugar</span><h2>Encontre.<br />Estude.<br />Avance.</h2><p>Uma biblioteca organizada para alunos, professores e administradores do Plantel de Dúvidas.</p></div>
         <ul className="beneficios-autenticacao"><li><Icone nome="buscar" /><span>Encontre materiais em segundos</span></li><li><Icone nome="acervo" /><span>Acesse em qualquer dispositivo</span></li><li><Icone nome="sucesso" /><span>Conteúdo organizado pelo Plantel</span></li></ul>
       </section>
 

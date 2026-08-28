@@ -16,6 +16,7 @@ import {
 import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
 import AdministracaoFase7 from "./AdministracaoFase7.jsx";
 import { Alerta, Carregando, Icone, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
+import { criarUrlDaNavegacao, obterAreaInicial, obterAreaPermitida, obterPastaDaUrl } from "./navegacao.js";
 
 function obterTipoDeUsuario(papel) {
   const tipos = { admin: "Administrador", professor: "Professor", aluno: "Aluno" };
@@ -169,7 +170,8 @@ function FormularioCatalogo({ titulo, singular, registros, api, aoAtualizar, aoE
   );
 }
 
-function PainelAcervo({ usuario, aoSair }) {
+function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
+  const areaInicial = obterAreaInicial(usuario.papel);
   const [estrutura, definirEstrutura] = useState({ categorias: [], disciplinas: [], concursos: [] });
   const [categorias, definirCategorias] = useState([]);
   const [disciplinas, definirDisciplinas] = useState([]);
@@ -191,19 +193,42 @@ function PainelAcervo({ usuario, aoSair }) {
   const [mensagem, definirMensagem] = useState("");
   const [erro, definirErro] = useState("");
   const [carregando, definirCarregando] = useState(true);
-  const [areaAtual, definirAreaAtual] = useState("acervo");
+  const [areaAtual, definirAreaAtual] = useState(function lerAreaInicialDaUrl() {
+    return obterAreaPermitida(usuario.papel, window.location.search);
+  });
   const [menuAberto, definirMenuAberto] = useState(false);
 
   function mostrarErro(mensagem) {
     definirErro(traduzirErroDaApi(mensagem));
   }
 
-  function navegar(area) {
+  function aplicarArea(area) {
     definirAreaAtual(area);
     definirMenuAberto(false);
     definirMensagem("");
     definirErro("");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function navegar(area) {
+    if (area === areaAtual && !new URLSearchParams(window.location.search).has("pasta")) {
+      definirMenuAberto(false);
+      return;
+    }
+    window.history.pushState(
+      { plantelListas: true, navegacaoInterna: true, tipo: "area", area: area },
+      "",
+      criarUrlDaNavegacao(window.location.pathname, area)
+    );
+    aplicarArea(area);
+  }
+
+  function voltarNaNavegacao() {
+    if (window.history.state && window.history.state.navegacaoInterna && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    navegar(areaInicial);
   }
 
   async function carregar(mensagemInformada) {
@@ -241,6 +266,37 @@ function PainelAcervo({ usuario, aoSair }) {
   useEffect(function carregarAoEntrar() {
     carregar();
   }, [usuario.id]);
+
+  useEffect(function prepararHistoricoDaNavegacao() {
+    const areaPermitida = obterAreaPermitida(usuario.papel, window.location.search);
+    const pasta = areaPermitida === "acervo" ? obterPastaDaUrl(window.location.search) : null;
+    window.history.replaceState(
+      { plantelListas: true, tipo: pasta ? "pasta" : "area", area: areaPermitida },
+      "",
+      criarUrlDaNavegacao(window.location.pathname, areaPermitida, pasta)
+    );
+    definirAreaAtual(areaPermitida);
+
+    function acompanharVoltarDoNavegador() {
+      aplicarArea(obterAreaPermitida(usuario.papel, window.location.search));
+    }
+
+    window.addEventListener("popstate", acompanharVoltarDoNavegador);
+    return function removerAcompanhamento() {
+      window.removeEventListener("popstate", acompanharVoltarDoNavegador);
+    };
+  }, [usuario.id, usuario.papel]);
+
+  useEffect(function permitirFecharMenuComEscape() {
+    if (!menuAberto) return undefined;
+    function fecharComEscape(evento) {
+      if (evento.key === "Escape") definirMenuAberto(false);
+    }
+    document.addEventListener("keydown", fecharComEscape);
+    return function removerAtalho() {
+      document.removeEventListener("keydown", fecharComEscape);
+    };
+  }, [menuAberto]);
 
   useEffect(function acompanharSincronizacao() {
     const ultimaSincronizacao = googleDrive && googleDrive.ultimaSincronizacao;
@@ -369,12 +425,30 @@ function PainelAcervo({ usuario, aoSair }) {
   }
 
   async function conectarGoogleDrive() {
+    const janelaOAuth = window.open(
+      "",
+      "plantel-google-drive-oauth",
+      "popup=yes,width=620,height=760,resizable=yes,scrollbars=yes"
+    );
+    if (!janelaOAuth) {
+      definirErro("Permita a abertura da janela de conexão para continuar com o Google Drive.");
+      return;
+    }
     definirProcessandoGoogleDrive(true);
     definirErro("");
+    const acompanhamentoDaJanela = window.setInterval(function acompanharFechamento() {
+      if (janelaOAuth.closed) {
+        window.clearInterval(acompanhamentoDaJanela);
+        definirProcessandoGoogleDrive(false);
+      }
+    }, 500);
     try {
       const resultado = await iniciarOAuthGoogleDrive();
-      window.location.assign(resultado.urlAutorizacao);
+      janelaOAuth.location.replace(resultado.urlAutorizacao);
+      janelaOAuth.focus();
     } catch (falha) {
+      window.clearInterval(acompanhamentoDaJanela);
+      janelaOAuth.close();
       mostrarErro(falha.message);
       definirProcessandoGoogleDrive(false);
     }
@@ -416,7 +490,7 @@ function PainelAcervo({ usuario, aoSair }) {
     usuarios: { titulo: "Usuários", texto: "Cuide das contas e dos tipos de acesso." },
     acessos: { titulo: "Acessos dos professores", texto: "Escolha quais pastas cada professor pode gerenciar." },
     organizacao: { titulo: "Organização do acervo", texto: "Mantenha pastas, disciplinas e concursos fáceis de encontrar." },
-    estatisticas: { titulo: "Estatísticas", texto: "Acompanhe como o acervo está sendo utilizado." },
+    estatisticas: { titulo: "Visão geral", texto: "Acompanhe os números e a atividade do Plantel Listas." },
     historico: { titulo: "Histórico de atividades", texto: "Consulte as ações importantes realizadas no sistema." },
     drive: { titulo: "Google Drive", texto: "Confira a conexão e mantenha o acervo atualizado." }
   };
@@ -431,18 +505,22 @@ function PainelAcervo({ usuario, aoSair }) {
       <button type="button" className="fundo-menu-mobile" aria-label="Fechar menu" tabIndex={menuAberto ? 0 : -1} onClick={function fecharMenu() { definirMenuAberto(false); }} />
       <aside className={menuAberto ? "barra-lateral aberta" : "barra-lateral"} aria-label="Menu principal">
         <div className="marca-painel"><span className="simbolo-marca">PL</span><span><strong>Plantel Listas</strong><small>Acervo de estudos</small></span><button type="button" className="botao-icone fechar-menu" aria-label="Fechar menu" onClick={function fechar() { definirMenuAberto(false); }}><Icone nome="fechar" /></button></div>
+        <div className={"perfil-lateral " + usuario.papel}><span className="icone-perfil"><Icone nome={usuario.papel === "aluno" ? "acervo" : usuario.papel === "professor" ? "pasta" : "usuarios"} /></span><span><strong>{obterTipoDeUsuario(usuario.papel)}</strong><small>Perfil ativo</small></span></div>
         <nav className="menu-principal">
           <span className="rotulo-menu">Navegação</span>
-          <ItemMenu area="acervo" atual={areaAtual} icone="acervo" texto="Acervo" aoAbrir={navegar} />
-          {usuario.papel === "professor" && <ItemMenu area="minhasPastas" atual={areaAtual} icone="pasta" texto="Minhas pastas" aoAbrir={navegar} />}
-          {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="estatisticas" atual={areaAtual} icone="estatisticas" texto="Estatísticas" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /></>}
+          {usuario.papel === "admin" && <ItemMenu area="estatisticas" atual={areaAtual} icone="estatisticas" texto="Visão geral" aoAbrir={navegar} />}
+          <ItemMenu area="acervo" atual={areaAtual} icone="acervo" texto="Biblioteca" aoAbrir={navegar} />
+          {usuario.papel === "professor" && <ItemMenu area="minhasPastas" atual={areaAtual} icone="pasta" texto="Pastas liberadas" aoAbrir={navegar} />}
+          {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /></>}
         </nav>
         <div className="conta-lateral"><span className="avatar-usuario">{usuario.email.slice(0, 1).toUpperCase()}</span><span><strong>{usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small></span><button type="button" className="botao-icone" aria-label="Sair" onClick={aoSair}><Icone nome="sair" /></button></div>
       </aside>
 
       <section className="conteudo-aplicacao">
-        <header className="cabecalho-mobile"><button type="button" className="botao-icone" aria-label="Abrir menu" onClick={function abrirMenu() { definirMenuAberto(true); }}><Icone nome="menu" /></button><div className="marca-mobile-painel"><span className="simbolo-marca pequeno">PL</span><strong>Plantel Listas</strong></div><span className="avatar-usuario pequeno">{usuario.email.slice(0, 1).toUpperCase()}</span></header>
-        <header className="cabecalho-painel"><div><span className="caminho-area">Plantel Listas <Icone nome="chevron" tamanho={14} /> {informacaoDaArea.titulo}</span><h1>{informacaoDaArea.titulo}</h1><p>{informacaoDaArea.texto}</p></div><div className="usuario-painel"><span className="avatar-usuario">{usuario.email.slice(0, 1).toUpperCase()}</span><span><strong>{usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small></span></div></header>
+        <header className="cabecalho-mobile"><button type="button" className="botao-icone" aria-label="Abrir menu" onClick={function abrirMenu() { definirMenuAberto(true); }}><Icone nome="menu" /></button><div className="marca-mobile-painel"><span className="simbolo-marca pequeno">PL</span><strong>Plantel Listas</strong></div><button type="button" className="botao-icone" onClick={aoAlternarTema} aria-label={tema === "escuro" ? "Usar modo claro" : "Usar modo escuro"}><Icone nome={tema === "escuro" ? "sol" : "lua"} /></button></header>
+        <header className="cabecalho-painel"><div><h1>{informacaoDaArea.titulo}</h1><p>{new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(new Date())}</p></div><div className="controles-cabecalho"><span className="estado-online"><Icone nome="online" tamanho={12} />Online</span><button type="button" className="alternar-tema" onClick={aoAlternarTema} aria-label={tema === "escuro" ? "Usar modo claro" : "Usar modo escuro"}><Icone nome={tema === "escuro" ? "sol" : "lua"} /><span>{tema === "escuro" ? "Claro" : "Escuro"}</span></button></div></header>
+        {areaAtual !== areaInicial && <button type="button" className="botao-voltar-navegacao voltar-area" onClick={voltarNaNavegacao}><Icone nome="voltar" tamanho={18} />Voltar</button>}
+        <section className="introducao-area"><h2>{informacaoDaArea.titulo}</h2><p>{informacaoDaArea.texto}</p></section>
         <div className="avisos-globais">{mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}{erro && <Alerta tipo="erro">{erro}</Alerta>}</div>
 
         {areaAtual === "acervo" && <BibliotecaAcervo usuario={usuario} aoMensagem={definirMensagem} />}

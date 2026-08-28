@@ -11,7 +11,7 @@ function criarIntegracaoGoogleDriveController(service, configuracao) {
   async function concluirOAuth(req, res, next) {
     try {
       await service.concluirOAuth(req.usuario.id, req.query);
-      res.redirect(303, configuracao.frontendUrl + "/?googleDrive=conectado");
+      res.redirect(303, configuracao.frontendUrl + "/?googleDrive=conectado&area=drive&oauthPopup=1");
     } catch (erro) {
       next(erro);
     }

@@ -21,7 +21,8 @@ function dataOuNula(valor) {
   return data && !Number.isNaN(data.getTime()) ? data : null;
 }
 
-function criarGoogleDriveChangesRepository(pool) {
+function criarGoogleDriveChangesRepository(pool, opcoes) {
+  const nomeTrava = String(opcoes && opcoes.nomeTrava || "plantel_listas_google_drive_changes").slice(0, 64);
   async function buscarCategoriaDrive(conexao, drivePastaId) {
     const [registros] = await conexao.execute(
       "SELECT id,drive_pasta_id,ativo FROM categorias WHERE drive_pasta_id=? LIMIT 1",
@@ -212,7 +213,8 @@ function criarGoogleDriveChangesRepository(pool) {
   async function adquirirTrava() {
     const conexao = await pool.getConnection();
     const [registros] = await conexao.execute(
-      "SELECT GET_LOCK('plantel_listas_google_drive_changes',0) AS adquirida"
+      "SELECT GET_LOCK(?,0) AS adquirida",
+      [nomeTrava]
     );
     if (Number(registros[0].adquirida) !== 1) {
       conexao.release();
@@ -223,7 +225,7 @@ function criarGoogleDriveChangesRepository(pool) {
 
   async function liberarTrava(conexao) {
     try {
-      await conexao.execute("SELECT RELEASE_LOCK('plantel_listas_google_drive_changes')");
+      await conexao.execute("SELECT RELEASE_LOCK(?)", [nomeTrava]);
     } finally {
       conexao.release();
     }

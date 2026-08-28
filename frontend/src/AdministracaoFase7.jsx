@@ -14,6 +14,43 @@ function CartaoNumero({ titulo, valor }) {
   return <article className="cartao-estatistica"><span>{titulo}</span><strong>{valor}</strong></article>;
 }
 
+function GraficoUso({ dados }) {
+  if (!dados.length) return <Vazio titulo="Ainda não há atividade no período" texto="O gráfico aparecerá conforme o acervo for utilizado." />;
+  const maior = Math.max(1, ...dados.flatMap(function valores(item) {
+    return [item.acessos, item.visualizacoes, item.downloads];
+  }));
+
+  function altura(valor) {
+    if (!valor) return "3px";
+    return Math.max(10, Math.round((valor / maior) * 100)) + "%";
+  }
+
+  return (
+    <div className="grafico-uso-completo">
+      <div className="legenda-grafico" aria-hidden="true">
+        <span><i className="legenda-acessos" />Acessos</span>
+        <span><i className="legenda-visualizacoes" />Visualizações</span>
+        <span><i className="legenda-downloads" />Downloads</span>
+      </div>
+      <div className="grafico-uso" role="img" aria-label="Acessos, visualizações e downloads do acervo por dia">
+        {dados.map(function coluna(item) {
+          const data = new Date(item.dia).toLocaleDateString("pt-BR");
+          return (
+            <div className="coluna-grafico" key={item.dia}>
+              <div className="grupo-barras-grafico">
+                <span className="barra-grafico acessos" style={{ height: altura(item.acessos) }} title={item.acessos + " acessos em " + data} />
+                <span className="barra-grafico visualizacoes" style={{ height: altura(item.visualizacoes) }} title={item.visualizacoes + " visualizações em " + data} />
+                <span className="barra-grafico downloads" style={{ height: altura(item.downloads) }} title={item.downloads + " downloads em " + data} />
+              </div>
+              <small>{new Date(item.dia).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</small>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function nomeAtividade(acao) {
   const nomes = {
     usuario_criado: "Usuário criado",
@@ -144,7 +181,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
       {carregando && <Carregando texto="Atualizando informações..." />}
 
       {area === "usuarios" && <section className="bloco-admin painel-conteudo">
-        <div className="cabecalho-bloco"><div><h2>Usuários</h2><p>Encontre uma conta e ajuste somente o necessário.</p></div><button type="button" className="botao-principal" onClick={function abrir() { definirNovoAberto(!novoAberto); }}><Icone nome={novoAberto ? "fechar" : "mais"} />{novoAberto ? "Cancelar" : "Novo usuário"}</button></div>
+        <div className="cabecalho-bloco"><div><h2>Contas cadastradas</h2><p>Busque uma pessoa ou ajuste seu acesso.</p></div><button type="button" className="botao-principal" onClick={function abrir() { definirNovoAberto(!novoAberto); }}><Icone nome={novoAberto ? "fechar" : "mais"} />{novoAberto ? "Fechar formulário" : "Novo usuário"}</button></div>
         {novoAberto && <form className="formulario-edicao" onSubmit={adicionar}><label>E-mail<input name="email" type="email" required /></label><label>Senha temporária<input name="senha" type="password" minLength="12" maxLength="128" required /></label><label>Tipo de usuário<select name="papel"><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select></label><button type="submit">Criar usuário</button></form>}
         <form className="filtros-admin" onSubmit={function pesquisar(evento) { evento.preventDefault(); carregarUsuarios(); }}><label>Buscar<input type="search" value={busca} onChange={function mudar(evento) { definirBusca(evento.target.value); }} placeholder="E-mail" /></label><label>Tipo<select value={papel} onChange={function mudar(evento) { definirPapel(evento.target.value); }}><option value="">Todos</option><option value="aluno">Alunos</option><option value="professor">Professores</option><option value="admin">Administradores</option></select></label><label>Conta<select value={estado} onChange={function mudar(evento) { definirEstado(evento.target.value); }}><option value="">Todas</option><option value="true">Liberadas</option><option value="false">Bloqueadas</option></select></label><button type="submit">Buscar</button></form>
         <ul className="lista-administrativa lista-usuarios">{usuarios.map(function renderizar(item) { return <li key={item.id} className={item.ativo ? "" : "inativo"}><span><strong>{item.email}</strong><small>{nomePapel(item.papel)} · <span className={item.ativo ? "estado-conta ativo" : "estado-conta"}>{item.ativo ? "Conta liberada" : "Conta bloqueada"}</span></small></span><div><select aria-label={"Tipo de usuário de " + item.email} value={item.papel} disabled={item.id === usuario.id} onChange={function mudar(evento) { mudarPapel(item, evento.target.value); }}><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select><button type="button" className="botao-pequeno secundario" onClick={function editar() { mudarEmail(item); }}>Editar e-mail</button><button type="button" className="botao-pequeno secundario" onClick={function senha() { redefinir(item); }}>Redefinir senha</button><button type="button" className="botao-pequeno neutro" disabled={item.id === usuario.id} onClick={function estadoConta() { alternar(item); }}>{item.ativo ? "Bloquear" : "Liberar"}</button></div></li>; })}</ul>
@@ -152,7 +189,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
         {paginacao && <p className="texto-apoio">{paginacao.total} usuário(s) encontrado(s).</p>}
       </section>}
 
-      {area === "estatisticas" && analytics && <section className="bloco-admin painel-conteudo"><div className="cabecalho-bloco"><div><h2>Estatísticas</h2><p>Uma visão simples do acervo e de seu uso.</p></div><a className="botao-secundario" href={obterUrlRelatorio(periodo)}><Icone nome="download" />Baixar relatório</a></div><label className="periodo-estatisticas">Mostrar<select value={periodo} onChange={function mudar(evento) { definirPeriodo(Number(evento.target.value)); }}><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option></select></label><div className="grade-estatisticas"><CartaoNumero titulo="Materiais" valor={analytics.resumo.materiais} /><CartaoNumero titulo="PDFs" valor={analytics.resumo.pdfs} /><CartaoNumero titulo="Vídeos" valor={analytics.resumo.videos} /><CartaoNumero titulo="Contas ativas" valor={analytics.resumo.usuariosAtivos} /><CartaoNumero titulo="Alunos" valor={analytics.resumo.alunos} /><CartaoNumero titulo="Professores" valor={analytics.resumo.professores} /></div><div className="grade-admin grade-dados"><div><h3>Materiais mais usados</h3><ol className="lista-simples">{analytics.materiaisMaisUsados.map(function item(material) { return <li key={material.id}><strong>{material.nome}</strong><small>{material.visualizacoes} visualizações · {material.downloads} downloads</small></li>; })}</ol>{!analytics.materiaisMaisUsados.length && <Vazio titulo="Ainda não há uso registrado" texto="Os dados aparecerão conforme o acervo for utilizado." />}</div><div><h3>Termos mais pesquisados</h3><ol className="lista-simples">{analytics.termosMaisPesquisados.map(function item(busca) { return <li key={busca.termo}><strong>{busca.termo}</strong><small>{busca.quantidade} busca(s)</small></li>; })}</ol>{!analytics.termosMaisPesquisados.length && <Vazio titulo="Nenhuma pesquisa no período" />}</div><div><h3>Pastas mais acessadas</h3><ol className="lista-simples">{analytics.pastasMaisAcessadas.map(function item(pasta) { return <li key={pasta.nome}><strong>{pasta.nome}</strong><small>{pasta.quantidade} acesso(s)</small></li>; })}</ol></div><div><h3>Atividade do acervo</h3><ul className="lista-simples">{analytics.atividadeDoAcervo.map(function item(atividade) { return <li key={atividade.acao}><strong>{nomeAtividade(atividade.acao)}</strong><small>{atividade.quantidade} ocorrência(s)</small></li>; })}</ul></div></div></section>}
+      {area === "estatisticas" && analytics && <section className="bloco-admin painel-conteudo"><div className="cabecalho-bloco"><div><h2>Visão geral</h2><p>Dados reais do acervo e de sua utilização.</p></div><div className="acoes-cabecalho"><label className="periodo-estatisticas">Período<select value={periodo} onChange={function mudar(evento) { definirPeriodo(Number(evento.target.value)); }}><option value="7">7 dias</option><option value="30">30 dias</option><option value="90">90 dias</option></select></label><a className="botao-secundario" href={obterUrlRelatorio(periodo)}><Icone nome="download" />Relatório CSV</a></div></div><div className="grade-estatisticas"><CartaoNumero titulo="Materiais" valor={analytics.resumo.materiais} /><CartaoNumero titulo="PDFs" valor={analytics.resumo.pdfs} /><CartaoNumero titulo="Vídeos" valor={analytics.resumo.videos} /><CartaoNumero titulo="Contas ativas" valor={analytics.resumo.usuariosAtivos} /><CartaoNumero titulo="Alunos" valor={analytics.resumo.alunos} /><CartaoNumero titulo="Professores" valor={analytics.resumo.professores} /></div><section className="painel-grafico"><div><h3>Uso do acervo</h3><p>Acessos, visualizações e downloads por dia.</p></div><GraficoUso dados={analytics.evolucao} /></section><div className="grade-admin grade-dados"><div><h3>Materiais mais usados</h3><ol className="lista-simples">{analytics.materiaisMaisUsados.map(function item(material) { return <li key={material.id}><strong>{material.nome}</strong><small>{material.visualizacoes} visualizações · {material.downloads} downloads</small></li>; })}</ol>{!analytics.materiaisMaisUsados.length && <Vazio titulo="Ainda não há uso registrado" texto="Os dados aparecerão conforme o acervo for utilizado." />}</div><div><h3>Termos mais pesquisados</h3><ol className="lista-simples">{analytics.termosMaisPesquisados.map(function item(busca) { return <li key={busca.termo}><strong>{busca.termo}</strong><small>{busca.quantidade} busca(s)</small></li>; })}</ol>{!analytics.termosMaisPesquisados.length && <Vazio titulo="Nenhuma pesquisa no período" />}</div><div><h3>Pastas mais acessadas</h3><ol className="lista-simples">{analytics.pastasMaisAcessadas.map(function item(pasta, indice) { return <li key={pasta.nome + "-" + indice}><strong>{pasta.nome}</strong><small>{pasta.quantidade} acesso(s)</small></li>; })}</ol></div><div><h3>Atividade do acervo</h3><ul className="lista-simples">{analytics.atividadeDoAcervo.map(function item(atividade) { return <li key={atividade.acao}><strong>{nomeAtividade(atividade.acao)}</strong><small>{atividade.quantidade} ocorrência(s)</small></li>; })}</ul></div></div></section>}
 
       {area === "historico" && auditoria && <section className="bloco-admin painel-conteudo"><div className="cabecalho-bloco"><div><h2>Histórico de atividades</h2><p>Acompanhe ações importantes realizadas no sistema.</p></div></div><label className="filtro-historico">Mostrar<select value={acao} onChange={function mudar(evento) { definirAcao(evento.target.value); }}><option value="">Todas as atividades</option>{auditoria.acoes.map(function opcao(item) { return <option key={item} value={item}>{nomeAtividade(item)}</option>; })}</select></label><ul className="lista-historico">{auditoria.eventos.map(function evento(item) { return <li key={item.chave}><span className="icone-historico"><Icone nome="historico" /></span><span><strong>{nomeAtividade(item.acao)}</strong><small>{item.descricao} · por {item.ator}</small></span><time>{new Date(item.criadoEm).toLocaleString("pt-BR")}</time></li>; })}</ul>{!auditoria.eventos.length && <Vazio titulo="Nenhuma atividade encontrada" texto="Altere o filtro para consultar outros registros." />}</section>}
 
