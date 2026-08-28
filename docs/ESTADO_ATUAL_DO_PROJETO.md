@@ -25,9 +25,9 @@ O Google OAuth esta atualmente em modo `Testing`. Como o sistema utiliza o scope
 
 FASE 5 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
 
-FASE 6 implementada e pronta para validacao humana na branch `fase/06-gestao-materiais`.
+FASE 6 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
 
-Upload, edicao, movimentacao, substituicao, lixeira, restauracao e exclusao administrativa foram implementados. O OAuth foi ampliado conscientemente para `https://www.googleapis.com/auth/drive`, a conta de teste foi reconectada e as operacoes foram aprovadas no Drive real somente com pasta, usuarios e arquivos temporarios da Fase 6. As barreiras da pasta raiz e das permissoes foram validadas e toda a estrutura temporaria foi removida. Nenhum arquivo legado foi alterado ou excluido. Nenhum deploy foi realizado.
+Upload, edicao, movimentacao, substituicao, lixeira, restauracao e exclusao administrativa foram implementados e aprovados em validacao humana. O OAuth foi ampliado conscientemente para `https://www.googleapis.com/auth/drive`, a conta de teste foi reconectada e as operacoes foram aprovadas no Drive real somente com pasta, usuarios e arquivos temporarios da Fase 6. As barreiras da pasta raiz e das permissoes foram validadas e toda a estrutura temporaria foi removida. Nenhum arquivo legado foi alterado ou excluido. Nenhum deploy foi realizado.
 
 A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
 
@@ -54,7 +54,7 @@ A implementacao aprovada da Fase 4 esta integrada na `main`.
 
 A implementacao aprovada da Fase 5 esta integrada na `main`.
 
-A preparacao da Fase 6 permanece somente na branch `fase/06-gestao-materiais` e nao foi integrada na `main`.
+A implementacao aprovada da Fase 6 esta integrada na `main`.
 
 ## Arquitetura fechada
 
@@ -170,6 +170,5 @@ Google Drive:
 
 ## Proxima acao
 
-1. Realizar a validacao humana da interface e dos fluxos da Fase 6.
-2. Manter a Fase 6 somente em `fase/06-gestao-materiais` ate aprovacao e autorizacao de merge.
-3. Nao fazer deploy nem iniciar a Fase 7 sem autorizacao explicita.
+1. Aguardar autorizacao explicita para iniciar a Fase 7.
+2. Nao fazer deploy nem iniciar a Fase 7 antes dessa autorizacao.

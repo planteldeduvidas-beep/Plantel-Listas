@@ -1,7 +1,7 @@
 # RELATORIO DA FASE 06 - GESTAO DE MATERIAIS
 
 Data: 27/08/2026
-Estado: **PRONTA PARA VALIDACAO HUMANA**
+Estado: **APROVADA E CONCLUIDA**
 
 ## 1. Resumo
 
@@ -139,6 +139,24 @@ Os testes incluem escopo antigo exigindo reconexao, substituicao segura da crede
 
 ## 12. Estado final
 
-**PRONTA PARA VALIDACAO HUMANA**
+**APROVADA E CONCLUIDA**
 
-A implementacao, a reconexao OAuth, os testes reais temporarios e a regressao foram concluidos. A Fase 6 permanece somente na branch `fase/06-gestao-materiais`. Nao houve merge, deploy ou inicio da Fase 7.
+A implementacao, a reconexao OAuth, os testes reais temporarios, a regressao e a validacao humana foram concluidos. O merge seguro em `main` foi autorizado para este fechamento. Nao houve deploy nem inicio da Fase 7.
+
+## 13. Validacao humana
+
+A validacao humana no navegador foi concluida com sucesso. Foram aprovados:
+
+- upload;
+- edicao e renomeacao;
+- movimentacao entre pastas autorizadas;
+- substituicao de arquivo;
+- envio para lixeira;
+- desaparecimento imediato do material do acervo;
+- restauracao por administrador;
+- exclusao definitiva somente de material temporario;
+- restricoes visuais e funcionais do professor;
+- ausencia de acoes administrativas para aluno;
+- experiencia geral da interface.
+
+Nenhum material legado foi alterado ou excluido durante a validacao humana.
