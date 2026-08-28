@@ -29,6 +29,10 @@ FASE 6 aprovada pelo responsavel humano, concluida e integrada na branch `main`.
 
 Upload, edicao, movimentacao, substituicao, lixeira, restauracao e exclusao administrativa foram implementados e aprovados em validacao humana. O OAuth foi ampliado conscientemente para `https://www.googleapis.com/auth/drive`, a conta de teste foi reconectada e as operacoes foram aprovadas no Drive real somente com pasta, usuarios e arquivos temporarios da Fase 6. As barreiras da pasta raiz e das permissoes foram validadas e toda a estrutura temporaria foi removida. Nenhum arquivo legado foi alterado ou excluido. Nenhum deploy foi realizado.
 
+FASE 7 implementada na branch `fase/07-admin-analytics-auditoria` e pronta para validacao humana.
+
+A fase adicionou gestao administrativa de usuarios, protecao do ultimo administrador ativo, salvamento atomico dos acessos de professores, analytics de uso, relatorio CSV e historico geral imutavel pela interface. Os eventos de uso possuem deduplicacao controlada e nao armazenam tokens, secrets ou conteudo de arquivos. A `main` ainda nao recebeu a Fase 7. Nenhum deploy foi realizado.
+
 A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
 
 O acompanhamento de mudancas do Drive usa Changes API com estado persistido, polling de recuperacao e suporte a canal webhook validado. Criacao, renomeacao, movimentacao e remocao de pastas usam reconciliacao incremental da subarvore quando a operacao pode ser comprovada com seguranca; a sincronizacao completa permanece como fallback. A URL publica HTTPS ainda nao foi definida, portanto a criacao e a renovacao de um canal real permanecem pendentes para o ambiente de producao.
@@ -55,6 +59,8 @@ A implementacao aprovada da Fase 4 esta integrada na `main`.
 A implementacao aprovada da Fase 5 esta integrada na `main`.
 
 A implementacao aprovada da Fase 6 esta integrada na `main`.
+
+A implementacao da Fase 7 permanece somente na branch `fase/07-admin-analytics-auditoria`, aguardando validacao humana e sem merge.
 
 ## Arquitetura fechada
 
@@ -170,5 +176,5 @@ Google Drive:
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para iniciar a Fase 7.
-2. Nao fazer deploy nem iniciar a Fase 7 antes dessa autorizacao.
+1. Realizar a validacao humana da Fase 7.
+2. Nao fazer merge, deploy nem iniciar a Fase 8 sem nova autorizacao explicita.
