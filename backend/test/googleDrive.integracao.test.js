@@ -297,7 +297,7 @@ test("OAuth usa estado com hash, guarda token criptografado e bloqueia replay", 
     + encodeURIComponent(estado)
   );
   assert.equal(callback.status, 303, JSON.stringify(callback.body));
-  assert.equal(callback.headers.location, configuracaoTeste.frontendUrl + "/?googleDrive=conectado");
+  assert.equal(callback.headers.location, configuracaoTeste.frontendUrl + "/?googleDrive=conectado&area=drive&oauthPopup=1");
   assert.equal(JSON.stringify(callback.body).includes("refresh-token"), false);
 
   const [credenciais] = await pool.execute(

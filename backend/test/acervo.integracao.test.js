@@ -169,6 +169,59 @@ test("navega com breadcrumb, busca parametrizada, filtros e paginacao", async fu
   assert.equal(injecao.body.paginacao.totalItens, 0);
 });
 
+test("conta materiais funcionais disponiveis em toda a subarvore das pastas", async function testarContagemRecursiva() {
+  const [filha] = await pool.execute(
+    "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id) VALUES ('Prof. Germano',?,'drivePastaFilhaContagem')",
+    [categoriaId]
+  );
+  const filhaId = Number(filha.insertId);
+  const [neta] = await pool.execute(
+    "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id) VALUES ('Fisica',?,'drivePastaNetaContagem')",
+    [filhaId]
+  );
+  const netaId = Number(neta.insertId);
+  const [vazia] = await pool.execute(
+    "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id) VALUES ('Pasta vazia',?,'drivePastaVaziaContagem')",
+    [categoriaId]
+  );
+  const vaziaId = Number(vazia.insertId);
+  const [oculta] = await pool.execute(
+    "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id,ativo) VALUES ('Pasta oculta',?,'drivePastaOcultaContagem',0)",
+    [filhaId]
+  );
+  const ocultaId = Number(oculta.insertId);
+
+  await pool.execute(
+    "INSERT INTO materiais (drive_file_id,categoria_id,nome,mime_type,tipo,extensao,disponivel,estado_gestao,ultima_sincronizacao_drive_id) VALUES "
+      + "('drivePdfFilhaContagem',?,'Material direto.pdf','application/pdf','pdf','pdf',1,'disponivel',NULL),"
+      + "('driveVideoNetoContagem',?,'Material profundo.mp4','video/mp4','video','mp4',1,'disponivel',NULL),"
+      + "('drivePdfLixeiraContagem',?,'Material na lixeira.pdf','application/pdf','pdf','pdf',0,'lixeira',NULL),"
+      + "('driveOutroContagem',?,'Documento fora da V1.docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document','outro','docx',1,'disponivel',NULL),"
+      + "('drivePdfIndisponivelContagem',?,'Material indisponivel.pdf','application/pdf','pdf','pdf',0,'disponivel',NULL),"
+      + "('drivePdfOcultoContagem',?,'Material oculto.pdf','application/pdf','pdf','pdf',1,'disponivel',NULL)",
+    [filhaId, netaId, netaId, netaId, netaId, ocultaId]
+  );
+
+  const autenticado = await autenticar("aluno");
+  const raiz = await autenticado.agente.get("/api/acervo");
+  const listas = raiz.body.pastas.find(function encontrar(item) { return item.id === categoriaId; });
+  assert.equal(listas.quantidadePastas, 2);
+  assert.equal(listas.quantidadeMateriais, 3);
+
+  const primeiroNivel = await autenticado.agente.get("/api/acervo?categoriaId=" + categoriaId);
+  const professora = primeiroNivel.body.pastas.find(function encontrar(item) { return item.id === filhaId; });
+  const pastaVazia = primeiroNivel.body.pastas.find(function encontrar(item) { return item.id === vaziaId; });
+  assert.equal(professora.quantidadePastas, 1);
+  assert.equal(professora.quantidadeMateriais, 2);
+  assert.equal(pastaVazia.quantidadePastas, 0);
+  assert.equal(pastaVazia.quantidadeMateriais, 0);
+
+  const segundoNivel = await autenticado.agente.get("/api/acervo?categoriaId=" + filhaId);
+  const fisica = segundoNivel.body.pastas.find(function encontrar(item) { return item.id === netaId; });
+  assert.equal(fisica.quantidadePastas, 0);
+  assert.equal(fisica.quantidadeMateriais, 1);
+});
+
 test("regras automaticas usam nomes e contextos inequivocos sem classificar pasta ambigua", function testarRegrasAutomaticas() {
   const raiz = { id: 1, nome: "LISTAS", categoria_pai_id: null };
   const mapas = new Map([[1, raiz]]);
@@ -391,7 +444,7 @@ test("reconcilia renomeacao, movimentacao e remocao de subarvore sem full sync",
   await pool.execute(
     "INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em) VALUES (1,'pagina-antiga',NOW(3))"
   );
-  const repository = criarChangesRepository(pool);
+  const repository = criarChangesRepository(pool, { nomeTrava: "plantel_changes_teste_acervo" });
   const alteracaoSubarvore = {
     fileId: "driveSubarvoreFase5",
     pastaRaizId: configuracao.googleDrive.pastaRaizId,

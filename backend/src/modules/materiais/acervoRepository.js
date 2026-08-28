@@ -78,12 +78,26 @@ function criarAcervoRepository(pool) {
   async function listarPastas(categoriaId) {
     const [registros] = await pool.execute(
       criarArvoreSql()
+      + ",pastas_exibidas AS ("
+      + "SELECT id FROM categorias WHERE ativo=1 AND categoria_pai_id <=> ?),"
+      + "subarvore_pastas AS ("
+      + "SELECT id AS pasta_raiz_id,id AS categoria_id FROM pastas_exibidas "
+      + "UNION ALL "
+      + "SELECT s.pasta_raiz_id,f.id FROM subarvore_pastas s "
+      + "INNER JOIN categorias f ON f.categoria_pai_id=s.categoria_id AND f.ativo=1),"
+      + "contagens_materiais AS ("
+      + "SELECT s.pasta_raiz_id,COUNT(m.id) AS quantidade_materiais "
+      + "FROM subarvore_pastas s LEFT JOIN materiais m ON m.categoria_id=s.categoria_id "
+      + "AND m.disponivel=1 AND m.estado_gestao='disponivel' AND m.tipo IN ('pdf','video') "
+      + "GROUP BY s.pasta_raiz_id) "
       + "SELECT a.*,d.nome AS disciplina_nome,c.nome AS concurso_nome,"
       + "(SELECT COUNT(*) FROM categorias f WHERE f.categoria_pai_id=a.id AND f.ativo=1) AS quantidade_pastas,"
-      + "(SELECT COUNT(*) FROM materiais m WHERE m.categoria_id=a.id AND m.disponivel=1 AND m.estado_gestao='disponivel' AND m.tipo IN ('pdf','video')) AS quantidade_materiais "
-      + "FROM arvore a LEFT JOIN disciplinas d ON d.id=a.disciplina_efetiva_id AND d.ativo=1 "
+      + "COALESCE(cm.quantidade_materiais,0) AS quantidade_materiais "
+      + "FROM pastas_exibidas pe INNER JOIN arvore a ON a.id=pe.id "
+      + "LEFT JOIN contagens_materiais cm ON cm.pasta_raiz_id=a.id "
+      + "LEFT JOIN disciplinas d ON d.id=a.disciplina_efetiva_id AND d.ativo=1 "
       + "LEFT JOIN concursos c ON c.id=a.concurso_efetivo_id AND c.ativo=1 "
-      + "WHERE a.ativo=1 AND a.categoria_pai_id <=> ? ORDER BY a.nome ASC",
+      + "ORDER BY a.nome ASC",
       [categoriaId]
     );
     return registros.map(mapearPasta);
