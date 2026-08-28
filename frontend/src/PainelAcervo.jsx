@@ -15,6 +15,7 @@ import {
 } from "./api.js";
 import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
 import AdministracaoFase7 from "./AdministracaoFase7.jsx";
+import { Alerta, Carregando, Icone, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 
 function obterTipoDeUsuario(papel) {
   const tipos = { admin: "Administrador", professor: "Professor", aluno: "Aluno" };
@@ -38,7 +39,7 @@ function obterTextoDaSincronizacao(sincronizacao) {
 }
 
 function traduzirErroDaApi(mensagem) {
-  return (mensagem || "Não foi possível concluir a ação.")
+  return mensagemHumana((mensagem || "Não foi possível concluir a ação.")
     .replace(/Movimentacao criaria ciclo na hierarquia/gi, "Esta pasta não pode ser colocada dentro de uma de suas subpastas")
     .replace(/Categoria nao pode ser pai de si mesma/gi, "Uma pasta não pode ser criada dentro dela mesma")
     .replace(/Categoria pai esta inativa/gi, "A pasta escolhida está oculta")
@@ -52,7 +53,11 @@ function traduzirErroDaApi(mensagem) {
     .replace(/categorias/gi, "pastas")
     .replace(/categoria/gi, "pasta")
     .replace(/permissoes/gi, "acessos")
-    .replace(/permissao/gi, "acesso");
+    .replace(/permissao/gi, "acesso"));
+}
+
+function ItemMenu({ area, atual, icone, texto, aoAbrir }) {
+  return <button type="button" className={area === atual ? "ativo" : ""} aria-current={area === atual ? "page" : undefined} onClick={function abrir() { aoAbrir(area); }}><Icone nome={icone} /><span>{texto}</span></button>;
 }
 
 function ListaDePastas({ categorias }) {
@@ -186,9 +191,19 @@ function PainelAcervo({ usuario, aoSair }) {
   const [mensagem, definirMensagem] = useState("");
   const [erro, definirErro] = useState("");
   const [carregando, definirCarregando] = useState(true);
+  const [areaAtual, definirAreaAtual] = useState("acervo");
+  const [menuAberto, definirMenuAberto] = useState(false);
 
   function mostrarErro(mensagem) {
     definirErro(traduzirErroDaApi(mensagem));
+  }
+
+  function navegar(area) {
+    definirAreaAtual(area);
+    definirMenuAberto(false);
+    definirMensagem("");
+    definirErro("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function carregar(mensagemInformada) {
@@ -395,79 +410,89 @@ function PainelAcervo({ usuario, aoSair }) {
     )
   );
 
+  const informacoesDasAreas = {
+    acervo: { titulo: "Acervo de estudos", texto: "Encontre pastas, PDFs e vídeos com facilidade." },
+    minhasPastas: { titulo: "Pastas que você gerencia", texto: "Veja onde você pode adicionar e organizar materiais." },
+    usuarios: { titulo: "Usuários", texto: "Cuide das contas e dos tipos de acesso." },
+    acessos: { titulo: "Acessos dos professores", texto: "Escolha quais pastas cada professor pode gerenciar." },
+    organizacao: { titulo: "Organização do acervo", texto: "Mantenha pastas, disciplinas e concursos fáceis de encontrar." },
+    estatisticas: { titulo: "Estatísticas", texto: "Acompanhe como o acervo está sendo utilizado." },
+    historico: { titulo: "Histórico de atividades", texto: "Consulte as ações importantes realizadas no sistema." },
+    drive: { titulo: "Google Drive", texto: "Confira a conexão e mantenha o acervo atualizado." }
+  };
+  const informacaoDaArea = informacoesDasAreas[areaAtual] || informacoesDasAreas.acervo;
+
   if (carregando) {
-    return <main className="pagina-painel"><p>Preparando seu acervo...</p></main>;
+    return <main className="pagina-painel carregamento-inicial"><Carregando texto="Preparando seu acervo..." /></main>;
   }
 
   return (
     <main className="pagina-painel">
-      <header className="cabecalho-painel">
-        <div><span className="marca">Plantel Listas</span><h1>Acervo de estudos</h1></div>
-        <div className="usuario-painel">
-          <span><strong>{usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small></span>
-          <button type="button" className="secundario" onClick={aoSair}>Sair</button>
-        </div>
-      </header>
-      {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
-      {erro && <p className="aviso erro" role="alert">{erro}</p>}
+      <button type="button" className="fundo-menu-mobile" aria-label="Fechar menu" tabIndex={menuAberto ? 0 : -1} onClick={function fecharMenu() { definirMenuAberto(false); }} />
+      <aside className={menuAberto ? "barra-lateral aberta" : "barra-lateral"} aria-label="Menu principal">
+        <div className="marca-painel"><span className="simbolo-marca">PL</span><span><strong>Plantel Listas</strong><small>Acervo de estudos</small></span><button type="button" className="botao-icone fechar-menu" aria-label="Fechar menu" onClick={function fechar() { definirMenuAberto(false); }}><Icone nome="fechar" /></button></div>
+        <nav className="menu-principal">
+          <span className="rotulo-menu">Navegação</span>
+          <ItemMenu area="acervo" atual={areaAtual} icone="acervo" texto="Acervo" aoAbrir={navegar} />
+          {usuario.papel === "professor" && <ItemMenu area="minhasPastas" atual={areaAtual} icone="pasta" texto="Minhas pastas" aoAbrir={navegar} />}
+          {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="estatisticas" atual={areaAtual} icone="estatisticas" texto="Estatísticas" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /></>}
+        </nav>
+        <div className="conta-lateral"><span className="avatar-usuario">{usuario.email.slice(0, 1).toUpperCase()}</span><span><strong>{usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small></span><button type="button" className="botao-icone" aria-label="Sair" onClick={aoSair}><Icone nome="sair" /></button></div>
+      </aside>
 
-      <BibliotecaAcervo usuario={usuario} />
+      <section className="conteudo-aplicacao">
+        <header className="cabecalho-mobile"><button type="button" className="botao-icone" aria-label="Abrir menu" onClick={function abrirMenu() { definirMenuAberto(true); }}><Icone nome="menu" /></button><div className="marca-mobile-painel"><span className="simbolo-marca pequeno">PL</span><strong>Plantel Listas</strong></div><span className="avatar-usuario pequeno">{usuario.email.slice(0, 1).toUpperCase()}</span></header>
+        <header className="cabecalho-painel"><div><span className="caminho-area">Plantel Listas <Icone nome="chevron" tamanho={14} /> {informacaoDaArea.titulo}</span><h1>{informacaoDaArea.titulo}</h1><p>{informacaoDaArea.texto}</p></div><div className="usuario-painel"><span className="avatar-usuario">{usuario.email.slice(0, 1).toUpperCase()}</span><span><strong>{usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small></span></div></header>
+        <div className="avisos-globais">{mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}{erro && <Alerta tipo="erro">{erro}</Alerta>}</div>
 
-      {usuario.papel === "professor" && (
-        <section className="cartao-painel">
-          <h2>Pastas que você pode gerenciar</h2>
-          <p className="texto-apoio">Você pode organizar conteúdos somente nestas pastas.</p>
-          <ul className="lista-simples">{minhasPermissoes.map(function renderizar(item) { return <li key={item.id}>{item.categoria.nome}</li>; })}</ul>
-          {!minhasPermissoes.length && <p>Nenhuma pasta foi liberada para você ainda.</p>}
-        </section>
-      )}
+        {areaAtual === "acervo" && <BibliotecaAcervo usuario={usuario} aoMensagem={definirMensagem} />}
 
-      {usuario.papel === "admin" && (
-        <section className="area-administrativa">
-          <AdministracaoFase7 usuario={usuario} aoMensagem={definirMensagem} aoErro={mostrarErro} />
-          <div className="introducao-admin"><h2>Organizar o acervo</h2><p>Crie as opções que alunos e professores usarão para encontrar os conteúdos.</p></div>
+        {usuario.papel === "professor" && areaAtual === "minhasPastas" && <section className="cartao-painel painel-conteudo"><div className="cabecalho-bloco"><div><h2>Pastas liberadas para você</h2><p>Você pode adicionar, editar e mover materiais somente nestas pastas.</p></div></div><ul className="lista-pastas-professor">{minhasPermissoes.map(function renderizar(item) { return <li key={item.id}><span className="icone-lista"><Icone nome="pasta" /></span><span><strong>{item.categoria.nome}</strong><small>Você pode gerenciar os materiais desta pasta.</small></span></li>; })}</ul>{!minhasPermissoes.length && <Vazio titulo="Nenhuma pasta liberada" texto="Quando um administrador liberar uma pasta, ela aparecerá aqui." />}</section>}
 
-          <section className="bloco-admin integracao-drive">
+        {usuario.papel === "admin" && ["usuarios", "estatisticas", "historico"].includes(areaAtual) && <AdministracaoFase7 usuario={usuario} area={areaAtual} aoMensagem={definirMensagem} aoErro={mostrarErro} />}
+
+        {usuario.papel === "admin" && areaAtual === "drive" && <section className="bloco-admin integracao-drive painel-conteudo">
             <div className="cabecalho-bloco">
               <div>
-                <h3>Google Drive</h3>
-                <p>Conecte e atualize as pastas e os arquivos do acervo.</p>
+                <span className="icone-destaque"><Icone nome="drive" tamanho={26} /></span>
+                <h2>Conexão com o Google Drive</h2>
+                <p>O Drive guarda os arquivos. Use esta área para conferir e atualizar o acervo.</p>
               </div>
               {googleDrive && googleDrive.conectado ? (
                 <button type="button" onClick={sincronizarAcervo} disabled={processandoGoogleDrive || sincronizacaoEmAndamento}>
-                  {processandoGoogleDrive || sincronizacaoEmAndamento ? "Sincronizando..." : "Sincronizar agora"}
+                  {processandoGoogleDrive || sincronizacaoEmAndamento ? "Atualizando acervo..." : "Atualizar acervo agora"}
                 </button>
               ) : (
                 <button type="button" onClick={conectarGoogleDrive} disabled={processandoGoogleDrive || !googleDrive || !googleDrive.configurado}>
                   {processandoGoogleDrive
                     ? "Conectando..."
                     : googleDrive && googleDrive.renovacaoNecessaria
-                      ? "Reconectar Google Drive"
-                      : "Conectar Google Drive"}
+                      ? "Renovar conexão"
+                      : "Conectar conta do acervo"}
                 </button>
               )}
             </div>
-            {googleDrive && googleDrive.conectado && <p className="estado-integracao conectado">Google Drive conectado.</p>}
-            {googleDrive && googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente">A conexão com o Google Drive precisa ser renovada. Reconecte a conta do acervo.</p>}
+            {googleDrive && googleDrive.conectado && <p className="estado-integracao conectado"><Icone nome="sucesso" /> Conta do acervo conectada.</p>}
+            {googleDrive && googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente"><Icone nome="alerta" /> A conexão precisa ser renovada para continuar atualizando o acervo.</p>}
             {googleDrive && !googleDrive.configurado && <p className="estado-integracao pendente">A conexão ainda precisa ser configurada pelo responsável técnico.</p>}
             {googleDrive && googleDrive.configurado && !googleDrive.conectado && !googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente">Conecte a conta do acervo antes da primeira sincronização.</p>}
             {googleDrive && googleDrive.ultimaSincronizacao && (
               <p className="resumo-sincronizacao">
-                Última sincronização: {obterTextoDaSincronizacao(googleDrive.ultimaSincronizacao)}. {googleDrive.ultimaSincronizacao.arquivosEncontrados} arquivos encontrados.
+                Última atualização: {obterTextoDaSincronizacao(googleDrive.ultimaSincronizacao)} · {googleDrive.ultimaSincronizacao.arquivosEncontrados} arquivos encontrados.
               </p>
             )}
             {acompanhamentoDrive && (
               <p className="resumo-sincronizacao">
-                Atualizações automáticas: {acompanhamentoDrive.acompanhamentoAtivo ? "ativas" : "preparando"}.
-                {acompanhamentoDrive.reconciliacaoNecessaria && " Uma conferência completa do acervo foi agendada."}
+                Atualizações automáticas: {acompanhamentoDrive.acompanhamentoAtivo ? "funcionando" : "sendo preparadas"}.
+                {acompanhamentoDrive.reconciliacaoNecessaria && " Uma conferência completa será feita em seguida."}
               </p>
             )}
-          </section>
+          </section>}
 
-          <section className="bloco-admin">
+        {usuario.papel === "admin" && areaAtual === "organizacao" && <><section className="bloco-admin painel-conteudo">
             <div className="cabecalho-bloco">
-              <div><h3>Pastas</h3><p>Organize o acervo em pastas e subpastas.</p></div>
-              {!formularioPastaAberto && <button type="button" onClick={iniciarCriacaoCategoria}>+ Nova pasta</button>}
+              <div><h2>Pastas</h2><p>Organize o acervo em pastas e subpastas.</p></div>
+              {!formularioPastaAberto && <button type="button" className="botao-principal" onClick={iniciarCriacaoCategoria}><Icone nome="mais" />Nova pasta</button>}
             </div>
             {formularioPastaAberto && (
               <form className="formulario-edicao" onSubmit={salvarCategoria}>
@@ -495,10 +520,10 @@ function PainelAcervo({ usuario, aoSair }) {
           <div className="grade-admin">
             <FormularioCatalogo titulo="Disciplinas" singular="Disciplina" registros={disciplinas} api={apiDisciplinas} aoAtualizar={carregar} aoErro={mostrarErro} />
             <FormularioCatalogo titulo="Concursos" singular="Concurso" registros={concursos} api={apiConcursos} aoAtualizar={carregar} aoErro={mostrarErro} />
-          </div>
+          </div></>}
 
-          <section className="bloco-admin">
-            <div className="cabecalho-bloco"><div><h3>Acesso dos professores</h3><p>Escolha um professor e marque as pastas que ele poderá gerenciar.</p></div></div>
+        {usuario.papel === "admin" && areaAtual === "acessos" && <section className="bloco-admin painel-conteudo">
+            <div className="cabecalho-bloco"><div><h2>Acessos dos professores</h2><p>Escolha um professor e marque as pastas que ele poderá gerenciar.</p></div></div>
             <form className="formulario-acessos" onSubmit={salvarAcessos}>
               <label>Professor<select value={professorId} onChange={selecionarProfessor} required><option value="">Selecione um professor</option>{professores.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.email}</option>; })}</select></label>
               {professorId && (
@@ -506,7 +531,7 @@ function PainelAcervo({ usuario, aoSair }) {
                   <legend>Quais pastas este professor pode gerenciar?</legend>
                   <div className="lista-selecao">
                     {categoriasAtivas.map(function opcao(categoria) {
-                      return <label key={categoria.id} className="opcao-pasta"><input type="checkbox" checked={pastasSelecionadas.includes(categoria.id)} onChange={function alternar() { alternarPastaSelecionada(categoria.id); }} /><span>{categoria.nome}</span></label>;
+                      return <label key={categoria.id} className="opcao-pasta"><input type="checkbox" checked={pastasSelecionadas.includes(categoria.id)} onChange={function alternar() { alternarPastaSelecionada(categoria.id); }} /><span className="icone-opcao"><Icone nome="pasta" /></span><span>{categoria.nome}</span></label>;
                     })}
                   </div>
                   {!categoriasAtivas.length && <p className="estado-vazio">Crie e mostre uma pasta antes de liberar acessos.</p>}
@@ -515,9 +540,8 @@ function PainelAcervo({ usuario, aoSair }) {
               {professorId && <button type="submit">Salvar acessos</button>}
             </form>
             {!professores.length && <p className="estado-vazio">Nenhum professor ativo encontrado.</p>}
-          </section>
-        </section>
-      )}
+          </section>}
+      </section>
     </main>
   );
 }
