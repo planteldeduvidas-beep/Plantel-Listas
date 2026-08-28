@@ -101,9 +101,27 @@ function listarEstruturaPublica() {
   return requisitar("/estrutura-acervo", { method: "GET" });
 }
 
-function listarUsuarios() {
-  return requisitar("/usuarios", { method: "GET" });
+function listarUsuarios(filtros) {
+  const parametros = new URLSearchParams();
+  Object.keys(filtros || {}).forEach(function adicionar(chave) {
+    if (filtros[chave] !== "" && filtros[chave] !== null && filtros[chave] !== undefined) parametros.set(chave, String(filtros[chave]));
+  });
+  return requisitar("/usuarios" + (parametros.toString() ? "?" + parametros.toString() : ""), { method: "GET" });
 }
+
+function criarUsuario(dados) { return requisitar("/usuarios", { method: "POST", body: JSON.stringify(dados) }); }
+function editarUsuario(id, email) { return requisitar("/usuarios/" + id, { method: "PATCH", body: JSON.stringify({ email: email }) }); }
+function alterarPapelUsuario(id, papel) { return requisitar("/usuarios/" + id + "/papel", { method: "PATCH", body: JSON.stringify({ papel: papel }) }); }
+function alterarEstadoUsuario(id, ativo) { return requisitar("/usuarios/" + id + "/ativo", { method: "PATCH", body: JSON.stringify({ ativo: ativo }) }); }
+function iniciarRedefinicaoUsuario(id) { return requisitar("/usuarios/" + id + "/redefinicao-senha", { method: "POST", body: JSON.stringify({}) }); }
+function salvarAcessosProfessor(id, categoriaIds) { return requisitar("/permissoes/professores/" + id, { method: "PUT", body: JSON.stringify({ categoriaIds: categoriaIds }) }); }
+function obterAnalytics(periodo) { return requisitar("/analytics?periodo=" + periodo, { method: "GET" }); }
+function obterAuditoria(filtros) {
+  const parametros = new URLSearchParams();
+  Object.keys(filtros || {}).forEach(function adicionar(chave) { if (filtros[chave]) parametros.set(chave, String(filtros[chave])); });
+  return requisitar("/auditoria" + (parametros.toString() ? "?" + parametros.toString() : ""), { method: "GET" });
+}
+function obterUrlRelatorio(periodo) { return API_BASE + "/analytics/relatorio.csv?periodo=" + periodo; }
 
 function criarOperacoesDeCatalogo(caminho, nomeSingular) {
   return {
@@ -268,6 +286,15 @@ export {
   redefinirSenha,
   listarEstruturaPublica,
   listarUsuarios,
+  criarUsuario,
+  editarUsuario,
+  alterarPapelUsuario,
+  alterarEstadoUsuario,
+  iniciarRedefinicaoUsuario,
+  salvarAcessosProfessor,
+  obterAnalytics,
+  obterAuditoria,
+  obterUrlRelatorio,
   categorias,
   disciplinas,
   concursos,

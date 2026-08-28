@@ -10,8 +10,12 @@ function criarAcervoService(dependencias) {
   const repository = dependencias.repository;
   const provider = dependencias.provider;
   const integracaoService = dependencias.integracaoService;
+  const analyticsService = dependencias.analyticsService || {
+    registrarUso: function registrarUso() { return Promise.resolve(); },
+    registrarConsulta: function registrarConsulta() { return Promise.resolve(); }
+  };
 
-  async function consultar(query) {
+  async function consultar(query, usuario) {
     const filtros = validarConsulta(query || {});
     if (filtros.categoriaId) {
       const categoria = await repository.buscarCategoria(filtros.categoriaId);
@@ -26,6 +30,7 @@ function criarAcervoService(dependencias) {
       repository.listarFiltros()
     ]);
     const totalPaginas = Math.max(1, Math.ceil(resultados[2].total / filtros.limite));
+    await analyticsService.registrarConsulta(usuario.id, filtros);
     return {
       breadcrumb: resultados[0],
       pastas: resultados[1],
@@ -63,7 +68,7 @@ function criarAcervoService(dependencias) {
     return range;
   }
 
-  async function obterArquivo(materialIdInformado, range) {
+  async function obterArquivo(materialIdInformado, range, usuario, baixar) {
     const materialId = validarMaterialId(materialIdInformado);
     const material = await repository.buscarMaterialDisponivel(materialId);
     if (!material) {
@@ -82,7 +87,8 @@ function criarAcervoService(dependencias) {
         erro.tamanhoTotal = material.tamanho_bytes;
         throw erro;
       }
-      return { material: material, resposta: resposta };
+    await analyticsService.registrarUso(usuario.id, material.id, baixar ? "download" : "visualizacao");
+    return { material: material, resposta: resposta };
     } catch (erro) {
       if (erro.codigo === "GOOGLE_AUTORIZACAO_INVALIDA") {
         await integracaoService.registrarFalhaDeAutorizacao(erro.codigo);

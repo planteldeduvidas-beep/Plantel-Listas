@@ -32,7 +32,7 @@ function copiarCabecalho(respostaDrive, respostaHttp, nome) {
 function criarAcervoController(service) {
   async function consultar(req, res, next) {
     try {
-      const resultado = await service.consultar(req.query);
+      const resultado = await service.consultar(req.query, req.usuario);
       res.status(200).json(resultado);
     } catch (erro) {
       next(erro);
@@ -41,7 +41,7 @@ function criarAcervoController(service) {
 
   async function enviarArquivo(req, res, next, baixar) {
     try {
-      const resultado = await service.obterArquivo(req.params.materialId, req.headers.range);
+      const resultado = await service.obterArquivo(req.params.materialId, req.headers.range, req.usuario, baixar);
       const respostaDrive = resultado.resposta;
       copiarCabecalho(respostaDrive, res, resultado.material);
       res.setHeader(
