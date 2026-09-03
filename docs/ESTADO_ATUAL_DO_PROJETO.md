@@ -1,7 +1,7 @@
 # ESTADO ATUAL DO PROJETO - PLANTEL LISTAS
 
 Versao da documentacao: 1.1
-Atualizado em: 28/08/2026
+Atualizado em: 03/09/2026
 
 ## Status
 
@@ -37,13 +37,17 @@ FASE 8 aprovada pelo responsavel humano, concluida e integrada na branch `main` 
 
 O frontend recebeu acabamento visual responsivo inspirado na referencia aprovada, adaptado para a identidade grafite, verde e turquesa do Plantel. Login, acervo, professor e administracao agora compartilham sidebar, cards, formularios, botoes, alertas, estados e modais consistentes, com linguagem simplificada. Navegacao, breadcrumb, retornos, PDF, video, drawer mobile e temas claro/escuro foram revalidados e aprovados pelo responsavel humano. O codigo preservou as regras funcionais e de seguranca das fases anteriores. Nenhum deploy foi realizado.
 
+AJUSTES FUNCIONAIS FINAIS DA V1 implementados na branch `ajuste/funcionalidades-finais` e aguardando validacao humana.
+
+O cadastro passou a solicitar o nome do aluno. Aluno e professor receberam uma area autenticada de suporte por e-mail, e o aluno recebeu um historico pessoal paginado e separado dos eventos brutos de analytics. A retencao dos eventos brutos foi definida em 180 dias por padrao, com agregacao diaria anterior a qualquer exclusao e execucao operacional explicita. Nenhum evento atual foi removido, nenhuma configuracao de producao foi alterada e nenhum deploy foi realizado.
+
 A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
 
 O acompanhamento de mudancas do Drive usa Changes API com estado persistido, polling de recuperacao e suporte a canal webhook validado. Criacao, renomeacao, movimentacao e remocao de pastas usam reconciliacao incremental da subarvore quando a operacao pode ser comprovada com seguranca; a sincronizacao completa permanece como fallback. A URL publica HTTPS ainda nao foi definida, portanto a criacao e a renovacao de um canal real permanecem pendentes para o ambiente de producao.
 
 PDF e video sao os unicos tipos funcionais da V1. Os cinco DOCX, dois ODT e cinco PNG observados permanecem somente indexados no MySQL e nao sao expostos para consulta, visualizacao ou download enquanto nao houver decisao humana de escopo.
 
-A V1 esta funcionalmente congelada.
+A base aprovada ate a Fase 8 permanece congelada. Os ajustes funcionais finais ainda nao foram integrados na `main`.
 
 ## Repositorio
 
@@ -179,10 +183,10 @@ Google Drive:
 - avaliar otimizacao controlada da leitura de arvores muito grandes, preservando limites da API;
 - validar limite pratico de videos na Hostinger antes do go-live;
 - definir estrategia exata de migration no deploy Hostinger antes da Fase 9.
-- definir a politica de retencao dos eventos de uso antes de uma escala que a exija;
+- agendar a rotina de retencao dos eventos de uso no ambiente definitivo, mantendo o valor configurado e a agregacao anterior a exclusao;
 - medir as agregacoes de analytics no banco de producao quando o deploy for autorizado.
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para iniciar a Fase 9.
-2. Nao fazer deploy nem iniciar a Fase 9 antes dessa autorizacao.
+1. Concluir a validacao humana dos ajustes funcionais finais da V1.
+2. Nao integrar a branch, fazer deploy nem iniciar a Fase 9 sem autorizacao explicita.

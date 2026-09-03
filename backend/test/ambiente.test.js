@@ -44,12 +44,32 @@ test("valida a configuracao SMTP quando informada", function testarSmtp() {
   variaveis.SMTP_USER = "usuario@example.com";
   variaveis.SMTP_PASSWORD = "segredo-de-teste";
   variaveis.SMTP_FROM = "usuario@example.com";
+  variaveis.SUPPORT_EMAIL_TO = "SUPORTE@example.com";
+  variaveis.ANALYTICS_RAW_RETENTION_DAYS = "365";
+  variaveis.ANALYTICS_RETENTION_BATCH_SIZE = "1000";
 
   const configuracao = validarVariaveisDeAmbiente(variaveis);
   assert.equal(configuracao.email.host, "smtp.example.com");
   assert.equal(configuracao.email.porta, 587);
   assert.equal(configuracao.email.seguro, false);
   assert.equal(configuracao.email.senha, "segredo-de-teste");
+  assert.equal(configuracao.suporte.destinatario, "suporte@example.com");
+  assert.equal(configuracao.analytics.retencaoEventosDias, 365);
+  assert.equal(configuracao.analytics.loteRetencao, 1000);
+});
+
+test("recusa destinatario de suporte e retencao invalidos", function testarAjustesFinaisInvalidos() {
+  const emailInvalido = criarVariaveisValidas();
+  emailInvalido.SUPPORT_EMAIL_TO = "nao-e-email";
+  assert.throws(function validarEmail() {
+    validarVariaveisDeAmbiente(emailInvalido);
+  }, /SUPPORT_EMAIL_TO/);
+
+  const retencaoInvalida = criarVariaveisValidas();
+  retencaoInvalida.ANALYTICS_RAW_RETENTION_DAYS = "30";
+  assert.throws(function validarRetencao() {
+    validarVariaveisDeAmbiente(retencaoInvalida);
+  }, /ANALYTICS_RAW_RETENTION_DAYS/);
 });
 
 test("falha de forma controlada quando uma env obrigatoria esta ausente", function testarEnvAusente() {

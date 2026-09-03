@@ -31,10 +31,12 @@ function App() {
   });
   const tokenRecuperacao = retornoInicial.tokenRecuperacao;
   const [usuario, definirUsuario] = useState(null);
+  const [entradaRecente, definirEntradaRecente] = useState(false);
   const [carregando, definirCarregando] = useState(true);
   const [processando, definirProcessando] = useState(false);
   const [tela, definirTela] = useState(tokenRecuperacao ? "redefinir" : "login");
   const [email, definirEmail] = useState("");
+  const [nome, definirNome] = useState("");
   const [senha, definirSenha] = useState("");
   const [mensagem, definirMensagem] = useState("");
   const [erro, definirErro] = useState("");
@@ -92,6 +94,7 @@ function App() {
     prepararOperacao();
     try {
       const dados = await entrar(email, senha);
+      definirEntradaRecente(true);
       definirUsuario(dados.usuario);
       definirSenha("");
     } catch (falha) {
@@ -105,10 +108,11 @@ function App() {
     evento.preventDefault();
     prepararOperacao();
     try {
-      await cadastrar(email, senha);
+      await cadastrar(nome, email, senha);
       definirMensagem("Cadastro concluido. Agora entre com sua conta.");
       definirTela("login");
       definirSenha("");
+      definirNome("");
     } catch (falha) {
       mostrarErroDaApi(falha);
     } finally {
@@ -138,6 +142,7 @@ function App() {
       definirTela("login");
       definirSenha("");
       definirUsuario(null);
+      definirEntradaRecente(false);
     } catch (falha) {
       mostrarErroDaApi(falha);
     } finally {
@@ -151,6 +156,7 @@ function App() {
       await sair();
       window.history.replaceState({}, "", window.location.pathname);
       definirUsuario(null);
+      definirEntradaRecente(false);
       definirTela("login");
       definirMensagem("Sessao encerrada com seguranca.");
     } catch (falha) {
@@ -172,7 +178,7 @@ function App() {
   }
 
   if (usuario) {
-    return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} />;
+    return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} mostrarBoasVindas={entradaRecente} />;
   }
 
   const configuracoesDaTela = {
@@ -200,6 +206,20 @@ function App() {
         <p className="descricao">{configuracaoDaTela.texto}</p>
 
         <form onSubmit={configuracaoDaTela.acao}>
+          {tela === "cadastro" && (
+            <label>
+              Nome
+              <input
+                type="text"
+                autoComplete="name"
+                minLength="2"
+                maxLength="120"
+                value={nome}
+                onChange={function atualizarNome(evento) { definirNome(evento.target.value); }}
+                required
+              />
+            </label>
+          )}
           {tela !== "redefinir" && (
             <label>
               E-mail

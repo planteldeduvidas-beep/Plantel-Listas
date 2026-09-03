@@ -48,10 +48,32 @@ function validarSenha(senha) {
   return senha;
 }
 
+function normalizarNome(nome) {
+  if (typeof nome !== "string") {
+    throw new AppError("Nome invalido", 400, "NOME_INVALIDO");
+  }
+  const nomeNormalizado = nome.trim().replace(/\s+/g, " ");
+  if (nomeNormalizado.length < 2 || nomeNormalizado.length > 120
+      || /[\u0000-\u001F\u007F<>]/.test(nomeNormalizado)) {
+    throw new AppError("Nome invalido", 400, "NOME_INVALIDO");
+  }
+  return nomeNormalizado;
+}
+
 function validarCredenciais(corpo) {
   exigirObjeto(corpo);
   validarCamposPermitidos(corpo, ["email", "senha"]);
   return {
+    email: normalizarEmail(corpo.email),
+    senha: validarSenha(corpo.senha)
+  };
+}
+
+function validarCadastro(corpo) {
+  exigirObjeto(corpo);
+  validarCamposPermitidos(corpo, ["nome", "email", "senha"]);
+  return {
+    nome: normalizarNome(corpo.nome),
     email: normalizarEmail(corpo.email),
     senha: validarSenha(corpo.senha)
   };
@@ -81,6 +103,8 @@ module.exports = {
   normalizarEmail: normalizarEmail,
   validarSenha: validarSenha,
   validarCredenciais: validarCredenciais,
+  validarCadastro: validarCadastro,
+  normalizarNome: normalizarNome,
   validarSolicitacaoDeRecuperacao: validarSolicitacaoDeRecuperacao,
   validarRedefinicaoDeSenha: validarRedefinicaoDeSenha,
   validarCamposPermitidos: validarCamposPermitidos,

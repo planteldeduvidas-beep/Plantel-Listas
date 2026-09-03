@@ -62,10 +62,10 @@ async function requisitar(caminho, opcoesInformadas) {
   return dados;
 }
 
-function cadastrar(email, senha) {
+function cadastrar(nome, email, senha) {
   return requisitar("/autenticacao/cadastro", {
     method: "POST",
-    body: JSON.stringify({ email: email, senha: senha })
+    body: JSON.stringify({ nome: nome, email: email, senha: senha })
   });
 }
 
@@ -111,7 +111,7 @@ function listarUsuarios(filtros) {
 }
 
 function criarUsuario(dados) { return requisitar("/usuarios", { method: "POST", body: JSON.stringify(dados) }); }
-function editarUsuario(id, email) { return requisitar("/usuarios/" + id, { method: "PATCH", body: JSON.stringify({ email: email }) }); }
+function editarUsuario(id, nome, email) { return requisitar("/usuarios/" + id, { method: "PATCH", body: JSON.stringify({ nome: nome, email: email }) }); }
 function alterarPapelUsuario(id, papel) { return requisitar("/usuarios/" + id + "/papel", { method: "PATCH", body: JSON.stringify({ papel: papel }) }); }
 function alterarEstadoUsuario(id, ativo) { return requisitar("/usuarios/" + id + "/ativo", { method: "PATCH", body: JSON.stringify({ ativo: ativo }) }); }
 function iniciarRedefinicaoUsuario(id) { return requisitar("/usuarios/" + id + "/redefinicao-senha", { method: "POST", body: JSON.stringify({}) }); }
@@ -123,6 +123,8 @@ function obterAuditoria(filtros) {
   return requisitar("/auditoria" + (parametros.toString() ? "?" + parametros.toString() : ""), { method: "GET" });
 }
 function obterUrlRelatorio(periodo) { return API_BASE + "/analytics/relatorio.csv?periodo=" + periodo; }
+function enviarSuporte(assunto, mensagem) { return requisitar("/suporte", { method: "POST", body: JSON.stringify({ assunto: assunto, mensagem: mensagem }) }); }
+function obterMeuHistorico(pagina, limite) { return requisitar("/meu-historico?pagina=" + pagina + "&limite=" + limite, { method: "GET" }); }
 
 function criarOperacoesDeCatalogo(caminho, nomeSingular) {
   return {
@@ -296,6 +298,8 @@ export {
   obterAnalytics,
   obterAuditoria,
   obterUrlRelatorio,
+  enviarSuporte,
+  obterMeuHistorico,
   categorias,
   disciplinas,
   concursos,

@@ -1,17 +1,18 @@
 const nodemailer = require("nodemailer");
 
 function criarEmailProviderNaoConfigurado(logger) {
-  return {
-    enviarRecuperacaoSenha: async function informarPendencia() {
-      if (logger) {
-        logger.warn(
-          { codigo: "EMAIL_PROVIDER_NAO_CONFIGURADO" },
-          "Envio de recuperacao indisponivel neste ambiente"
-        );
-      }
-
-      throw new Error("EMAIL_PROVIDER_NAO_CONFIGURADO");
+  async function informarPendencia() {
+    if (logger) {
+      logger.warn(
+        { codigo: "EMAIL_PROVIDER_NAO_CONFIGURADO" },
+        "Envio de email indisponivel neste ambiente"
+      );
     }
+    throw new Error("EMAIL_PROVIDER_NAO_CONFIGURADO");
+  }
+  return {
+    enviarRecuperacaoSenha: informarPendencia,
+    enviarSuporte: informarPendencia
   };
 }
 
@@ -54,6 +55,24 @@ function criarEmailProviderSmtp(configuracao) {
         ].join("\n")
       });
     },
+    enviarSuporte: async function enviarSuporte(dados) {
+      await transportador.sendMail({
+        from: configuracao.remetente,
+        to: dados.destinatario,
+        replyTo: dados.email,
+        subject: "[Suporte Plantel] " + dados.assunto,
+        text: [
+          "Nova mensagem enviada pelo Plantel Listas.",
+          "",
+          "Nome: " + dados.nome,
+          "E-mail: " + dados.email,
+          "Perfil: " + dados.papel,
+          "",
+          "Mensagem:",
+          dados.mensagem
+        ].join("\n")
+      });
+    },
     verificarConexao: function verificarConexao() {
       return transportador.verify();
     }
@@ -73,7 +92,10 @@ function criarEmailProviderFake() {
 
   return {
     enviarRecuperacaoSenha: async function armazenarMensagem(dados) {
-      mensagens.push(Object.assign({}, dados));
+      mensagens.push(Object.assign({ tipo: "recuperacao" }, dados));
+    },
+    enviarSuporte: async function armazenarMensagemDeSuporte(dados) {
+      mensagens.push(Object.assign({ tipo: "suporte" }, dados));
     },
     obterMensagens: function obterMensagens() {
       return mensagens.slice();

@@ -19,6 +19,7 @@ const configuracao = Object.assign({}, base, {
   ambiente: "test",
   nivelDeLog: "silent",
   banco: Object.assign({}, base.banco, { nome: nomeBanco }),
+  seguranca: Object.assign({}, base.seguranca, { limiteAutenticacao: 100 }),
   googleDrive: {
     clientId: "cliente-fase5.apps.googleusercontent.com",
     clientSecret: "segredo-fase5",
@@ -83,6 +84,7 @@ async function limparCategorias() {
 }
 
 async function limpar() {
+  await pool.execute("DELETE FROM historico_materiais_usuario");
   await pool.execute("DELETE FROM notificacoes_google_drive");
   await pool.execute("DELETE FROM canais_google_drive");
   await pool.execute("DELETE FROM estado_changes_google_drive");
@@ -263,6 +265,35 @@ test("download usa anexo e nome seguro e material indisponivel nao e entregue", 
   await pool.execute("UPDATE materiais SET disponivel=0 WHERE id=?", [materialId]);
   const ausente = await autenticado.agente.get("/api/acervo/materiais/" + materialId + "/conteudo");
   assert.equal(ausente.status, 404);
+});
+
+test("meu historico registra uso do aluno, isola usuarios e oculta material indisponivel", async function testarMeuHistorico() {
+  const aluno = await autenticar("aluno");
+  const professor = await autenticar("professor");
+  assert.equal((await aluno.agente.get("/api/acervo/materiais/" + materialId + "/conteudo")).status, 200);
+  assert.equal((await aluno.agente.get("/api/acervo/materiais/" + materialId + "/download")).status, 200);
+
+  const historico = await aluno.agente.get("/api/meu-historico?pagina=1&limite=1");
+  assert.equal(historico.status, 200);
+  assert.equal(historico.body.itens.length, 1);
+  assert.equal(historico.body.itens[0].material.id, materialId);
+  assert.equal(historico.body.itens[0].acao, "download");
+  assert.equal(Object.hasOwn(historico.body.itens[0].material, "driveFileId"), false);
+  assert.equal((await professor.agente.get("/api/meu-historico")).status, 403);
+
+  const outroAluno = request.agent(aplicacao);
+  const csrf = (await outroAluno.get("/api/autenticacao/csrf")).body.csrfToken;
+  const [outro] = await pool.execute(
+    "INSERT INTO usuarios (nome,email,senha_hash,papel) VALUES (?,?,?,'aluno')",
+    ["Outro Aluno", "outro-historico@example.com", await criarHashDaSenha("Senha-forte-fase-5")]
+  );
+  assert.ok(outro.insertId > 0);
+  await outroAluno.post("/api/autenticacao/login").set("X-CSRF-Token", csrf).send({ email: "outro-historico@example.com", senha: "Senha-forte-fase-5" });
+  assert.equal((await outroAluno.get("/api/meu-historico")).body.itens.length, 0);
+
+  await pool.execute("UPDATE materiais SET disponivel=0 WHERE id=?", [materialId]);
+  assert.equal((await aluno.agente.get("/api/meu-historico")).body.itens.length, 0);
+  assert.equal((await aluno.agente.get("/api/meu-historico?usuarioId=" + usuarios.professor.id)).status, 400);
 });
 
 test("classificacao e exclusiva de admin, exige CSRF e bloqueia mass assignment", async function testarClassificacao() {

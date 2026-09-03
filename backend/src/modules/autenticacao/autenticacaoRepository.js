@@ -10,7 +10,7 @@ function criarAutenticacaoRepository(pool) {
   async function buscarSessaoAtivaPorHash(tokenHash) {
     const [registros] = await pool.execute(
       "SELECT s.id AS sessao_id, s.token_hash, s.expira_em, "
-      + "u.id, u.email, u.papel, u.ativo, u.criado_em, u.atualizado_em "
+      + "u.id, u.nome, u.email, u.papel, u.ativo, u.criado_em, u.atualizado_em "
       + "FROM sessoes s INNER JOIN usuarios u ON u.id = s.usuario_id "
       + "WHERE s.token_hash = ? AND s.revogada_em IS NULL "
       + "AND s.expira_em > CURRENT_TIMESTAMP(3) AND u.ativo = 1 LIMIT 1",
@@ -27,6 +27,7 @@ function criarAutenticacaoRepository(pool) {
       expiraEm: registros[0].expira_em,
       usuario: {
         id: registros[0].id,
+        nome: registros[0].nome,
         email: registros[0].email,
         papel: registros[0].papel,
         ativo: registros[0].ativo === 1,

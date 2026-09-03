@@ -29,7 +29,7 @@ function criarUsuarioService(dependencias) {
 
   async function criarUsuario(usuarioAutenticado, corpo) {
     const dados = validarCriacao(corpo);
-    const usuario = await usuarioRepository.criar(dados.email, await criarHashDaSenha(dados.senha), dados.papel);
+    const usuario = await usuarioRepository.criar(dados.nome, dados.email, await criarHashDaSenha(dados.senha), dados.papel);
     await registrar(usuarioAutenticado, "usuario_criado", usuario.id, { papel: usuario.papel });
     return criarUsuarioPublico(usuario);
   }
@@ -37,8 +37,8 @@ function criarUsuarioService(dependencias) {
   async function editarUsuario(usuarioAutenticado, parametroId, corpo) {
     const id = validarUsuarioId(parametroId);
     const dados = validarEdicao(corpo);
-    if (!await usuarioRepository.atualizarEmail(id, dados.email)) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
-    await registrar(usuarioAutenticado, "usuario_editado", id, { emailAlterado: true });
+    if (!await usuarioRepository.atualizarDados(id, dados.nome, dados.email)) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
+    await registrar(usuarioAutenticado, "usuario_editado", id, { nomeAlterado: true, emailAlterado: true });
     return criarUsuarioPublico(await usuarioRepository.buscarPorId(id));
   }
 

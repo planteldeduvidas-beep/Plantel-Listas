@@ -15,7 +15,9 @@ import {
 } from "./api.js";
 import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
 import AdministracaoFase7 from "./AdministracaoFase7.jsx";
-import { Alerta, AlternadorTema, Carregando, Icone, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
+import MeuHistorico from "./MeuHistorico.jsx";
+import Suporte from "./Suporte.jsx";
+import { Alerta, AlternadorTema, Carregando, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, obterAreaInicial, obterAreaPermitida, obterPastaDaUrl } from "./navegacao.js";
 
 function obterTipoDeUsuario(papel) {
@@ -179,7 +181,7 @@ function FormularioCatalogo({ titulo, singular, registros, api, aoAtualizar, aoE
   );
 }
 
-function PainelAcervo({ usuario, aoSair }) {
+function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
   const areaInicial = obterAreaInicial(usuario.papel);
   const [estrutura, definirEstrutura] = useState({ categorias: [], disciplinas: [], concursos: [] });
   const [categorias, definirCategorias] = useState([]);
@@ -206,6 +208,9 @@ function PainelAcervo({ usuario, aoSair }) {
     return obterAreaPermitida(usuario.papel, window.location.search);
   });
   const [menuAberto, definirMenuAberto] = useState(false);
+  const [boasVindasAlunoAberta, definirBoasVindasAlunoAberta] = useState(
+    mostrarBoasVindas && usuario.papel === "aluno"
+  );
   const [buscaPastasAdmin, definirBuscaPastasAdmin] = useState("");
   const [paginaPastasAdmin, definirPaginaPastasAdmin] = useState(1);
 
@@ -510,6 +515,8 @@ function PainelAcervo({ usuario, aoSair }) {
 
   const informacoesDasAreas = {
     acervo: { codigo: "PL / 01", contexto: "Biblioteca digital", titulo: "Materiais de estudo", texto: "Encontre pastas, PDFs e vídeos com facilidade." },
+    meuHistorico: { codigo: "PL / 08", contexto: "Sua biblioteca", titulo: "Meu Histórico", texto: "Retome materiais que você já abriu ou baixou." },
+    suporte: { codigo: "PL / 09", contexto: "Fale com o Plantel", titulo: "Suporte", texto: "Conte sua dúvida para nossa equipe." },
     minhasPastas: { codigo: "PL / 02", contexto: "Área do professor", titulo: "Pastas que você gerencia", texto: "Veja onde você pode adicionar e organizar materiais." },
     usuarios: { codigo: "PL / 03", contexto: "Administração", titulo: "Usuários", texto: "Cuide das contas e dos tipos de acesso." },
     acessos: { codigo: "PL / 04", contexto: "Administração", titulo: "Acessos dos professores", texto: "Escolha quais pastas cada professor pode gerenciar." },
@@ -534,10 +541,13 @@ function PainelAcervo({ usuario, aoSair }) {
           <span className="rotulo-menu">Navegação</span>
           {usuario.papel === "admin" && <ItemMenu area="estatisticas" atual={areaAtual} icone="estatisticas" texto="Visão geral" aoAbrir={navegar} />}
           <ItemMenu area="acervo" atual={areaAtual} icone="acervo" texto="Biblioteca" aoAbrir={navegar} />
+          {usuario.papel === "aluno" && <ItemMenu area="meuHistorico" atual={areaAtual} icone="historico" texto="Meu Histórico" aoAbrir={navegar} />}
           {usuario.papel === "professor" && <ItemMenu area="minhasPastas" atual={areaAtual} icone="pasta" texto="Pastas liberadas" aoAbrir={navegar} />}
+          {["aluno", "professor"].includes(usuario.papel) && <ItemMenu area="suporte" atual={areaAtual} icone="suporte" texto="Suporte" aoAbrir={navegar} />}
+          <a className="item-menu-link" href="https://planteldeduvidas.com.br" target="_blank" rel="noreferrer"><Icone nome="inicio" /><span>Site do Plantel</span></a>
           {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /></>}
         </nav>
-        <div className="conta-lateral"><span className="avatar-usuario">{usuario.email.slice(0, 1).toUpperCase()}</span><span><strong>{usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small></span><button type="button" className="botao-icone" aria-label="Sair" onClick={aoSair}><Icone nome="sair" /></button></div>
+        <div className="conta-lateral"><span className="avatar-usuario">{(usuario.nome || usuario.email).slice(0, 1).toUpperCase()}</span><span><strong>{usuario.nome || usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small><small className="email-conta-lateral">{usuario.email}</small></span><button type="button" className="botao-icone" aria-label="Sair" title="Sair" onClick={aoSair}><Icone nome="sair" /></button></div>
       </aside>
 
       <section className={"conteudo-aplicacao area-" + areaAtual}>
@@ -551,6 +561,8 @@ function PainelAcervo({ usuario, aoSair }) {
         <div className="avisos-globais">{mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}{erro && <Alerta tipo="erro">{erro}</Alerta>}</div>
 
         {areaAtual === "acervo" && <BibliotecaAcervo usuario={usuario} aoMensagem={definirMensagem} />}
+        {usuario.papel === "aluno" && areaAtual === "meuHistorico" && <MeuHistorico aoErro={mostrarErro} />}
+        {["aluno", "professor"].includes(usuario.papel) && areaAtual === "suporte" && <Suporte usuario={usuario} />}
 
         {usuario.papel === "professor" && areaAtual === "minhasPastas" && <section className="cartao-painel painel-conteudo"><div className="cabecalho-bloco"><div><h2>Pastas liberadas para você</h2><p>Você pode adicionar, editar e mover materiais somente nestas pastas.</p></div></div><ul className="lista-pastas-professor">{minhasPermissoes.map(function renderizar(item) { return <li key={item.id}><span className="icone-lista"><Icone nome="pasta" /></span><span><strong>{item.categoria.nome}</strong><small>Você pode gerenciar os materiais desta pasta.</small></span></li>; })}</ul>{!minhasPermissoes.length && <Vazio titulo="Nenhuma pasta liberada" texto="Quando um administrador liberar uma pasta, ela aparecerá aqui." />}</section>}
 
@@ -652,6 +664,23 @@ function PainelAcervo({ usuario, aoSair }) {
             {!professores.length && <p className="estado-vazio">Nenhum professor ativo encontrado.</p>}
           </section>}
       </section>
+      {boasVindasAlunoAberta && usuario.papel === "aluno" && (
+        <Modal
+          titulo={"Bem-vindo, " + String(usuario.nome || "aluno").trim().split(/\s+/)[0] + "!"}
+          descricao="Sua biblioteca de estudos está pronta."
+          aoFechar={function fecharBoasVindas() { definirBoasVindasAlunoAberta(false); }}
+          classe="modal-boas-vindas-aluno"
+        >
+          <div className="conteudo-boas-vindas">
+            <span className="marca-boas-vindas" aria-hidden="true"><Icone nome="acervo" tamanho={30} /></span>
+            <div><h3>Encontre seus materiais</h3><p>Use as pastas ou a busca para abrir PDFs e vídeos. Seus acessos ficam salvos em Meu Histórico.</p></div>
+          </div>
+          <div className="acoes-boas-vindas">
+            <a className="botao-secundario" href="https://planteldeduvidas.com.br" target="_blank" rel="noreferrer"><Icone nome="inicio" tamanho={18} />Conhecer o site do Plantel</a>
+            <button type="button" className="botao-principal" onClick={function comecar() { definirBoasVindasAlunoAberta(false); }}>Começar a estudar</button>
+          </div>
+        </Modal>
+      )}
     </main>
   );
 }

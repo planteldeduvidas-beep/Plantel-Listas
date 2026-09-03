@@ -102,6 +102,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
   const [carregando, definirCarregando] = useState(false);
   const [confirmacao, definirConfirmacao] = useState(null);
   const [emailEmEdicao, definirEmailEmEdicao] = useState("");
+  const [nomeEmEdicao, definirNomeEmEdicao] = useState("");
 
   async function carregarUsuarios() {
     definirCarregando(true);
@@ -135,7 +136,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
     evento.preventDefault();
     const formulario = new FormData(evento.currentTarget);
     try {
-      await criarUsuario({ email: formulario.get("email"), senha: formulario.get("senha"), papel: formulario.get("papel") });
+      await criarUsuario({ nome: formulario.get("nome"), email: formulario.get("email"), senha: formulario.get("senha"), papel: formulario.get("papel") });
       evento.currentTarget.reset();
       definirNovoAberto(false);
       aoMensagem("Usuário criado com sucesso.");
@@ -144,8 +145,9 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
   }
 
   function mudarEmail(item) {
+    definirNomeEmEdicao(item.nome);
     definirEmailEmEdicao(item.email);
-    definirConfirmacao({ tipo: "email", item: item, titulo: "Editar e-mail", texto: "Confira o novo endereço antes de salvar." });
+    definirConfirmacao({ tipo: "dados", item: item, titulo: "Editar pessoa", texto: "Confira o nome e o e-mail antes de salvar." });
   }
 
   function mudarPapel(item, novoPapel) {
@@ -166,10 +168,10 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
     if (!confirmacao) return;
     definirCarregando(true);
     try {
-      if (confirmacao.tipo === "email") {
-        if (emailEmEdicao === confirmacao.item.email) { definirConfirmacao(null); return; }
-        await editarUsuario(confirmacao.item.id, emailEmEdicao);
-        aoMensagem("E-mail atualizado.");
+      if (confirmacao.tipo === "dados") {
+        if (emailEmEdicao === confirmacao.item.email && nomeEmEdicao === confirmacao.item.nome) { definirConfirmacao(null); return; }
+        await editarUsuario(confirmacao.item.id, nomeEmEdicao, emailEmEdicao);
+        aoMensagem("Dados atualizados.");
       }
       if (confirmacao.tipo === "papel") {
         await alterarPapelUsuario(confirmacao.item.id, confirmacao.valor);
@@ -195,9 +197,9 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
 
       {area === "usuarios" && <section className="bloco-admin painel-conteudo">
         <div className="cabecalho-bloco"><div><h2>Contas cadastradas</h2><p>Busque uma pessoa ou ajuste seu acesso.</p></div><button type="button" className="botao-principal" onClick={function abrir() { definirNovoAberto(!novoAberto); }}><Icone nome={novoAberto ? "fechar" : "mais"} />{novoAberto ? "Fechar formulário" : "Novo usuário"}</button></div>
-        {novoAberto && <form className="formulario-edicao" onSubmit={adicionar}><label>E-mail<input name="email" type="email" required /></label><label>Senha temporária<input name="senha" type="password" minLength="12" maxLength="128" required /></label><label>Tipo de usuário<select name="papel"><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select></label><button type="submit">Criar usuário</button></form>}
-        <form className="filtros-admin" onSubmit={function pesquisar(evento) { evento.preventDefault(); carregarUsuarios(); }}><label>Buscar<input type="search" value={busca} onChange={function mudar(evento) { definirBusca(evento.target.value); }} placeholder="E-mail" /></label><label>Tipo<select value={papel} onChange={function mudar(evento) { definirPapel(evento.target.value); }}><option value="">Todos</option><option value="aluno">Alunos</option><option value="professor">Professores</option><option value="admin">Administradores</option></select></label><label>Conta<select value={estado} onChange={function mudar(evento) { definirEstado(evento.target.value); }}><option value="">Todas</option><option value="true">Liberadas</option><option value="false">Bloqueadas</option></select></label><button type="submit">Buscar</button></form>
-        <ul className="lista-administrativa lista-usuarios">{usuarios.map(function renderizar(item) { return <li key={item.id} className={item.ativo ? "" : "inativo"}><span className="identidade-usuario"><span className={"monograma-usuario " + item.papel}>{item.email.slice(0, 1).toUpperCase()}</span><span><strong>{item.email}</strong><small>{nomePapel(item.papel)} · <span className={item.ativo ? "estado-conta ativo" : "estado-conta"}>{item.ativo ? "Conta liberada" : "Conta bloqueada"}</span></small></span></span><div className="controles-usuario"><select aria-label={"Tipo de usuário de " + item.email} value={item.papel} disabled={item.id === usuario.id} onChange={function mudar(evento) { mudarPapel(item, evento.target.value); }}><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select><details className="menu-acoes-usuario"><summary aria-label={"Mais opções para " + item.email}><Icone nome="opcoes" /><span>Opções</span></summary><div><button type="button" onClick={function editar() { mudarEmail(item); }}>Editar e-mail</button><button type="button" onClick={function senha() { redefinir(item); }}>Redefinir senha</button><button type="button" className={item.ativo ? "perigo-texto" : ""} disabled={item.id === usuario.id} onClick={function estadoConta() { alternar(item); }}>{item.ativo ? "Bloquear conta" : "Liberar conta"}</button></div></details></div></li>; })}</ul>
+        {novoAberto && <form className="formulario-edicao" onSubmit={adicionar}><label>Nome<input name="nome" minLength="2" maxLength="120" required /></label><label>E-mail<input name="email" type="email" required /></label><label>Senha temporária<input name="senha" type="password" minLength="12" maxLength="128" required /></label><label>Tipo de usuário<select name="papel"><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select></label><button type="submit">Criar usuário</button></form>}
+        <form className="filtros-admin" onSubmit={function pesquisar(evento) { evento.preventDefault(); carregarUsuarios(); }}><label>Buscar<input type="search" value={busca} onChange={function mudar(evento) { definirBusca(evento.target.value); }} placeholder="Nome ou e-mail" /></label><label>Tipo<select value={papel} onChange={function mudar(evento) { definirPapel(evento.target.value); }}><option value="">Todos</option><option value="aluno">Alunos</option><option value="professor">Professores</option><option value="admin">Administradores</option></select></label><label>Conta<select value={estado} onChange={function mudar(evento) { definirEstado(evento.target.value); }}><option value="">Todas</option><option value="true">Liberadas</option><option value="false">Bloqueadas</option></select></label><button type="submit">Buscar</button></form>
+        <ul className="lista-administrativa lista-usuarios">{usuarios.map(function renderizar(item) { return <li key={item.id} className={item.ativo ? "" : "inativo"}><span className="identidade-usuario"><span className={"monograma-usuario " + item.papel}>{item.nome.slice(0, 1).toUpperCase()}</span><span><strong>{item.nome}</strong><small>{item.email}</small><small>{nomePapel(item.papel)} · <span className={item.ativo ? "estado-conta ativo" : "estado-conta"}>{item.ativo ? "Conta liberada" : "Conta bloqueada"}</span></small></span></span><div className="controles-usuario"><select aria-label={"Tipo de usuário de " + item.nome} value={item.papel} disabled={item.id === usuario.id} onChange={function mudar(evento) { mudarPapel(item, evento.target.value); }}><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select><details className="menu-acoes-usuario"><summary aria-label={"Mais opções para " + item.nome}><Icone nome="opcoes" /><span>Opções</span></summary><div><button type="button" onClick={function editar() { mudarEmail(item); }}>Editar dados</button><button type="button" onClick={function senha() { redefinir(item); }}>Redefinir senha</button><button type="button" className={item.ativo ? "perigo-texto" : ""} disabled={item.id === usuario.id} onClick={function estadoConta() { alternar(item); }}>{item.ativo ? "Bloquear conta" : "Liberar conta"}</button></div></details></div></li>; })}</ul>
         {!usuarios.length && !carregando && <Vazio titulo="Nenhum usuário encontrado" texto="Tente outra busca ou altere os filtros." />}
         {paginacao && <p className="texto-apoio">{paginacao.total} usuário(s) encontrado(s).</p>}
       </section>}
@@ -206,7 +208,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
 
       {area === "historico" && auditoria && <section className="bloco-admin painel-conteudo"><div className="cabecalho-bloco"><div><h2>Histórico de atividades</h2><p>Acompanhe ações importantes realizadas no sistema.</p></div></div><label className="filtro-historico">Mostrar<select value={acao} onChange={function mudar(evento) { definirAcao(evento.target.value); }}><option value="">Todas as atividades</option>{auditoria.acoes.map(function opcao(item) { return <option key={item} value={item}>{nomeAtividade(item)}</option>; })}</select></label><ul className="lista-historico">{auditoria.eventos.map(function evento(item) { return <li key={item.chave}><span className="icone-historico"><Icone nome="historico" /></span><span><strong>{nomeAtividade(item.acao)}</strong><small>{item.descricao} · por {item.ator}</small></span><time>{new Date(item.criadoEm).toLocaleString("pt-BR")}</time></li>; })}</ul>{!auditoria.eventos.length && <Vazio titulo="Nenhuma atividade encontrada" texto="Altere o filtro para consultar outros registros." />}</section>}
 
-      {confirmacao && <Modal titulo={confirmacao.titulo} aoFechar={function fechar() { definirConfirmacao(null); }}><form onSubmit={confirmarAcao}><p>{confirmacao.texto}</p>{confirmacao.tipo === "email" && <label>Novo e-mail<input type="email" value={emailEmEdicao} onChange={function mudar(evento) { definirEmailEmEdicao(evento.target.value); }} autoFocus required /></label>}<div className="acoes-formulario"><button type="submit" className={confirmacao.tipo === "estado" && confirmacao.item.ativo ? "perigo" : "botao-principal"} disabled={carregando}>{carregando ? "Concluindo..." : "Confirmar"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirConfirmacao(null); }}>Cancelar</button></div></form></Modal>}
+      {confirmacao && <Modal titulo={confirmacao.titulo} aoFechar={function fechar() { definirConfirmacao(null); }}><form onSubmit={confirmarAcao}><p>{confirmacao.texto}</p>{confirmacao.tipo === "dados" && <><label>Nome<input value={nomeEmEdicao} minLength="2" maxLength="120" onChange={function mudar(evento) { definirNomeEmEdicao(evento.target.value); }} autoFocus required /></label><label>E-mail<input type="email" value={emailEmEdicao} onChange={function mudar(evento) { definirEmailEmEdicao(evento.target.value); }} required /></label></>}<div className="acoes-formulario"><button type="submit" className={confirmacao.tipo === "estado" && confirmacao.item.ativo ? "perigo" : "botao-principal"} disabled={carregando}>{carregando ? "Concluindo..." : "Confirmar"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirConfirmacao(null); }}>Cancelar</button></div></form></Modal>}
     </section>
   );
 }

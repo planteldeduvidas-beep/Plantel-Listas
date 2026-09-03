@@ -454,16 +454,23 @@ p, small {
   margin-top: 24px;
 }
 
-.menu-principal button {
+.menu-principal button,
+.menu-principal .item-menu-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   justify-content: flex-start;
   width: 100%;
   padding: 12px 14px;
   color: #c9d4d1;
   background: transparent;
   font-weight: 650;
+  text-decoration: none;
 }
 
 .menu-principal button:hover,
+.menu-principal .item-menu-link:hover,
+.menu-principal .item-menu-link:focus-visible,
 .menu-principal button.ativo {
   color: #fff;
   background: var(--cor-lateral-suave);
@@ -477,7 +484,7 @@ p, small {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   margin-top: auto;
   padding: 18px 8px 0;
   border-top: 1px solid rgb(255 255 255 / 10%);
@@ -486,6 +493,8 @@ p, small {
 .conta-lateral > span:nth-child(2) {
   display: grid;
   min-width: 0;
+  gap: 2px;
+  padding-right: 4px;
 }
 
 .conta-lateral strong {
@@ -495,8 +504,15 @@ p, small {
 }
 
 .conta-lateral .botao-icone {
+  margin-left: 4px;
   border-color: rgb(255 255 255 / 12%);
   color: #fff;
+}
+
+.conta-lateral .email-conta-lateral {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .avatar-usuario {
@@ -1716,11 +1732,14 @@ select {
   color: #b6c3bf;
 }
 
-:root[data-tema="escuro"] .menu-principal button {
+:root[data-tema="escuro"] .menu-principal button,
+:root[data-tema="escuro"] .menu-principal .item-menu-link {
   color: #b6c3bf;
 }
 
-.menu-principal button:hover {
+.menu-principal button:hover,
+.menu-principal .item-menu-link:hover,
+.menu-principal .item-menu-link:focus-visible {
   color: #fff;
   background: rgb(255 255 255 / 5%);
 }
@@ -5540,4 +5559,202 @@ body:has(.barra-lateral.aberta) {
 
 .area-estatisticas .painel-grafico {
   background: linear-gradient(145deg, color-mix(in srgb, var(--cor-area) 5%, var(--cor-superficie-suave)), color-mix(in srgb, var(--cor-area-secundaria) 4%, var(--cor-superficie-suave)));
+}
+
+/* Ajustes funcionais finais: suporte, historico pessoal e acesso institucional. */
+.conteudo-aplicacao.area-meuHistorico { --cor-area-secundaria: #5f7fa0; }
+.conteudo-aplicacao.area-suporte { --cor-area-secundaria: #83755f; }
+
+.modal-boas-vindas-aluno {
+  width: min(100%, 610px);
+  background:
+    radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--cor-primaria) 12%, transparent), transparent 34%),
+    var(--cor-superficie);
+}
+
+.conteudo-boas-vindas {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.marca-boas-vindas {
+  display: grid;
+  width: 62px;
+  height: 62px;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--cor-primaria);
+  background: color-mix(in srgb, var(--cor-primaria) 11%, var(--cor-superficie));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cor-primaria) 18%, transparent);
+}
+
+.conteudo-boas-vindas h3 {
+  margin: 2px 0 8px;
+  font-size: 1.08rem;
+}
+
+.conteudo-boas-vindas p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  line-height: 1.65;
+}
+
+.acoes-boas-vindas {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--cor-texto) 8%, transparent);
+}
+
+.acoes-boas-vindas .botao-secundario,
+.acoes-boas-vindas .botao-principal {
+  min-height: 42px;
+}
+
+.painel-suporte,
+.painel-meu-historico {
+  max-width: 980px;
+}
+
+.painel-suporte {
+  background: linear-gradient(140deg, color-mix(in srgb, var(--cor-area) 5%, var(--cor-superficie)), var(--cor-superficie) 46%);
+}
+
+.painel-suporte .cabecalho-bloco > div {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  column-gap: 14px;
+}
+
+.painel-suporte .cabecalho-bloco .icone-destaque {
+  grid-row: 1 / span 2;
+}
+
+.painel-suporte .cabecalho-bloco h2,
+.painel-suporte .cabecalho-bloco p {
+  grid-column: 2;
+}
+
+.formulario-suporte {
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+  padding-top: 6px;
+}
+
+.formulario-suporte label {
+  display: grid;
+  gap: 8px;
+}
+
+.formulario-suporte textarea {
+  min-height: 190px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.formulario-suporte > small {
+  margin-top: -10px;
+  color: var(--cor-texto-suave);
+  text-align: right;
+}
+
+.formulario-suporte .botao-principal {
+  justify-self: start;
+  min-width: 154px;
+}
+
+.lista-historico-aluno {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--cor-superficie);
+}
+
+.lista-historico-aluno::before {
+  display: none;
+}
+
+.lista-historico-aluno li {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 74px;
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cor-texto) 7%, transparent);
+}
+
+.lista-historico-aluno li:last-child {
+  border-bottom: 0;
+}
+
+.lista-historico-aluno .icone-historico {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--cor-area);
+  background: color-mix(in srgb, var(--cor-area) 10%, var(--cor-superficie));
+}
+
+.lista-historico-aluno .icone-historico .icone-svg {
+  width: 20px;
+  height: 20px;
+}
+
+.lista-historico-aluno li > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.lista-historico-aluno strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lista-historico-aluno small {
+  color: var(--cor-texto-suave);
+}
+
+@media (max-width: 720px) {
+  .lista-historico-aluno li {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .lista-historico-aluno .botao-secundario {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .formulario-suporte .botao-principal {
+    width: 100%;
+  }
+
+  .conteudo-boas-vindas {
+    grid-template-columns: 1fr;
+  }
+
+  .marca-boas-vindas {
+    display: none;
+  }
+
+  .acoes-boas-vindas {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .acoes-boas-vindas .botao-secundario,
+  .acoes-boas-vindas .botao-principal {
+    width: 100%;
+  }
 }

@@ -56,3 +56,15 @@ test("desenvolvimento entrega conteudo pela mesma origem usando proxy seguro", f
   assert.match(vite, /"\/api"/);
   assert.match(vite, /target: destinoApi/);
 });
+
+test("sidebar aproxima o site da navegacao e boas-vindas ficam exclusivas do aluno", function testarAjustesDaSidebar() {
+  const painel = fs.readFileSync(path.resolve(__dirname, "../../frontend/src/PainelAcervo.jsx"), "utf8");
+  const inicioDoMenu = painel.indexOf('<nav className="menu-principal">');
+  const linkDoSite = painel.indexOf('className="item-menu-link"');
+  const fimDoMenu = painel.indexOf("</nav>", inicioDoMenu);
+
+  assert.ok(inicioDoMenu >= 0 && linkDoSite > inicioDoMenu && linkDoSite < fimDoMenu);
+  assert.match(painel, /mostrarBoasVindas && usuario\.papel === "aluno"/);
+  assert.match(painel, /boasVindasAlunoAberta && usuario\.papel === "aluno"/);
+  assert.match(painel, /className="email-conta-lateral"/);
+});

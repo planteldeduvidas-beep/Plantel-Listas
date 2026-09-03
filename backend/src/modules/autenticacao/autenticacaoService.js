@@ -7,6 +7,7 @@ const {
 } = require("../../shared/utils/tokens");
 const {
   validarCredenciais,
+  validarCadastro,
   validarSolicitacaoDeRecuperacao,
   validarRedefinicaoDeSenha
 } = require("./autenticacaoValidator");
@@ -26,9 +27,9 @@ function criarAutenticacaoService(dependencias) {
   const configuracao = dependencias.configuracao;
 
   async function cadastrar(corpo) {
-    const dados = validarCredenciais(corpo);
+    const dados = validarCadastro(corpo);
     const senhaHash = await criarHashDaSenha(dados.senha);
-    const usuario = await usuarioRepository.criarAluno(dados.email, senhaHash);
+    const usuario = await usuarioRepository.criarAluno(dados.nome, dados.email, senhaHash);
     return criarUsuarioPublico(usuario);
   }
 

@@ -29,7 +29,8 @@ async function executarBootstrapAdmin(pool, emailInformado, senhaInformada) {
     }
 
     const senhaHash = await criarHashDaSenha(senha);
-    return usuarioRepository.criarAdmin(email, senhaHash);
+    const nome = String(process.env.BOOTSTRAP_ADMIN_NAME || "Administrador").trim();
+    return usuarioRepository.criarAdmin(nome, email, senhaHash);
   } finally {
     try {
       await conexao.execute("SELECT RELEASE_LOCK(?)", ["plantel_listas_bootstrap_admin"]);

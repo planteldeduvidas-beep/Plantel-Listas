@@ -44,8 +44,26 @@ function autorizarAdmin(req, res, next) {
   next();
 }
 
+function autorizarAluno(req, res, next) {
+  if (!req.usuario || req.usuario.papel !== "aluno") {
+    next(new AppError("Usuario sem permissao", 403, "SEM_PERMISSAO"));
+    return;
+  }
+  next();
+}
+
+function autorizarAlunoOuProfessor(req, res, next) {
+  if (!req.usuario || !["aluno", "professor"].includes(req.usuario.papel)) {
+    next(new AppError("Usuario sem permissao", 403, "SEM_PERMISSAO"));
+    return;
+  }
+  next();
+}
+
 module.exports = {
   criarAutenticacaoMiddleware: criarAutenticacaoMiddleware,
-  autorizarAdmin: autorizarAdmin
+  autorizarAdmin: autorizarAdmin,
+  autorizarAluno: autorizarAluno,
+  autorizarAlunoOuProfessor: autorizarAlunoOuProfessor
 };
 

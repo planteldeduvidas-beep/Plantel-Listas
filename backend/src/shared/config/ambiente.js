@@ -92,6 +92,16 @@ function validarUrlOpcional(valor, nome, ambiente) {
   return url.toString();
 }
 
+function validarEmailOpcional(valor, nome) {
+  if (!valor) {
+    return "";
+  }
+  if (valor.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) {
+    throw new Error("Variavel de ambiente invalida: " + nome);
+  }
+  return valor.toLowerCase();
+}
+
 function validarWebhookGoogleDrive(valor) {
   if (!valor) {
     return "";
@@ -180,6 +190,7 @@ function validarVariaveisDeAmbiente(variaveis) {
         1,
         1000
       ),
+      limiteSuporte: lerInteiro(variaveis, "SUPPORT_RATE_LIMIT_MAX", 5, 1, 100),
       limiteUpload: lerInteiro(variaveis, "UPLOAD_RATE_LIMIT_MAX", 20, 1, 1000),
       tamanhoMaximoPdfBytes: lerInteiro(variaveis, "UPLOAD_MAX_PDF_MB", 50, 1, 500) * 1024 * 1024,
       tamanhoMaximoVideoBytes: lerInteiro(variaveis, "UPLOAD_MAX_VIDEO_MB", 500, 1, 5000) * 1024 * 1024
@@ -199,6 +210,28 @@ function validarVariaveisDeAmbiente(variaveis) {
       usuario: lerTextoOpcional(variaveis, "SMTP_USER"),
       senha: variaveis.SMTP_PASSWORD || "",
       remetente: lerTextoOpcional(variaveis, "SMTP_FROM")
+    }),
+    suporte: Object.freeze({
+      destinatario: validarEmailOpcional(
+        lerTextoOpcional(variaveis, "SUPPORT_EMAIL_TO"),
+        "SUPPORT_EMAIL_TO"
+      )
+    }),
+    analytics: Object.freeze({
+      retencaoEventosDias: lerInteiro(
+        variaveis,
+        "ANALYTICS_RAW_RETENTION_DAYS",
+        180,
+        90,
+        3650
+      ),
+      loteRetencao: lerInteiro(
+        variaveis,
+        "ANALYTICS_RETENTION_BATCH_SIZE",
+        5000,
+        100,
+        50000
+      )
     }),
     googleDrive: Object.freeze({
       clientId: lerTextoOpcional(variaveis, "GOOGLE_DRIVE_CLIENT_ID"),

@@ -34,5 +34,6 @@ test("constroi provider SMTP sem abrir conexao antecipadamente", function testar
   });
 
   assert.equal(typeof provider.enviarRecuperacaoSenha, "function");
+  assert.equal(typeof provider.enviarSuporte, "function");
   assert.equal(typeof provider.verificarConexao, "function");
 });

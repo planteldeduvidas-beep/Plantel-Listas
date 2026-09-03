@@ -4,13 +4,13 @@ const crypto = require("node:crypto");
 function numero(valor) { return Number(valor || 0); }
 
 function criarAnalyticsService(repository) {
-  async function registrarUso(usuarioId, materialId, tipo) {
+  async function registrarUso(usuario, materialId, tipo) {
     const agora = new Date();
     const intervalo = tipo === "visualizacao"
       ? agora.toISOString().slice(0, 10)
       : agora.toISOString().slice(0, 16);
-    const chave = [tipo, usuarioId, materialId, intervalo].join(":");
-    await repository.registrarUso(usuarioId, materialId, tipo, chave);
+    const chave = [tipo, usuario.id, materialId, intervalo].join(":");
+    await repository.registrarUso(usuario, materialId, tipo, chave);
   }
 
   async function registrarConsulta(usuarioId, filtros) {
@@ -62,7 +62,14 @@ function criarAnalyticsService(repository) {
     }).join("\r\n") + "\r\n";
   }
 
-  return { registrarUso: registrarUso, registrarConsulta: registrarConsulta, obterPainel: obterPainel, gerarCsv: gerarCsv };
+  async function executarRetencao(configuracao) {
+    const limite = new Date();
+    limite.setUTCHours(0, 0, 0, 0);
+    limite.setUTCDate(limite.getUTCDate() - configuracao.retencaoEventosDias);
+    return repository.consolidarEventosAnteriores(limite, configuracao.loteRetencao);
+  }
+
+  return { registrarUso: registrarUso, registrarConsulta: registrarConsulta, obterPainel: obterPainel, gerarCsv: gerarCsv, executarRetencao: executarRetencao };
 }
 
 module.exports = criarAnalyticsService;

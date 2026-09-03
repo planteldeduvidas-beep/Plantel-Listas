@@ -7,6 +7,7 @@ function mapearUsuario(registro) {
 
   return {
     id: registro.id,
+    nome: registro.nome,
     email: registro.email,
     senhaHash: registro.senha_hash,
     papel: registro.papel,
@@ -19,7 +20,7 @@ function mapearUsuario(registro) {
 function criarUsuarioRepository(pool) {
   async function buscarPorEmail(email) {
     const [registros] = await pool.execute(
-      "SELECT id, email, senha_hash, papel, ativo, criado_em, atualizado_em "
+      "SELECT id, nome, email, senha_hash, papel, ativo, criado_em, atualizado_em "
       + "FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
@@ -28,18 +29,18 @@ function criarUsuarioRepository(pool) {
 
   async function buscarPorId(usuarioId) {
     const [registros] = await pool.execute(
-      "SELECT id, email, senha_hash, papel, ativo, criado_em, atualizado_em "
+      "SELECT id, nome, email, senha_hash, papel, ativo, criado_em, atualizado_em "
       + "FROM usuarios WHERE id = ? LIMIT 1",
       [usuarioId]
     );
     return mapearUsuario(registros[0]);
   }
 
-  async function criar(email, senhaHash, papel) {
+  async function criar(nome, email, senhaHash, papel) {
     try {
       const [resultado] = await pool.execute(
-        "INSERT INTO usuarios (email, senha_hash, papel) VALUES (?, ?, ?)",
-        [email, senhaHash, papel]
+        "INSERT INTO usuarios (nome, email, senha_hash, papel) VALUES (?, ?, ?, ?)",
+        [nome, email, senhaHash, papel]
       );
       return buscarPorId(resultado.insertId);
     } catch (erro) {
@@ -51,12 +52,12 @@ function criarUsuarioRepository(pool) {
     }
   }
 
-  function criarAluno(email, senhaHash) {
-    return criar(email, senhaHash, "aluno");
+  function criarAluno(nome, email, senhaHash) {
+    return criar(nome, email, senhaHash, "aluno");
   }
 
-  function criarAdmin(email, senhaHash) {
-    return criar(email, senhaHash, "admin");
+  function criarAdmin(nome, email, senhaHash) {
+    return criar(nome, email, senhaHash, "admin");
   }
 
   async function contarAdmins() {
@@ -70,13 +71,13 @@ function criarUsuarioRepository(pool) {
   async function listar(filtros) {
     const condicoes = [];
     const parametros = [];
-    if (filtros.busca) { condicoes.push("email LIKE ?"); parametros.push("%" + filtros.busca + "%"); }
+    if (filtros.busca) { condicoes.push("(nome LIKE ? OR email LIKE ?)"); parametros.push("%" + filtros.busca + "%", "%" + filtros.busca + "%"); }
     if (filtros.papel) { condicoes.push("papel=?"); parametros.push(filtros.papel); }
     if (filtros.ativo !== null) { condicoes.push("ativo=?"); parametros.push(filtros.ativo ? 1 : 0); }
     const onde = condicoes.length ? " WHERE " + condicoes.join(" AND ") : "";
     const [totais] = await pool.execute("SELECT COUNT(*) AS total FROM usuarios" + onde, parametros);
     const [registros] = await pool.execute(
-      "SELECT id, email, senha_hash, papel, ativo, criado_em, atualizado_em "
+      "SELECT id, nome, email, senha_hash, papel, ativo, criado_em, atualizado_em "
       + "FROM usuarios" + onde + " ORDER BY email ASC,id ASC LIMIT ? OFFSET ?",
       parametros.concat([filtros.limite, (filtros.pagina - 1) * filtros.limite])
     );
@@ -102,6 +103,19 @@ function criarUsuarioRepository(pool) {
   async function atualizarEmail(usuarioId, email) {
     try {
       const [resultado] = await pool.execute("UPDATE usuarios SET email=? WHERE id=?", [email, usuarioId]);
+      return resultado.affectedRows > 0;
+    } catch (erro) {
+      if (erro && erro.code === "ER_DUP_ENTRY") throw new AppError("Email ja cadastrado", 409, "EMAIL_JA_CADASTRADO");
+      throw erro;
+    }
+  }
+
+  async function atualizarDados(usuarioId, nome, email) {
+    try {
+      const [resultado] = await pool.execute(
+        "UPDATE usuarios SET nome=?,email=? WHERE id=?",
+        [nome, email, usuarioId]
+      );
       return resultado.affectedRows > 0;
     } catch (erro) {
       if (erro && erro.code === "ER_DUP_ENTRY") throw new AppError("Email ja cadastrado", 409, "EMAIL_JA_CADASTRADO");
@@ -145,6 +159,7 @@ function criarUsuarioRepository(pool) {
     atualizarAtivo: atualizarAtivo,
     atualizarPapel: atualizarPapel,
     atualizarEmail: atualizarEmail,
+    atualizarDados: atualizarDados,
     contarAdminsAtivos: contarAdminsAtivos,
     revogarPermissoesDoProfessor: revogarPermissoesDoProfessor,
     comTravaAdministrativa: comTravaAdministrativa

@@ -24,6 +24,8 @@ function Icone({ nome, tamanho }) {
   if (nome === "organizacao") return <svg {...propriedades}><rect x="8.5" y="3" width="7" height="5" rx="1.4" /><rect x="3" y="16" width="7" height="5" rx="1.4" /><rect x="14" y="16" width="7" height="5" rx="1.4" /><path d="M12 8v4M6.5 16v-2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2" /></svg>;
   if (nome === "estatisticas") return <svg {...propriedades}><path d="M4 20V9.5h4V20M10 20V4h4v16M16 20v-7h4v7M2 20h20" /></svg>;
   if (nome === "historico") return <svg {...propriedades}><path d="M4.4 7.1A9 9 0 1 1 3 12" /><path d="M3 5v5h5M12 7.2V12l3.3 2" /></svg>;
+  if (nome === "suporte") return <svg {...propriedades}><path d="M4 13v-2a8 8 0 0 1 16 0v2" /><path d="M4 12H2.8A1.8 1.8 0 0 0 1 13.8v3.4A1.8 1.8 0 0 0 2.8 19H5v-7zM20 12h1.2a1.8 1.8 0 0 1 1.8 1.8v3.4a1.8 1.8 0 0 1-1.8 1.8H19v-7zM19 19c0 1.1-.9 2-2 2h-3" /></svg>;
+  if (nome === "inicio") return <svg {...propriedades}><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10M9 20v-6h6v6" /></svg>;
   if (nome === "drive") return <svg {...propriedades}><path d="m9.2 3-6 10.4 3.1 5.4L15.4 3z" /><path d="M15.4 3 21 12.7h-6.3L9.2 3M6.3 18.8h11.5l3.2-6.1H9.8z" /></svg>;
   if (nome === "sair") return <svg {...propriedades}><path d="M10 17l5-5-5-5M15 12H3M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /></svg>;
   if (nome === "buscar") return <svg {...propriedades}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>;

@@ -74,7 +74,7 @@ async function obterCsrf(agente) {
 
 async function cadastrar(agente, email, senha, camposAdicionais) {
   const csrf = await obterCsrf(agente);
-  const corpo = Object.assign({ email: email, senha: senha }, camposAdicionais || {});
+  const corpo = Object.assign({ nome: "Aluno Teste", email: email, senha: senha }, camposAdicionais || {});
   return agente
     .post("/api/autenticacao/cadastro")
     .set("X-CSRF-Token", csrf)
@@ -122,21 +122,29 @@ test("cadastra somente aluno com senha Argon2id", async function testarCadastro(
   );
 
   assert.equal(resposta.status, 201);
+  assert.equal(resposta.body.usuario.nome, "Aluno Teste");
   assert.equal(resposta.body.usuario.email, "aluno@example.com");
   assert.equal(resposta.body.usuario.papel, "aluno");
   assert.equal(JSON.stringify(resposta.body).includes("Senha-forte-123"), false);
 
   const [usuarios] = await pool.execute(
-    "SELECT senha_hash, papel FROM usuarios WHERE email = ?",
+    "SELECT nome, senha_hash, papel FROM usuarios WHERE email = ?",
     ["aluno@example.com"]
   );
   assert.match(usuarios[0].senha_hash, /^\$argon2id\$/);
+  assert.equal(usuarios[0].nome, "Aluno Teste");
   assert.equal(usuarios[0].senha_hash.includes("Senha-forte-123"), false);
   assert.equal(usuarios[0].papel, "aluno");
 });
 
 test("rejeita cadastro invalido, duplicado e mass assignment", async function testarCadastroInvalido() {
   const agente = request.agent(aplicacao);
+  const csrf = await obterCsrf(agente);
+  const semNome = await agente.post("/api/autenticacao/cadastro")
+    .set("X-CSRF-Token", csrf)
+    .send({ email: "sem-nome@example.com", senha: "Senha-forte-123" });
+  assert.equal(semNome.status, 400);
+  assert.equal(semNome.body.erro.codigo, "NOME_INVALIDO");
   const invalido = await cadastrar(agente, "email-invalido", "curta");
   assert.equal(invalido.status, 400);
 
@@ -192,7 +200,7 @@ test("cookie de sessao usa Secure em producao", async function testarCookieProdu
     .post("/api/autenticacao/cadastro")
     .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)
     .set("X-CSRF-Token", tokenCsrf)
-    .send({ email: "secure@example.com", senha: "Senha-forte-123" });
+    .send({ nome: "Conta Segura", email: "secure@example.com", senha: "Senha-forte-123" });
   const resposta = await request(aplicacao)
     .post("/api/autenticacao/login")
     .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)

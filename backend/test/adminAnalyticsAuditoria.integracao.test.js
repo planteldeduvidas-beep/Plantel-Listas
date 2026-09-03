@@ -19,6 +19,11 @@ const senha = "Senha-admin-fase-7-123";
 let aplicacao;
 
 async function limpar() {
+  await pool.execute("DELETE FROM historico_materiais_usuario");
+  await pool.execute("DELETE FROM analytics_resumo_diario");
+  await pool.execute("DELETE FROM analytics_materiais_diario");
+  await pool.execute("DELETE FROM analytics_buscas_diario");
+  await pool.execute("DELETE FROM analytics_pastas_diario");
   await pool.execute("DELETE FROM eventos_uso_acervo");
   await pool.execute("DELETE FROM auditoria_geral");
   await pool.execute("DELETE FROM auditoria_materiais");
@@ -59,9 +64,9 @@ test.after(async function encerrar() { await limpar(); await pool.end(); });
 test("admin cria, pesquisa e filtra usuarios sem expor campos internos", async function testarUsuarios() {
   const adminId = await usuario("admin-f7@example.com", "admin");
   const admin = await sessao("admin-f7@example.com");
-  const semCsrf = await admin.agente.post("/api/usuarios").send({ email: "novo@example.com", senha: senha, papel: "professor" });
+  const semCsrf = await admin.agente.post("/api/usuarios").send({ nome: "Novo Professor", email: "novo@example.com", senha: senha, papel: "professor" });
   assert.equal(semCsrf.status, 403);
-  const criado = await admin.agente.post("/api/usuarios").set("X-CSRF-Token", admin.csrf).send({ email: "novo@example.com", senha: senha, papel: "professor" });
+  const criado = await admin.agente.post("/api/usuarios").set("X-CSRF-Token", admin.csrf).send({ nome: "Novo Professor", email: "novo@example.com", senha: senha, papel: "professor" });
   assert.equal(criado.status, 201);
   assert.equal(Object.hasOwn(criado.body.usuario, "senhaHash"), false);
   const filtrados = await admin.agente.get("/api/usuarios?busca=novo&papel=professor&ativo=true&limite=10&pagina=1");
@@ -71,9 +76,9 @@ test("admin cria, pesquisa e filtra usuarios sem expor campos internos", async f
   assert.equal(JSON.stringify(filtrados.body).includes("senha_hash"), false);
   assert.equal((await admin.agente.get("/api/usuarios?limite=101")).status, 400);
   assert.equal((await admin.agente.get("/api/usuarios?busca=%27%20OR%201%3D1--")).body.paginacao.total, 0);
-  const massa = await admin.agente.patch("/api/usuarios/" + criado.body.usuario.id).set("X-CSRF-Token", admin.csrf).send({ email: "x@example.com", ativo: false });
+  const massa = await admin.agente.patch("/api/usuarios/" + criado.body.usuario.id).set("X-CSRF-Token", admin.csrf).send({ nome: "Outro Nome", email: "x@example.com", ativo: false });
   assert.equal(massa.status, 400);
-  assert.equal((await admin.agente.patch("/api/usuarios/999999").set("X-CSRF-Token", admin.csrf).send({ email: "ausente@example.com" })).status, 404);
+  assert.equal((await admin.agente.patch("/api/usuarios/999999").set("X-CSRF-Token", admin.csrf).send({ nome: "Conta Ausente", email: "ausente@example.com" })).status, 404);
   assert.equal((await admin.agente.post("/api/usuarios/" + criado.body.usuario.id + "/redefinicao-senha").set("X-CSRF-Token", admin.csrf).send({})).status, 200);
   const proprioPapel = await admin.agente.patch("/api/usuarios/" + adminId + "/papel").set("X-CSRF-Token", admin.csrf).send({ papel: "aluno" });
   assert.equal(proprioPapel.status, 409);
@@ -139,7 +144,7 @@ test("analytics agrega uso e permanece exclusivo de admin", async function testa
 test("historico registra autoria, filtra, pagina e nao oferece mutacao", async function testarAuditoria() {
   await usuario("admin-auditoria@example.com", "admin");
   const admin = await sessao("admin-auditoria@example.com");
-  await admin.agente.post("/api/usuarios").set("X-CSRF-Token", admin.csrf).send({ email: "auditado@example.com", senha: senha, papel: "aluno" });
+  await admin.agente.post("/api/usuarios").set("X-CSRF-Token", admin.csrf).send({ nome: "Usuario Auditado", email: "auditado@example.com", senha: senha, papel: "aluno" });
   const historico = await admin.agente.get("/api/auditoria?acao=usuario_criado&limite=10&pagina=1");
   assert.equal(historico.status, 200);
   assert.equal(historico.body.eventos[0].ator, "admin-auditoria@example.com");

@@ -87,8 +87,8 @@ function criarAcervoService(dependencias) {
         erro.tamanhoTotal = material.tamanho_bytes;
         throw erro;
       }
-    await analyticsService.registrarUso(usuario.id, material.id, baixar ? "download" : "visualizacao");
-    return { material: material, resposta: resposta };
+      await analyticsService.registrarUso(usuario, material.id, baixar ? "download" : "visualizacao");
+      return { material: material, resposta: resposta };
     } catch (erro) {
       if (erro.codigo === "GOOGLE_AUTORIZACAO_INVALIDA") {
         await integracaoService.registrarFalhaDeAutorizacao(erro.codigo);

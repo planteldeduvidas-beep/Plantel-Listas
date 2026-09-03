@@ -51,9 +51,18 @@ const criarAuditoriaRepository = require("./modules/auditoria/auditoriaRepositor
 const criarAuditoriaService = require("./modules/auditoria/auditoriaService");
 const criarAuditoriaController = require("./modules/auditoria/auditoriaController");
 const criarAuditoriaRoutes = require("./modules/auditoria/auditoriaRoutes");
+const criarSuporteService = require("./modules/suporte/suporteService");
+const criarSuporteController = require("./modules/suporte/suporteController");
+const criarSuporteRoutes = require("./modules/suporte/suporteRoutes");
+const criarHistoricoAlunoRepository = require("./modules/historicoAluno/historicoAlunoRepository");
+const criarHistoricoAlunoService = require("./modules/historicoAluno/historicoAlunoService");
+const criarHistoricoAlunoController = require("./modules/historicoAluno/historicoAlunoController");
+const criarHistoricoAlunoRoutes = require("./modules/historicoAluno/historicoAlunoRoutes");
 const {
   criarAutenticacaoMiddleware,
-  autorizarAdmin
+  autorizarAdmin,
+  autorizarAluno,
+  autorizarAlunoOuProfessor
 } = require("./modules/autenticacao/autenticacaoMiddleware");
 
 function criarConfiguracaoCors(configuracao) {
@@ -214,6 +223,23 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     controller: criarAnalyticsController(analyticsService),
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
+  }));
+  aplicacao.use("/api/meu-historico", criarHistoricoAlunoRoutes({
+    controller: criarHistoricoAlunoController(
+      criarHistoricoAlunoService(criarHistoricoAlunoRepository(pool))
+    ),
+    autenticar: autenticar,
+    autorizarAluno: autorizarAluno
+  }));
+  aplicacao.use("/api/suporte", criarSuporteRoutes({
+    controller: criarSuporteController(criarSuporteService({
+      emailProvider: emailProvider,
+      configuracao: configuracao,
+      logger: logger
+    })),
+    autenticar: autenticar,
+    autorizarAlunoOuProfessor: autorizarAlunoOuProfessor,
+    rateLimiter: rateLimiters.suporte
   }));
   aplicacao.use("/api/auditoria", criarAuditoriaRoutes({
     controller: criarAuditoriaController(criarAuditoriaService(auditoriaRepository)),

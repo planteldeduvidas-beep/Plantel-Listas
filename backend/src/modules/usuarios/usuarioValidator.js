@@ -3,7 +3,8 @@ const {
   exigirObjeto,
   validarCamposPermitidos,
   normalizarEmail,
-  validarSenha
+  validarSenha,
+  normalizarNome
 } = require("../autenticacao/autenticacaoValidator");
 
 function validarUsuarioId(valor) {
@@ -57,15 +58,15 @@ function validarConsulta(query) {
 
 function validarCriacao(corpo) {
   exigirObjeto(corpo);
-  validarCamposPermitidos(corpo, ["email", "senha", "papel"]);
+  validarCamposPermitidos(corpo, ["nome", "email", "senha", "papel"]);
   const papel = validarAlteracaoDePapel({ papel: corpo.papel }).papel;
-  return { email: normalizarEmail(corpo.email), senha: validarSenha(corpo.senha), papel: papel };
+  return { nome: normalizarNome(corpo.nome), email: normalizarEmail(corpo.email), senha: validarSenha(corpo.senha), papel: papel };
 }
 
 function validarEdicao(corpo) {
   exigirObjeto(corpo);
-  validarCamposPermitidos(corpo, ["email"]);
-  return { email: normalizarEmail(corpo.email) };
+  validarCamposPermitidos(corpo, ["nome", "email"]);
+  return { nome: normalizarNome(corpo.nome), email: normalizarEmail(corpo.email) };
 }
 
 module.exports = {
