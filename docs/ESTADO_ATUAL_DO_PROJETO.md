@@ -37,9 +37,9 @@ FASE 8 aprovada pelo responsavel humano, concluida e integrada na branch `main` 
 
 O frontend recebeu acabamento visual responsivo inspirado na referencia aprovada, adaptado para a identidade grafite, verde e turquesa do Plantel. Login, acervo, professor e administracao agora compartilham sidebar, cards, formularios, botoes, alertas, estados e modais consistentes, com linguagem simplificada. Navegacao, breadcrumb, retornos, PDF, video, drawer mobile e temas claro/escuro foram revalidados e aprovados pelo responsavel humano. O codigo preservou as regras funcionais e de seguranca das fases anteriores. Nenhum deploy foi realizado.
 
-AJUSTES FUNCIONAIS FINAIS DA V1 implementados na branch `ajuste/funcionalidades-finais` e aguardando validacao humana.
+AJUSTES FUNCIONAIS FINAIS DA V1 aprovados e concluidos na branch `ajuste/funcionalidades-finais`, aguardando integracao autorizada.
 
-O cadastro passou a solicitar o nome do aluno. Aluno e professor receberam uma area autenticada de suporte por e-mail, e o aluno recebeu um historico pessoal paginado e separado dos eventos brutos de analytics. A retencao dos eventos brutos foi definida em 180 dias por padrao, com agregacao diaria anterior a qualquer exclusao e execucao operacional explicita. Nenhum evento atual foi removido, nenhuma configuracao de producao foi alterada e nenhum deploy foi realizado.
+O cadastro passou a solicitar o nome do aluno, e o campo foi aprovado na validacao humana. Aluno e professor receberam uma area autenticada de suporte por e-mail, e o aluno recebeu um historico pessoal paginado e separado dos eventos brutos de analytics. A retencao dos eventos brutos foi definida em 180 dias por padrao, com agregacao diaria anterior a qualquer exclusao e execucao operacional explicita. A validacao humana visual dos ajustes foi concluida e aprovada. Nenhum evento atual foi removido, nenhuma configuracao de producao foi alterada e nenhum deploy foi realizado.
 
 A biblioteca agora possui navegacao por pastas, breadcrumb, busca e filtros no MySQL, paginacao, classificacao conservadora por disciplina e concurso, visualizacao de PDF, reproducao de video com Range e download seguro. Todos os acessos a arquivo partem de `materialId`; o ID do Drive permanece interno ao backend.
 
@@ -47,7 +47,7 @@ O acompanhamento de mudancas do Drive usa Changes API com estado persistido, pol
 
 PDF e video sao os unicos tipos funcionais da V1. Os cinco DOCX, dois ODT e cinco PNG observados permanecem somente indexados no MySQL e nao sao expostos para consulta, visualizacao ou download enquanto nao houver decisao humana de escopo.
 
-A base aprovada ate a Fase 8 permanece congelada. Os ajustes funcionais finais ainda nao foram integrados na `main`.
+A base aprovada ate a Fase 8 permanece congelada. Os ajustes funcionais finais estao aprovados e concluidos na branch propria, mas ainda nao foram integrados na `main`.
 
 ## Repositorio
 
@@ -188,5 +188,5 @@ Google Drive:
 
 ## Proxima acao
 
-1. Concluir a validacao humana dos ajustes funcionais finais da V1.
-2. Nao integrar a branch, fazer deploy nem iniciar a Fase 9 sem autorizacao explicita.
+1. Aguardar autorizacao explicita para integrar a branch dos ajustes funcionais finais.
+2. Nao fazer deploy, alterar configuracao de producao nem iniciar a Fase 9 sem autorizacao explicita.

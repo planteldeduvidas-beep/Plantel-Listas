@@ -1,11 +1,13 @@
 # RELATORIO DOS AJUSTES FUNCIONAIS FINAIS DA V1
 
 Data: 03/09/2026
-Estado: **PRONTO PARA VALIDACAO HUMANA**
+Estado: **APROVADO E CONCLUIDO**
 
 ## 1. Resumo
 
 Os ajustes finais adicionaram nome no cadastro, suporte por e-mail para aluno e professor, historico pessoal de materiais para aluno, retencao controlada dos eventos brutos de analytics e um acesso discreto ao site institucional do Plantel.
+
+A validacao humana visual foi concluida e aprovada. O campo `Nome` no cadastro tambem foi aprovado e permanece como parte definitiva dos ajustes funcionais finais da V1.
 
 O trabalho permanece na branch `ajuste/funcionalidades-finais`, derivada de `b9411a7`, que ja continha o commit separado da correcao de seguranca do `qs`. Nao houve merge em `main`, deploy, configuracao de producao ou inicio da Fase 9.
 
@@ -106,13 +108,12 @@ Nenhum `.env` real, arquivo de credencial, token OAuth ou padrao de secret foi e
 ## 9. Pendencias
 
 - informar `SUPPORT_EMAIL_TO` no ambiente definitivo e validar o recebimento real quando autorizado;
-- concluir a validacao humana e, se desejado, repetir visualmente o suporte com uma conta temporaria de professor;
 - agendar `npm run analytics:retention` no ambiente definitivo;
 - medir as agregacoes no banco de producao somente durante a etapa de deploy autorizada;
 - manter as pendencias existentes de URL publica, OAuth, webhook e Hostinger.
 
 ## 10. Estado final
 
-**PRONTO PARA VALIDACAO HUMANA**
+**APROVADO E CONCLUIDO**
 
-Os ajustes finais permanecem somente na branch `ajuste/funcionalidades-finais`. Nao houve merge, deploy ou inicio da Fase 9.
+Os ajustes finais foram aprovados na validacao humana e permanecem somente na branch `ajuste/funcionalidades-finais`, aguardando autorizacao separada para integracao. Nao houve merge, deploy, alteracao de configuracao de producao ou inicio da Fase 9.
