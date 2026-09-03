@@ -3,6 +3,8 @@ const AppError = require("../../shared/errors/AppError");
 const { gerarTokenAleatorio, gerarHashDoToken } = require("../../shared/utils/tokens");
 const { MIME_PASTA } = require("../../shared/providers/googleDriveProvider");
 
+const LIMITE_ALTERACOES_POR_CICLO = 25;
+
 function criarGoogleDriveChangesService(dependencias) {
   const repository = dependencias.repository;
   const provider = dependencias.provider;
@@ -53,7 +55,7 @@ function criarGoogleDriveChangesService(dependencias) {
         fileId: item.id,
         disponivel: true,
         pastaRaizId: provider.pastaRaizId,
-        subarvore: await provider.listarSubarvore(refreshToken, item)
+        pasta: Object.assign({}, item, { parentId: item.parents[0] })
       };
     }
     const dentroDaRaiz = await provider.verificarDescendenteDaRaiz(refreshToken, item);
@@ -74,17 +76,17 @@ function criarGoogleDriveChangesService(dependencias) {
     try {
       const estado = await obterEstadoPreparado();
       const refreshToken = await integracaoService.obterRefreshTokenParaUso();
-      let pageToken = estado.page_token;
-      let resposta;
+      const pageToken = estado.page_token;
       const alteracoesPreparadas = [];
-      do {
-        resposta = await provider.listarAlteracoes(refreshToken, pageToken);
-        for (const alteracao of resposta.changes || []) {
-          alteracoesPreparadas.push(await prepararAlteracao(refreshToken, alteracao));
-        }
-        pageToken = resposta.nextPageToken || resposta.newStartPageToken || pageToken;
-      } while (resposta.nextPageToken);
-      const tokenFinal = resposta.newStartPageToken || pageToken;
+      const resposta = await provider.listarAlteracoes(
+        refreshToken,
+        pageToken,
+        LIMITE_ALTERACOES_POR_CICLO
+      );
+      for (const alteracao of resposta.changes || []) {
+        alteracoesPreparadas.push(await prepararAlteracao(refreshToken, alteracao));
+      }
+      const tokenFinal = resposta.nextPageToken || resposta.newStartPageToken || pageToken;
       const resumo = alteracoesPreparadas.length > 0
         ? await repository.aplicarAlteracoes(conexao, alteracoesPreparadas, tokenFinal)
         : (await repository.registrarVerificacao(tokenFinal), {
@@ -220,12 +222,21 @@ function criarGoogleDriveChangesService(dependencias) {
     }
   }
 
+  function pararMonitor() {
+    if (!temporizador) {
+      return;
+    }
+    clearInterval(temporizador);
+    temporizador = null;
+  }
+
   return {
     receberNotificacao: receberNotificacao,
     processarAlteracoes: processarAlteracoes,
     renovarCanal: renovarCanal,
     obterStatus: obterStatus,
-    iniciarMonitor: iniciarMonitor
+    iniciarMonitor: iniciarMonitor,
+    pararMonitor: pararMonitor
   };
 }
 

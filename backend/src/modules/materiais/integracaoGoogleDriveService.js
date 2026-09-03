@@ -15,6 +15,8 @@ function criarIntegracaoGoogleDriveService(dependencias) {
   const configuracao = dependencias.configuracao;
   const logger = dependencias.logger;
   const agendarTarefa = dependencias.agendarTarefa || setImmediate;
+  const encryptionKey = configuracao.googleDrive.encryptionKey
+    || configuracao.seguranca.csrfSecret;
 
   function exigirProvider() {
     if (!provider) {
@@ -53,7 +55,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
     const refreshToken = await provider.trocarCodigoPorRefreshToken(dados.codigo);
     const tokenCriptografado = criptografarRefreshToken(
       refreshToken,
-      configuracao.seguranca.csrfSecret
+      encryptionKey
     );
     await repository.salvarCredencial(
       tokenCriptografado,
@@ -77,7 +79,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       return {
         refreshToken: descriptografarRefreshToken(
           credencial.refresh_token_criptografado,
-          configuracao.seguranca.csrfSecret
+          encryptionKey
         ),
         origem: "banco"
       };
@@ -104,7 +106,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
     if (credencialDeUso && credencialDeUso.origem === "ambiente") {
       const tokenCriptografado = criptografarRefreshToken(
         credencialDeUso.refreshToken,
-        configuracao.seguranca.csrfSecret
+        encryptionKey
       );
       await repository.salvarCredencial(
         tokenCriptografado,

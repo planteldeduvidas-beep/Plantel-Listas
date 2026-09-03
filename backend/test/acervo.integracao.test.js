@@ -476,6 +476,28 @@ test("reconcilia renomeacao, movimentacao e remocao de subarvore sem full sync",
     "INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em) VALUES (1,'pagina-antiga',NOW(3))"
   );
   const repository = criarChangesRepository(pool, { nomeTrava: "plantel_changes_teste_acervo" });
+  const conexaoPasta = await repository.adquirirTrava();
+  const pastaIncremental = await repository.aplicarAlteracoes(conexaoPasta, [{
+    fileId: "driveSubarvoreFase5",
+    pastaRaizId: configuracao.googleDrive.pastaRaizId,
+    pasta: {
+      id: "driveSubarvoreFase5",
+      name: "Nome incremental",
+      mimeType: "application/vnd.google-apps.folder",
+      parentId: "driveDestinoFase5"
+    }
+  }], "pagina-incremental");
+  await repository.liberarTrava(conexaoPasta);
+  assert.equal(pastaIncremental.reconciliacaoNecessaria, false);
+  const [pastaAtualizada] = await pool.execute(
+    "SELECT nome,categoria_pai_id FROM categorias WHERE drive_pasta_id='driveSubarvoreFase5'"
+  );
+  assert.equal(pastaAtualizada[0].nome, "Nome incremental");
+  assert.equal(Number(pastaAtualizada[0].categoria_pai_id), Number(destino.insertId));
+  const [materialPreservado] = await pool.execute(
+    "SELECT disponivel FROM materiais WHERE drive_file_id='driveArquivoAntigoSubarvore'"
+  );
+  assert.equal(Number(materialPreservado[0].disponivel), 1);
   const alteracaoSubarvore = {
     fileId: "driveSubarvoreFase5",
     pastaRaizId: configuracao.googleDrive.pastaRaizId,

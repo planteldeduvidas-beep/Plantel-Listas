@@ -82,7 +82,23 @@ test("Changes API aplica criacao dentro da raiz e avanca token de forma idempote
   assert.equal(cenario.chamadas.liberada, true);
 });
 
-test("mudanca fora da raiz fica indisponivel e pasta usa reconciliacao de subarvore", async function testarLimites() {
+test("Changes API processa somente um lote por ciclo e libera a trava", async function testarLoteLimitado() {
+  const cenario = criarCenario();
+  let listagens = 0;
+  cenario.provider.listarAlteracoes = async function listarAlteracoes(token, pageToken, limite) {
+    listagens += 1;
+    assert.equal(pageToken, "pagina-1");
+    assert.equal(limite, 25);
+    return { changes: [], nextPageToken: "pagina-2" };
+  };
+
+  await cenario.service.processarAlteracoes();
+
+  assert.equal(listagens, 1);
+  assert.equal(cenario.chamadas.liberada, true);
+});
+
+test("mudanca fora da raiz fica indisponivel e pasta e aplicada sem varrer subarvore", async function testarLimites() {
   const cenario = criarCenario();
   cenario.provider.verificarDescendenteDaRaiz = async function fora() { return false; };
   await cenario.service.processarAlteracoes();
@@ -93,7 +109,8 @@ test("mudanca fora da raiz fica indisponivel e pasta usa reconciliacao de subarv
     return { changes: [{ fileId: "pasta", file: { id: "pasta", name: "Pasta", mimeType: "application/vnd.google-apps.folder", parents: [cenario.provider.pastaRaizId] } }], newStartPageToken: "pagina-3" };
   };
   const resumo = await cenario.service.processarAlteracoes();
-  assert.equal(Boolean(cenario.chamadas.aplicadas.alteracoes[0].subarvore), true);
+  assert.equal(cenario.chamadas.aplicadas.alteracoes[0].pasta.parentId, cenario.provider.pastaRaizId);
+  assert.equal(Boolean(cenario.chamadas.aplicadas.alteracoes[0].subarvore), false);
   assert.equal(resumo.reconciliacaoNecessaria, false);
   assert.equal(cenario.chamadas.agendamentos, 0);
 });

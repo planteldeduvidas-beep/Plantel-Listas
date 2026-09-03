@@ -18,6 +18,8 @@ function categoria(id) {
 function criarDependencias(alteracoes) {
   const chamadas = [];
   const repository = {
+    adquirirTravaDeOperacao: async function adquirirTrava() { return {}; },
+    liberarTravaDeOperacao: async function liberarTrava() {},
     buscarMaterial: async function buscar() { return material(); },
     buscarCategoria: async function buscar(id) { return categoria(id); },
     professorPodeAcessarCategoria: async function permitir() { return true; },

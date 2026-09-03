@@ -88,6 +88,33 @@ function criarGestaoMateriaisService(dependencias) {
     throw erro;
   }
 
+  async function executarComTravaDeOperacao(tarefa, arquivoTemporario) {
+    let conexao;
+    try {
+      conexao = await repository.adquirirTravaDeOperacao();
+    } catch (erro) {
+      if (arquivoTemporario && arquivoTemporario.path) {
+        await fs.unlink(arquivoTemporario.path).catch(function ignorar() {});
+      }
+      throw erro;
+    }
+    if (!conexao) {
+      if (arquivoTemporario && arquivoTemporario.path) {
+        await fs.unlink(arquivoTemporario.path).catch(function ignorar() {});
+      }
+      throw new AppError(
+        "Outra operacao do Google Drive esta em andamento. Tente novamente",
+        409,
+        "GOOGLE_DRIVE_OPERACAO_CONCORRENTE"
+      );
+    }
+    try {
+      return await tarefa();
+    } finally {
+      await repository.liberarTravaDeOperacao(conexao);
+    }
+  }
+
   async function executarGoogle(tarefa) {
     try { return await tarefa(); } catch (erro) {
       if (erro.codigo === "GOOGLE_AUTORIZACAO_INVALIDA") await integracaoService.registrarFalhaDeAutorizacao(erro.codigo);
@@ -188,7 +215,31 @@ function criarGestaoMateriaisService(dependencias) {
   async function excluirDefinitivamente(usuario,idInformado,corpo){if(usuario.papel!=="admin")throw new AppError("Usuario sem permissao",403,"SEM_PERMISSAO");const id=inteiroPositivo(idInformado,"Material");const versao=validarVersao(corpo || {});const material=await exigirMaterial(usuario,id,["lixeira","exclusao_pendente"]);const categoria=await exigirCategoria(usuario,material.categoriaAnteriorId);material.categoriaDriveId=categoria.drivePastaId;const refreshToken=await token();await exigirArquivoDoAcervo(refreshToken,material,true);let pendente=material;let marcadaAgora=false;if(material.estado==="lixeira"){try{pendente=await repository.marcarExclusao(id,versao,usuario.id);marcadaAgora=true;}catch(erro){tratarConcorrencia(erro);}}try{await executarGoogle(function excluir(){return provider.excluirArquivo(refreshToken,pendente.driveFileId);});}catch(erro){if(erro.codigo!=="GOOGLE_ARQUIVO_NAO_ENCONTRADO"){if(marcadaAgora)await repository.reverterExclusao(id);throw erro;}}await repository.concluirExclusao(id,usuario.id);return{excluido:true};}
   async function listarPastas(usuario){exigirPapelDeGestao(usuario);return repository.listarPastasGerenciaveis(usuario);}
 
-  return {adicionar,editar,mover,substituir,enviarLixeira,listarLixeira,restaurar,excluirDefinitivamente,listarPastas};
+  return {
+    adicionar: function adicionarComTrava(usuario, corpo, arquivo) {
+      return executarComTravaDeOperacao(function executar() { return adicionar(usuario, corpo, arquivo); }, arquivo);
+    },
+    editar: function editarComTrava(usuario, id, corpo) {
+      return executarComTravaDeOperacao(function executar() { return editar(usuario, id, corpo); });
+    },
+    mover: function moverComTrava(usuario, id, corpo) {
+      return executarComTravaDeOperacao(function executar() { return mover(usuario, id, corpo); });
+    },
+    substituir: function substituirComTrava(usuario, id, corpo, arquivo) {
+      return executarComTravaDeOperacao(function executar() { return substituir(usuario, id, corpo, arquivo); }, arquivo);
+    },
+    enviarLixeira: function lixeiraComTrava(usuario, id, corpo) {
+      return executarComTravaDeOperacao(function executar() { return enviarLixeira(usuario, id, corpo); });
+    },
+    listarLixeira: listarLixeira,
+    restaurar: function restaurarComTrava(usuario, id, corpo) {
+      return executarComTravaDeOperacao(function executar() { return restaurar(usuario, id, corpo); });
+    },
+    excluirDefinitivamente: function excluirComTrava(usuario, id, corpo) {
+      return executarComTravaDeOperacao(function executar() { return excluirDefinitivamente(usuario, id, corpo); });
+    },
+    listarPastas: listarPastas
+  };
 }
 
 module.exports = criarGestaoMateriaisService;

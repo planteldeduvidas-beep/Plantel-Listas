@@ -13,6 +13,7 @@ const {
 
 class OAuth2ClientFake {
   constructor(configuracao) {
+    OAuth2ClientFake.instancias = (OAuth2ClientFake.instancias || 0) + 1;
     this.configuracao = configuracao;
     this.credenciais = null;
     OAuth2ClientFake.ultimaInstancia = this;
@@ -80,6 +81,7 @@ test("gera OAuth server-side com escopo unico de gestao e acesso offline", async
 });
 
 test("prepara upload resumivel e alteracoes sem expor credenciais", async function testarEscritas() {
+  OAuth2ClientFake.instancias = 0;
   const chamadas = [];
   const caminho = path.join(os.tmpdir(), "plantel-listas-provider-" + process.pid + ".pdf");
   await fs.writeFile(caminho, Buffer.from("%PDF-1.7\nteste"));
@@ -110,6 +112,7 @@ test("prepara upload resumivel e alteracoes sem expor credenciais", async functi
     await provider.moverArquivo("refresh-token-secreto", "arquivoNovo123", "pastaOrigem123", "pastaDestino123");
     await provider.alterarLixeira("refresh-token-secreto", "arquivoNovo123", true);
     await provider.excluirArquivo("refresh-token-secreto", "arquivoNovo123");
+    assert.equal(OAuth2ClientFake.instancias, 1);
     assert.deepEqual(chamadas.map(function metodo(item) { return item.metodo; }), ["POST", "PUT", "PATCH", "PATCH", "PATCH", "DELETE"]);
     assert.equal(chamadas[0].corpo.includes("pastaDestino123"), true);
     assert.equal(String(chamadas[2].corpo).includes("renomeado.pdf"), true);

@@ -28,12 +28,15 @@ function criarVariaveisValidas() {
 }
 
 test("aceita uma configuracao valida", function testarConfiguracaoValida() {
-  const configuracao = validarVariaveisDeAmbiente(criarVariaveisValidas());
+  const variaveis = criarVariaveisValidas();
+  const configuracao = validarVariaveisDeAmbiente(variaveis);
   assert.equal(configuracao.ambiente, "test");
   assert.equal(configuracao.banco.nome, "plantel_listas_test");
   assert.equal(configuracao.email.host, "");
   assert.equal(configuracao.email.porta, 465);
   assert.equal(configuracao.email.seguro, true);
+  assert.equal(configuracao.banco.limiteDaFila, 100);
+  assert.equal(configuracao.googleDrive.encryptionKey, variaveis.CSRF_SECRET);
 });
 
 test("valida a configuracao SMTP quando informada", function testarSmtp() {
@@ -110,10 +113,63 @@ test("valida configuracao Google Drive sem expor ou exigir segredo opcional", fu
 test("exige HTTPS na redirect URI Google Drive em producao", function testarRedirectProducao() {
   const variaveis = criarVariaveisValidas();
   variaveis.NODE_ENV = "production";
+  variaveis.CORS_ORIGENS = "https://listas.example.com";
+  variaveis.FRONTEND_URL = "https://listas.example.com";
   variaveis.GOOGLE_DRIVE_REDIRECT_URI = "http://localhost:3000/api/integracoes/google-drive/oauth/callback";
 
   assert.throws(function validar() {
     validarVariaveisDeAmbiente(variaveis);
   }, /GOOGLE_DRIVE_REDIRECT_URI/);
+});
+
+test("recusa origem CORS com caminho e URL publica insegura", function testarUrlsPublicas() {
+  const corsComCaminho = criarVariaveisValidas();
+  corsComCaminho.CORS_ORIGENS = "http://localhost:5173/aplicacao";
+  assert.throws(function validarCors() {
+    validarVariaveisDeAmbiente(corsComCaminho);
+  }, /CORS_ORIGENS/);
+
+  const frontendInseguro = criarVariaveisValidas();
+  frontendInseguro.NODE_ENV = "production";
+  frontendInseguro.CORS_ORIGENS = "https://listas.example.com";
+  frontendInseguro.FRONTEND_URL = "http://plantel.example.com";
+  assert.throws(function validarFrontend() {
+    validarVariaveisDeAmbiente(frontendInseguro);
+  }, /FRONTEND_URL/);
+});
+
+test("recusa SMTP parcial em qualquer ambiente", function testarSmtpParcial() {
+  const variaveis = criarVariaveisValidas();
+  variaveis.SMTP_HOST = "smtp.example.com";
+
+  assert.throws(function validar() {
+    validarVariaveisDeAmbiente(variaveis);
+  }, /SMTP incompleta/);
+});
+
+test("exige integracoes e chave exclusiva em producao", function testarProducaoCompleta() {
+  const variaveis = criarVariaveisValidas();
+  variaveis.NODE_ENV = "production";
+  variaveis.FRONTEND_URL = "https://listas.example.com";
+  variaveis.CORS_ORIGENS = "https://listas.example.com";
+  variaveis.TRUST_PROXY = "1";
+  variaveis.SMTP_HOST = "smtp.example.com";
+  variaveis.SMTP_USER = "usuario@example.com";
+  variaveis.SMTP_PASSWORD = "senha-de-aplicativo";
+  variaveis.SMTP_FROM = "usuario@example.com";
+  variaveis.SUPPORT_EMAIL_TO = "suporte@example.com";
+  variaveis.GOOGLE_DRIVE_CLIENT_ID = "cliente.apps.googleusercontent.com";
+  variaveis.GOOGLE_DRIVE_CLIENT_SECRET = "segredo-google";
+  variaveis.GOOGLE_DRIVE_PASTA_RAIZ_ID = "pasta-raiz";
+  variaveis.GOOGLE_DRIVE_REDIRECT_URI = "https://api.example.com/api/integracoes/google-drive/oauth/callback";
+  variaveis.GOOGLE_DRIVE_WEBHOOK_URL = "https://api.example.com/api/integracoes/google-drive/webhook";
+
+  assert.throws(function validarSemChave() {
+    validarVariaveisDeAmbiente(variaveis);
+  }, /GOOGLE_DRIVE_ENCRYPTION_KEY/);
+
+  variaveis.GOOGLE_DRIVE_ENCRYPTION_KEY = "chave-exclusiva-de-producao-com-32-caracteres";
+  const configuracao = validarVariaveisDeAmbiente(variaveis);
+  assert.equal(configuracao.googleDrive.encryptionKey, variaveis.GOOGLE_DRIVE_ENCRYPTION_KEY);
 });
 

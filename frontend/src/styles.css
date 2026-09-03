@@ -270,24 +270,16 @@ p, small {
 }
 
 .simbolo-marca {
-  display: inline-grid;
+  display: block;
   width: 46px;
   height: 46px;
-  place-items: center;
   flex: 0 0 auto;
-  border-radius: 13px;
-  color: #0f2823;
-  background: #56d4c9;
-  font-size: .88rem;
-  font-weight: 900;
-  letter-spacing: .04em;
+  object-fit: contain;
 }
 
 .simbolo-marca.pequeno {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
-  font-size: .72rem;
 }
 
 .beneficios-autenticacao {
@@ -1453,9 +1445,9 @@ a.botao-secundario:hover {
   --cor-texto: #17211f;
   --cor-texto-suave: #66736f;
   --cor-borda: #dfe6e3;
-  --cor-primaria: #0d7c70;
-  --cor-primaria-forte: #09645b;
-  --cor-primaria-suave: #e7f4f1;
+  --cor-primaria: #0a675b;
+  --cor-primaria-forte: #075247;
+  --cor-primaria-suave: #e4f0ed;
   --cor-lateral: #10201d;
   --cor-lateral-suave: #1b322e;
   --cor-perigo: #b33d46;
@@ -2268,47 +2260,6 @@ select {
   }
 }
 
-.ferramentas-lista-organizacao {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 18px;
-  margin: 0 0 10px;
-}
-
-.ferramentas-lista-organizacao label {
-  width: min(100%, 460px);
-}
-
-.ferramentas-lista-organizacao > span {
-  padding-bottom: 10px;
-  color: var(--cor-texto-suave);
-  font-size: .78rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.ferramentas-lista-organizacao input {
-  min-height: 40px;
-  padding-left: 40px;
-  border-radius: 6px;
-}
-
-.paginacao-organizacao {
-  margin-top: 12px;
-}
-
-@media (max-width: 600px) {
-  .ferramentas-lista-organizacao {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .ferramentas-lista-organizacao > span {
-    padding: 0;
-  }
-}
-
 /* Botoes com linguagem propria: precisos, compactos e sem efeito de template. */
 button,
 .botao-principal,
@@ -2328,14 +2279,14 @@ a.botao-secundario {
 button,
 .botao-principal {
   color: #f7fbfa;
-  background: #183d37;
+  background: #0a4a3f;
   box-shadow: inset 0 -2px rgb(0 0 0 / 14%);
 }
 
 button:hover:not(:disabled),
 .botao-principal:hover:not(:disabled) {
   color: #fff;
-  background: #0d7166;
+  background: #0b6153;
 }
 
 button:active:not(:disabled),
@@ -2346,15 +2297,15 @@ button:active:not(:disabled),
 
 :root[data-tema="escuro"] button,
 :root[data-tema="escuro"] .botao-principal {
-  color: #09211d;
-  background: #a9e8dd;
+  color: #ffffff;
+  background: #176b5f;
   box-shadow: inset 0 -2px rgb(7 36 31 / 14%);
 }
 
 :root[data-tema="escuro"] button:hover:not(:disabled),
 :root[data-tema="escuro"] .botao-principal:hover:not(:disabled) {
-  color: #071a17;
-  background: #d0f7f0;
+  color: #ffffff;
+  background: #237d70;
 }
 
 .botao-secundario,
@@ -5580,14 +5531,16 @@ body:has(.barra-lateral.aberta) {
 }
 
 .marca-boas-vindas {
-  display: grid;
+  display: block;
   width: 62px;
   height: 62px;
-  place-items: center;
-  border-radius: 14px;
-  color: var(--cor-primaria);
-  background: color-mix(in srgb, var(--cor-primaria) 11%, var(--cor-superficie));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cor-primaria) 18%, transparent);
+}
+
+.marca-boas-vindas img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .conteudo-boas-vindas h3 {
@@ -5757,4 +5710,417 @@ body:has(.barra-lateral.aberta) {
   .acoes-boas-vindas .botao-principal {
     width: 100%;
   }
+}
+
+/* Camada final: respiro real do titulo e branco suave acromatico. */
+:root:not([data-tema="escuro"]),
+:root[data-tema="claro"] {
+  --cor-fundo: #f4f4f4;
+  --cor-superficie: #ffffff;
+  --cor-superficie-suave: #f7f7f7;
+  --cor-borda: #dddddd;
+  --cor-texto-suave: #646464;
+}
+
+.conteudo-aplicacao {
+  background: #f4f4f4;
+}
+
+:root[data-tema="escuro"] .conteudo-aplicacao {
+  background: #0d1416;
+}
+
+.conteudo-aplicacao::before {
+  display: none;
+}
+
+.cabecalho-painel {
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 7%);
+}
+
+:root[data-tema="escuro"] .cabecalho-painel {
+  background: rgb(15 24 27 / 96%);
+}
+
+.introducao-area {
+  position: relative;
+  display: flex;
+  min-height: 154px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 25px;
+  padding: 34px 148px 34px 38px;
+  overflow: hidden;
+  border: 0;
+  border-left: 4px solid var(--cor-area);
+  border-radius: 12px;
+  border-top: 1px solid rgb(0 0 0 / 7%);
+  border-right: 1px solid rgb(0 0 0 / 7%);
+  border-bottom: 1px solid rgb(0 0 0 / 7%);
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgb(0 0 0 / 10%);
+}
+
+.texto-introducao {
+  display: grid;
+  gap: 9px;
+}
+
+.texto-introducao > span {
+  line-height: 1.2;
+}
+
+.introducao-area h2 {
+  margin: 0;
+  font-size: clamp(1.9rem, 2.35vw, 2.55rem);
+  line-height: 1.17;
+}
+
+.introducao-area p {
+  max-width: 760px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.introducao-area::before {
+  display: none;
+}
+
+.introducao-area::after,
+.codigo-area {
+  display: none;
+}
+
+:root[data-tema="escuro"] .introducao-area {
+  border-left-color: var(--cor-area);
+  background: #121d20;
+  box-shadow: 0 16px 36px rgb(0 0 0 / 25%);
+}
+
+:root[data-tema="escuro"] .introducao-area::before {
+  opacity: .28;
+}
+
+.busca-acervo,
+.navegacao-pastas,
+.painel-gestao-materiais,
+.painel-conteudo,
+.administracao-fase7 > .bloco-admin,
+.grade-admin > .bloco-admin,
+.area-acessos .formulario-acessos fieldset,
+.area-estatisticas .painel-grafico,
+.area-estatisticas .grade-admin.grade-dados,
+.grade-pastas,
+.lista-materiais,
+.administracao-fase7 .lista-administrativa,
+.area-organizacao .lista-administrativa,
+.lista-historico,
+.lista-pastas-professor {
+  border: 1px solid rgb(0 0 0 / 8%);
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 8%);
+}
+
+.grade-pastas .item-pasta:nth-child(even),
+.lista-materiais .item-material:nth-child(even),
+.administracao-fase7 .lista-administrativa li:nth-child(even),
+.area-organizacao .lista-administrativa li:nth-child(even),
+.lista-historico li:nth-child(even),
+.lista-pastas-professor li:nth-child(even) {
+  background: #f7f7f7;
+}
+
+.busca-acervo,
+.navegacao-pastas,
+.painel-gestao-materiais,
+.painel-conteudo,
+.administracao-fase7 > .bloco-admin,
+.grade-admin > .bloco-admin,
+.area-acessos .formulario-acessos fieldset,
+.area-estatisticas .painel-grafico,
+.area-estatisticas .grade-admin.grade-dados {
+  border: 1px solid rgb(0 0 0 / 8%);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 8%);
+}
+
+.busca-acervo,
+.navegacao-pastas {
+  box-shadow: 0 10px 26px rgb(0 0 0 / 7%);
+}
+
+input,
+select,
+textarea {
+  background-color: #fafafa;
+}
+
+:root[data-tema="escuro"] .busca-acervo,
+:root[data-tema="escuro"] .navegacao-pastas,
+:root[data-tema="escuro"] .painel-gestao-materiais,
+:root[data-tema="escuro"] .painel-conteudo,
+:root[data-tema="escuro"] .administracao-fase7 > .bloco-admin,
+:root[data-tema="escuro"] .grade-admin > .bloco-admin,
+:root[data-tema="escuro"] .area-acessos .formulario-acessos fieldset,
+:root[data-tema="escuro"] .area-estatisticas .painel-grafico,
+:root[data-tema="escuro"] .area-estatisticas .grade-admin.grade-dados,
+:root[data-tema="escuro"] .grade-pastas,
+:root[data-tema="escuro"] .lista-materiais,
+:root[data-tema="escuro"] .administracao-fase7 .lista-administrativa,
+:root[data-tema="escuro"] .area-organizacao .lista-administrativa,
+:root[data-tema="escuro"] .lista-historico,
+:root[data-tema="escuro"] .lista-pastas-professor {
+  border-color: rgb(255 255 255 / 7%);
+  background: var(--cor-superficie);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 20%);
+}
+
+:root[data-tema="escuro"] .grade-pastas .item-pasta:nth-child(even),
+:root[data-tema="escuro"] .lista-materiais .item-material:nth-child(even),
+:root[data-tema="escuro"] .administracao-fase7 .lista-administrativa li:nth-child(even),
+:root[data-tema="escuro"] .area-organizacao .lista-administrativa li:nth-child(even),
+:root[data-tema="escuro"] .lista-historico li:nth-child(even),
+:root[data-tema="escuro"] .lista-pastas-professor li:nth-child(even) {
+  background: var(--cor-superficie-suave);
+}
+
+:root[data-tema="escuro"] input,
+:root[data-tema="escuro"] select,
+:root[data-tema="escuro"] textarea {
+  background-color: var(--cor-fundo);
+}
+
+.painel-suporte {
+  display: grid;
+  max-width: 1200px;
+  grid-template-columns: minmax(300px, .72fr) minmax(430px, 1.35fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.apresentacao-suporte {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 38px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--cor-area) 10%, #f7f3ec), #f7f3ec);
+}
+
+:root[data-tema="escuro"] .apresentacao-suporte {
+  background: color-mix(in srgb, var(--cor-area) 10%, var(--cor-superficie-suave));
+}
+
+.apresentacao-suporte .icone-destaque {
+  margin-bottom: 32px;
+}
+
+.sobrelinha-suporte {
+  margin-bottom: 10px;
+  color: var(--cor-area);
+  font-size: .7rem;
+  font-weight: 850;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.apresentacao-suporte h2 {
+  margin-bottom: 12px;
+  font-size: clamp(1.65rem, 2vw, 2.1rem);
+  line-height: 1.18;
+}
+
+.apresentacao-suporte > p {
+  max-width: 390px;
+  color: var(--cor-texto-suave);
+  line-height: 1.7;
+}
+
+.detalhes-suporte {
+  display: grid;
+  margin: 32px 0 22px;
+}
+
+.detalhes-suporte > div {
+  display: grid;
+  gap: 5px;
+  padding: 15px 0;
+  border-top: 1px solid color-mix(in srgb, var(--cor-texto) 9%, transparent);
+}
+
+.detalhes-suporte dt {
+  color: var(--cor-texto-suave);
+  font-size: .7rem;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.detalhes-suporte dd {
+  margin: 0;
+  overflow: hidden;
+  font-weight: 750;
+  text-overflow: ellipsis;
+}
+
+.aviso-seguranca-suporte {
+  display: block;
+  margin-top: auto;
+  padding-top: 18px;
+  color: var(--cor-texto-suave);
+  line-height: 1.55;
+}
+
+.formulario-suporte {
+  max-width: none;
+  align-content: start;
+  padding: 38px 42px;
+}
+
+.cabecalho-formulario-suporte {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.cabecalho-formulario-suporte > span {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.cabecalho-formulario-suporte small {
+  color: var(--cor-texto-suave);
+}
+
+@media (max-width: 900px) {
+  .introducao-area {
+    min-height: 138px;
+    padding: 30px 116px 30px 30px;
+  }
+
+  .introducao-area::before {
+    right: 28px;
+    width: 66px;
+    height: 66px;
+  }
+
+  .painel-suporte {
+    grid-template-columns: 1fr;
+  }
+
+  .apresentacao-suporte {
+    padding: 30px 28px;
+  }
+
+  .formulario-suporte {
+    padding: 30px 28px;
+  }
+}
+
+@media (max-width: 720px) {
+  .introducao-area {
+    min-height: 0;
+    padding: 25px 22px;
+    border-left-width: 3px;
+  }
+
+  .introducao-area::before {
+    display: none;
+  }
+
+  .texto-introducao {
+    gap: 7px;
+  }
+
+  .introducao-area h2 {
+    font-size: 1.8rem;
+  }
+
+  .formulario-suporte {
+    padding: 24px 20px;
+  }
+
+  .apresentacao-suporte {
+    padding: 24px 20px;
+  }
+
+  .cabecalho-formulario-suporte {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+/* Tema claro: o plano de fundo e as superficies nao herdam matiz verde. */
+:root:not([data-tema="escuro"]) body,
+:root:not([data-tema="escuro"]) .pagina-painel,
+:root:not([data-tema="escuro"]) .conteudo-aplicacao {
+  background-color: #f4f4f4;
+  background-image: none;
+}
+
+:root:not([data-tema="escuro"]) .resumo-biblioteca span,
+:root:not([data-tema="escuro"]) .filtros-ativos > span,
+:root:not([data-tema="escuro"]) .estado-interface,
+:root:not([data-tema="escuro"]) .area-organizacao .grade-admin > .bloco-admin,
+:root:not([data-tema="escuro"]) .area-acessos .formulario-acessos fieldset,
+:root:not([data-tema="escuro"]) .integracao-drive.painel-conteudo,
+:root:not([data-tema="escuro"]) .area-estatisticas .grade-estatisticas,
+:root:not([data-tema="escuro"]) .area-estatisticas .grade-estatisticas .cartao-estatistica,
+:root:not([data-tema="escuro"]) .area-estatisticas .painel-grafico,
+:root:not([data-tema="escuro"]) .area-estatisticas .grade-admin.grade-dados,
+:root:not([data-tema="escuro"]) .painel-gestao-materiais,
+:root:not([data-tema="escuro"]) .painel-gestao-materiais .formulario-material,
+:root:not([data-tema="escuro"]) .formulario-edicao,
+:root:not([data-tema="escuro"]) .formulario-acessos,
+:root:not([data-tema="escuro"]) .organizacao-lote,
+:root:not([data-tema="escuro"]) .apresentacao-suporte {
+  border-color: #dddddd;
+  background: #ffffff;
+  background-image: none;
+}
+
+:root:not([data-tema="escuro"]) .grade-pastas,
+:root:not([data-tema="escuro"]) .lista-materiais,
+:root:not([data-tema="escuro"]) .administracao-fase7 .lista-administrativa,
+:root:not([data-tema="escuro"]) .area-organizacao .lista-administrativa,
+:root:not([data-tema="escuro"]) .lista-historico,
+:root:not([data-tema="escuro"]) .lista-pastas-professor {
+  border-color: #dddddd;
+  background: #ffffff;
+}
+
+/* Filtros: verde mineral localizado, sem alterar os demais botoes. */
+:root:not([data-tema="escuro"]) .botao-filtros:hover:not(:disabled),
+:root:not([data-tema="escuro"]) .botao-filtros.ativo {
+  color: #174f46;
+  background: #dce9e4;
+  box-shadow: inset 0 -2px #5f8c82;
+}
+
+:root:not([data-tema="escuro"]) .filtros-acervo {
+  border-color: #bfd0ca;
+  background: #eef3f1;
+}
+
+:root:not([data-tema="escuro"]) .filtros-acervo select:hover {
+  color: #174f46;
+  background-color: #dde9e5;
+}
+
+/* Identidade lateral: verde-floresta perceptivel, sem parecer preto. */
+.barra-lateral,
+.apresentacao-autenticacao {
+  background: #123f35;
+}
+
+.apresentacao-autenticacao {
+  border-right-color: rgb(255 255 255 / 10%);
+}
+
+.apresentacao-autenticacao .chamada-autenticacao p,
+.apresentacao-autenticacao small {
+  color: #c8d8d3;
 }

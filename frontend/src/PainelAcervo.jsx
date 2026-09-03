@@ -535,7 +535,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
     <main className="pagina-painel">
       <button type="button" className="fundo-menu-mobile" aria-label="Fechar menu" tabIndex={menuAberto ? 0 : -1} onClick={function fecharMenu() { definirMenuAberto(false); }} />
       <aside className={menuAberto ? "barra-lateral aberta" : "barra-lateral"} aria-label="Menu principal">
-        <div className="marca-painel"><span className="simbolo-marca">PL</span><span><strong>Plantel Listas</strong><small>Materiais de estudo</small></span><button type="button" className="botao-icone fechar-menu" aria-label="Fechar menu" onClick={function fechar() { definirMenuAberto(false); }}><Icone nome="fechar" /></button></div>
+        <div className="marca-painel"><img className="simbolo-marca" src="/plantel-logo.png" alt="" /><span><strong>Plantel Listas</strong><small>Materiais de estudo</small></span><button type="button" className="botao-icone fechar-menu" aria-label="Fechar menu" onClick={function fechar() { definirMenuAberto(false); }}><Icone nome="fechar" /></button></div>
         <div className={"perfil-lateral " + usuario.papel}><span className="icone-perfil"><Icone nome={usuario.papel === "aluno" ? "acervo" : usuario.papel === "professor" ? "pasta" : "usuarios"} /></span><span><small>Ambiente atual</small><strong>{obterAmbienteDoUsuario(usuario.papel)}</strong></span></div>
         <nav className="menu-principal">
           <span className="rotulo-menu">Navegação</span>
@@ -551,7 +551,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
       </aside>
 
       <section className={"conteudo-aplicacao area-" + areaAtual}>
-        <header className="cabecalho-mobile"><button type="button" className="botao-icone" aria-label="Abrir menu" onClick={function abrirMenu() { definirMenuAberto(true); }}><Icone nome="menu" /></button><div className="marca-mobile-painel"><span className="simbolo-marca pequeno">PL</span><strong>Plantel Listas</strong></div><AlternadorTema compacto /></header>
+        <header className="cabecalho-mobile"><button type="button" className="botao-icone" aria-label="Abrir menu" onClick={function abrirMenu() { definirMenuAberto(true); }}><Icone nome="menu" /></button><div className="marca-mobile-painel"><img className="simbolo-marca pequeno" src="/plantel-logo.png" alt="" /><strong>Plantel Listas</strong></div><AlternadorTema compacto /></header>
         <header className="cabecalho-painel">
           <div className="identidade-cabecalho"><i aria-hidden="true" /><div><small>Área atual</small><h1>{informacaoDaArea.titulo}</h1></div></div>
           <div className="controles-cabecalho"><time className="data-cabecalho" dateTime={new Date().toISOString().slice(0, 10)}>{new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(new Date())}</time><AlternadorTema /></div>
@@ -672,7 +672,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           classe="modal-boas-vindas-aluno"
         >
           <div className="conteudo-boas-vindas">
-            <span className="marca-boas-vindas" aria-hidden="true"><Icone nome="acervo" tamanho={30} /></span>
+            <span className="marca-boas-vindas" aria-hidden="true"><img src="/plantel-logo.png" alt="" /></span>
             <div><h3>Encontre seus materiais</h3><p>Use as pastas ou a busca para abrir PDFs e vídeos. Seus acessos ficam salvos em Meu Histórico.</p></div>
           </div>
           <div className="acoes-boas-vindas">

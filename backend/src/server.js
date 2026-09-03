@@ -8,11 +8,12 @@ const { criarEmailProvider } = require("./shared/providers/emailProvider");
 async function iniciarServidor() {
   let configuracao;
   let logger;
+  let pool;
 
   try {
     configuracao = obterConfiguracao();
     logger = criarLogger(configuracao);
-    const pool = criarPool(configuracao.banco);
+    pool = criarPool(configuracao.banco);
     await verificarConexaoComBanco(pool);
 
     const emailProvider = criarEmailProvider(configuracao.email, logger);
@@ -32,23 +33,54 @@ async function iniciarServidor() {
       );
     });
 
-    async function encerrarServidor(sinal) {
-      logger.info({ sinal: sinal }, "Encerrando servidor");
-      servidor.close(async function finalizarConexoes(erro) {
-        await pool.end();
+    let encerramentoEmAndamento = null;
+    async function encerrarServidor(motivo, erroFatal) {
+      if (encerramentoEmAndamento) {
+        return encerramentoEmAndamento;
+      }
 
-        if (erro) {
-          logger.error({ err: erro }, "Falha ao encerrar servidor");
+      encerramentoEmAndamento = (async function encerrar() {
+        if (erroFatal) {
+          logger.fatal({ err: erroFatal, motivo: motivo }, "Falha fatal no processo");
           process.exitCode = 1;
+        } else {
+          logger.info({ motivo: motivo }, "Encerrando servidor");
         }
+
+        aplicacao.locals.googleDriveChangesService.pararMonitor();
+        try {
+          await new Promise(function aguardarServidor(resolve, reject) {
+            servidor.close(function finalizar(erro) {
+              if (erro) {
+                reject(erro);
+                return;
+              }
+              resolve();
+            });
+          });
+        } finally {
+          await pool.end();
+        }
+      })().catch(function registrarFalha(erro) {
+        logger.error({ err: erro, motivo: motivo }, "Falha ao encerrar servidor");
+        process.exitCode = 1;
       });
+
+      return encerramentoEmAndamento;
     }
 
     process.once("SIGINT", function encerrarComSigint() {
-      encerrarServidor("SIGINT");
+      void encerrarServidor("SIGINT");
     });
     process.once("SIGTERM", function encerrarComSigterm() {
-      encerrarServidor("SIGTERM");
+      void encerrarServidor("SIGTERM");
+    });
+    process.once("unhandledRejection", function encerrarComRejeicao(erro) {
+      const erroNormalizado = erro instanceof Error ? erro : new Error(String(erro));
+      void encerrarServidor("unhandledRejection", erroNormalizado);
+    });
+    process.once("uncaughtException", function encerrarComExcecao(erro) {
+      void encerrarServidor("uncaughtException", erro);
     });
   } catch (erro) {
     if (logger) {
@@ -58,6 +90,9 @@ async function iniciarServidor() {
     }
 
     process.exitCode = 1;
+    if (pool) {
+      await pool.end().catch(function ignorarFalhaAoFecharPool() {});
+    }
   }
 }
 

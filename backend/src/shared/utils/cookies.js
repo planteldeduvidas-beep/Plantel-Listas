@@ -21,7 +21,7 @@ function limparCookieDeSessao(res, configuracao) {
 
 function definirCookieCsrf(res, token, configuracao) {
   const opcoes = criarOpcoesBaseDoCookie(configuracao);
-  opcoes.httpOnly = false;
+  opcoes.httpOnly = true;
   opcoes.maxAge = 8 * 60 * 60 * 1000;
   res.cookie(configuracao.seguranca.nomeCookieCsrf, token, opcoes);
 }

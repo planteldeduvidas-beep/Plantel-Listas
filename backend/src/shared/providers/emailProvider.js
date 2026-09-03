@@ -31,6 +31,9 @@ function criarEmailProviderSmtp(configuracao) {
     host: configuracao.host,
     port: configuracao.porta,
     secure: configuracao.seguro,
+    connectionTimeout: configuracao.timeoutConexaoMs,
+    greetingTimeout: configuracao.timeoutSaudacaoMs,
+    socketTimeout: configuracao.timeoutSocketMs,
     auth: {
       user: configuracao.usuario,
       pass: configuracao.senha

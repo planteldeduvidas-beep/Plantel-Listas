@@ -49,9 +49,23 @@ function mensagemHumana(falhaOuMensagem) {
   const mensagem = typeof falhaOuMensagem === "string"
     ? falhaOuMensagem
     : falhaOuMensagem && falhaOuMensagem.message;
+  const codigo = typeof falhaOuMensagem === "object" && falhaOuMensagem
+    ? falhaOuMensagem.codigo
+    : null;
+  const status = typeof falhaOuMensagem === "object" && falhaOuMensagem
+    ? falhaOuMensagem.status
+    : null;
 
   if (!mensagem || /failed to fetch|networkerror|fetch failed/i.test(mensagem)) {
     return "Não foi possível falar com o sistema. Verifique sua conexão e tente novamente.";
+  }
+
+  if (codigo === "API_INDISPONIVEL" || status >= 500) {
+    return "O sistema está temporariamente indisponível. Tente novamente em instantes.";
+  }
+
+  if (codigo === "NAO_AUTENTICADO") {
+    return "Sua sessão terminou. Entre novamente.";
   }
 
   const traducoes = [
@@ -65,7 +79,7 @@ function mensagemHumana(falhaOuMensagem) {
     [/Material nao encontrado/i, "Esse material não está mais disponível."],
     [/arquivo.*grande|limite.*arquivo/i, "Esse arquivo é maior que o limite permitido."],
     [/tipo.*permitido|MIME|extensao/i, "Use um arquivo PDF ou vídeo compatível."],
-    [/sessao|não autenticado|nao autenticado/i, "Sua sessão terminou. Entre novamente."],
+    [/Autenticacao necessaria|não autenticado|nao autenticado/i, "Sua sessão terminou. Entre novamente."],
     [/Movimentacao criaria ciclo/i, "Essa pasta não pode ficar dentro de uma de suas próprias subpastas."],
     [/Categoria nao pode ser pai de si mesma/i, "Uma pasta não pode ficar dentro dela mesma."]
   ];

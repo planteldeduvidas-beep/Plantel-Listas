@@ -91,7 +91,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     const conexao = await pool.getConnection();
     try {
       const [registros] = await conexao.execute(
-        "SELECT GET_LOCK('plantel_listas_google_drive_sync', 0) AS adquirida"
+        "SELECT GET_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64), 0) AS adquirida"
       );
       if (Number(registros[0].adquirida) !== 1) {
         conexao.release();
@@ -106,7 +106,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
 
   async function liberarTravaDeSincronizacao(conexao) {
     try {
-      await conexao.execute("SELECT RELEASE_LOCK('plantel_listas_google_drive_sync')");
+      await conexao.execute("SELECT RELEASE_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64))");
     } finally {
       conexao.release();
     }

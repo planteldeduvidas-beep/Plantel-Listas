@@ -72,7 +72,7 @@ function lerBooleano(variaveis, nome, valorPadrao) {
   throw new Error("Variavel de ambiente invalida: " + nome);
 }
 
-function validarUrlOpcional(valor, nome, ambiente) {
+function validarUrlOpcional(valor, nome, ambiente, exigirOrigemExata) {
   if (!valor) {
     return "";
   }
@@ -86,6 +86,11 @@ function validarUrlOpcional(valor, nome, ambiente) {
 
   const localhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
   if (url.protocol !== "https:" && !(ambiente !== "production" && url.protocol === "http:" && localhost)) {
+    throw new Error("Variavel de ambiente invalida: " + nome);
+  }
+
+  if (url.username || url.password || url.search || url.hash
+      || (exigirOrigemExata && url.pathname !== "/")) {
     throw new Error("Variavel de ambiente invalida: " + nome);
   }
 
@@ -121,7 +126,7 @@ function validarWebhookGoogleDrive(valor) {
   return url.toString();
 }
 
-function lerOrigensCors(variaveis) {
+function lerOrigensCors(variaveis, ambiente) {
   const textoDasOrigens = exigirTexto(variaveis, "CORS_ORIGENS");
   const origens = textoDasOrigens.split(",").map(function limparOrigem(origem) {
     return origem.trim();
@@ -129,11 +134,41 @@ function lerOrigensCors(variaveis) {
     return origem !== "";
   });
 
-  if (origens.includes("*")) {
+  if (origens.length === 0 || origens.includes("*")) {
     throw new Error("CORS_ORIGENS nao pode liberar todas as origens");
   }
 
-  return origens;
+  return Array.from(new Set(origens.map(function validarOrigem(origem) {
+    const urlValidada = validarUrlOpcional(origem, "CORS_ORIGENS", ambiente, true);
+    return new URL(urlValidada).origin;
+  })));
+}
+
+function validarConfiguracaoDeProducao(configuracao) {
+  if (configuracao.ambiente !== "production") {
+    return;
+  }
+
+  const obrigatorias = [
+    [configuracao.confiarProxy > 0, "TRUST_PROXY"],
+    [configuracao.email.host, "SMTP_HOST"],
+    [configuracao.email.usuario, "SMTP_USER"],
+    [configuracao.email.senha, "SMTP_PASSWORD"],
+    [configuracao.email.remetente, "SMTP_FROM"],
+    [configuracao.suporte.destinatario, "SUPPORT_EMAIL_TO"],
+    [configuracao.googleDrive.clientId, "GOOGLE_DRIVE_CLIENT_ID"],
+    [configuracao.googleDrive.clientSecret, "GOOGLE_DRIVE_CLIENT_SECRET"],
+    [configuracao.googleDrive.pastaRaizId, "GOOGLE_DRIVE_PASTA_RAIZ_ID"],
+    [configuracao.googleDrive.redirectUri, "GOOGLE_DRIVE_REDIRECT_URI"],
+    [configuracao.googleDrive.webhookUrl, "GOOGLE_DRIVE_WEBHOOK_URL"],
+    [configuracao.googleDrive.encryptionKey, "GOOGLE_DRIVE_ENCRYPTION_KEY"]
+  ];
+
+  for (const [valor, nome] of obrigatorias) {
+    if (!valor) {
+      throw new Error("Variavel de ambiente obrigatoria em producao: " + nome);
+    }
+  }
 }
 
 function validarVariaveisDeAmbiente(variaveis) {
@@ -144,15 +179,26 @@ function validarVariaveisDeAmbiente(variaveis) {
     throw new Error("Variavel de ambiente invalida: NODE_ENV");
   }
 
-  return Object.freeze({
+  const csrfSecret = exigirSegredo(variaveis, "CSRF_SECRET");
+  const encryptionKeyInformada = lerTextoOpcional(variaveis, "GOOGLE_DRIVE_ENCRYPTION_KEY");
+  if (encryptionKeyInformada && encryptionKeyInformada.length < 32) {
+    throw new Error("Variavel de ambiente deve ter pelo menos 32 caracteres: GOOGLE_DRIVE_ENCRYPTION_KEY");
+  }
+
+  const configuracao = {
     ambiente: ambiente,
     porta: lerInteiro(variaveis, "PORT", 3000, 1, 65535),
     nivelDeLog: variaveis.LOG_LEVEL || "info",
-    origensCors: lerOrigensCors(variaveis),
-    frontendUrl: exigirTexto(variaveis, "FRONTEND_URL").replace(/\/$/, ""),
+    origensCors: lerOrigensCors(variaveis, ambiente),
+    frontendUrl: validarUrlOpcional(
+      exigirTexto(variaveis, "FRONTEND_URL"),
+      "FRONTEND_URL",
+      ambiente,
+      true
+    ).replace(/\/$/, ""),
     confiarProxy: lerInteiro(variaveis, "TRUST_PROXY", 0, 0, 10),
     seguranca: Object.freeze({
-      csrfSecret: exigirSegredo(variaveis, "CSRF_SECRET"),
+      csrfSecret: csrfSecret,
       duracaoSessaoHoras: lerInteiro(
         variaveis,
         "SESSION_DURATION_HOURS",
@@ -201,7 +247,9 @@ function validarVariaveisDeAmbiente(variaveis) {
       usuario: exigirTexto(variaveis, "DB_USER"),
       senha: variaveis.DB_PASSWORD || "",
       nome: validarNomeDoBanco(exigirTexto(variaveis, "DB_NAME")),
-      limiteDeConexoes: lerInteiro(variaveis, "DB_CONNECTION_LIMIT", 10, 1, 50)
+      limiteDeConexoes: lerInteiro(variaveis, "DB_CONNECTION_LIMIT", 10, 1, 50),
+      limiteDaFila: lerInteiro(variaveis, "DB_QUEUE_LIMIT", 100, 1, 10000),
+      timeoutConexaoMs: lerInteiro(variaveis, "DB_CONNECT_TIMEOUT_MS", 10000, 1000, 60000)
     }),
     email: Object.freeze({
       host: lerTextoOpcional(variaveis, "SMTP_HOST"),
@@ -209,7 +257,10 @@ function validarVariaveisDeAmbiente(variaveis) {
       seguro: lerBooleano(variaveis, "SMTP_SECURE", true),
       usuario: lerTextoOpcional(variaveis, "SMTP_USER"),
       senha: variaveis.SMTP_PASSWORD || "",
-      remetente: lerTextoOpcional(variaveis, "SMTP_FROM")
+      remetente: lerTextoOpcional(variaveis, "SMTP_FROM"),
+      timeoutConexaoMs: lerInteiro(variaveis, "SMTP_CONNECTION_TIMEOUT_MS", 10000, 1000, 60000),
+      timeoutSaudacaoMs: lerInteiro(variaveis, "SMTP_GREETING_TIMEOUT_MS", 10000, 1000, 60000),
+      timeoutSocketMs: lerInteiro(variaveis, "SMTP_SOCKET_TIMEOUT_MS", 30000, 1000, 120000)
     }),
     suporte: Object.freeze({
       destinatario: validarEmailOpcional(
@@ -246,6 +297,7 @@ function validarVariaveisDeAmbiente(variaveis) {
       webhookUrl: validarWebhookGoogleDrive(
         lerTextoOpcional(variaveis, "GOOGLE_DRIVE_WEBHOOK_URL")
       ),
+      encryptionKey: encryptionKeyInformada || (ambiente === "production" ? "" : csrfSecret),
       intervaloChangesMs: lerInteiro(
         variaveis,
         "GOOGLE_DRIVE_CHANGES_INTERVAL_MS",
@@ -255,7 +307,23 @@ function validarVariaveisDeAmbiente(variaveis) {
       ),
       escopo: "https://www.googleapis.com/auth/drive"
     })
-  });
+  };
+
+  const smtpInformado = Boolean(
+    configuracao.email.host
+    || configuracao.email.usuario
+    || configuracao.email.senha
+    || configuracao.email.remetente
+  );
+  if (smtpInformado && !(configuracao.email.host
+      && configuracao.email.usuario
+      && configuracao.email.senha
+      && configuracao.email.remetente)) {
+    throw new Error("Configuracao SMTP incompleta");
+  }
+
+  validarConfiguracaoDeProducao(configuracao);
+  return Object.freeze(configuracao);
 }
 
 function obterConfiguracao() {

@@ -10,8 +10,9 @@ function criarPool(configuracaoDoBanco) {
     database: configuracaoDoBanco.nome,
     charset: "utf8mb4",
     connectionLimit: configuracaoDoBanco.limiteDeConexoes,
+    connectTimeout: configuracaoDoBanco.timeoutConexaoMs,
     waitForConnections: true,
-    queueLimit: 0,
+    queueLimit: configuracaoDoBanco.limiteDaFila,
     enableKeepAlive: true,
     multipleStatements: false
   });

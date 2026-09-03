@@ -21,13 +21,24 @@ async function obterTokenCsrf() {
     return tokenCsrfEmMemoria;
   }
 
-  const resposta = await fetch(API_BASE + "/autenticacao/csrf", {
-    credentials: "include"
-  });
+  let resposta;
+  try {
+    resposta = await fetch(API_BASE + "/autenticacao/csrf", {
+      credentials: "include"
+    });
+  } catch (falha) {
+    const erro = new Error("Nao foi possivel conectar com a API");
+    erro.codigo = "API_INDISPONIVEL";
+    erro.causa = falha;
+    throw erro;
+  }
   const dados = await lerResposta(resposta);
 
   if (!resposta.ok || !dados || !dados.csrfToken) {
-    throw new Error("Nao foi possivel iniciar a protecao da sessao");
+    const erro = new Error("Nao foi possivel obter o token de seguranca");
+    erro.codigo = resposta.status >= 500 ? "API_INDISPONIVEL" : "CSRF_INDISPONIVEL";
+    erro.status = resposta.status;
+    throw erro;
   }
 
   tokenCsrfEmMemoria = dados.csrfToken;

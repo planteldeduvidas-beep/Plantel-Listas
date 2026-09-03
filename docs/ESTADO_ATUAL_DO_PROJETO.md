@@ -49,6 +49,12 @@ PDF e video sao os unicos tipos funcionais da V1. Os cinco DOCX, dois ODT e cinc
 
 A base aprovada ate a Fase 8 permanece congelada. Os ajustes funcionais finais estao aprovados e concluidos na branch propria, mas ainda nao foram integrados na `main`.
 
+FASE 9A concluida tecnicamente na branch `fase/09-qa-producao`, derivada dos ajustes funcionais finais.
+
+O QA final revalidou os tres papeis, seguranca, Google Drive real com arvore temporaria, migrations em banco limpo, carga MySQL controlada e restore em banco isolado. Foram corrigidos pontos de configuracao de producao, timeouts, fila do pool, encerramento gracioso e concorrencia entre escritas locais, sincronizacao e Changes API. O guia operacional e o relatorio completo estao em `docs/OPERACAO_PRODUCAO.md` e `docs/relatorios/RELATORIO_FASE_09.md`.
+
+Estado da etapa: **PRONTA PARA AUTORIZACAO DE CONFIGURACAO/DEPLOY**. Isso nao autoriza nem registra deploy: Hostinger, DNS/subdominio, MySQL e secrets de producao, OAuth/callback/webhook, backup definitivo e publicacao continuam dependentes de acompanhamento humano.
+
 ## Repositorio
 
 Repositorio GitHub:
@@ -188,5 +194,6 @@ Google Drive:
 
 ## Proxima acao
 
-1. Aguardar autorizacao explicita para integrar a branch dos ajustes funcionais finais.
-2. Nao fazer deploy, alterar configuracao de producao nem iniciar a Fase 9 sem autorizacao explicita.
+1. Revisar e aprovar o relatorio da Fase 9A.
+2. Aguardar autorizacao explicita para a configuracao acompanhada de producao e para qualquer integracao Git.
+3. Nao fazer deploy, alterar DNS/Hostinger/Google Cloud nem fazer merge em `main` sem autorizacao explicita.

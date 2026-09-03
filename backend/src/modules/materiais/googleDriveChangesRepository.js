@@ -22,10 +22,10 @@ function dataOuNula(valor) {
 }
 
 function criarGoogleDriveChangesRepository(pool, opcoes) {
-  const nomeTrava = String(opcoes && opcoes.nomeTrava || "plantel_listas_google_drive_changes").slice(0, 64);
+  const nomeTravaInformado = opcoes && opcoes.nomeTrava;
   async function buscarCategoriaDrive(conexao, drivePastaId) {
     const [registros] = await conexao.execute(
-      "SELECT id,drive_pasta_id,ativo FROM categorias WHERE drive_pasta_id=? LIMIT 1",
+      "SELECT id,drive_pasta_id,ativo,ordem FROM categorias WHERE drive_pasta_id=? LIMIT 1",
       [drivePastaId]
     );
     return registros[0] || null;
@@ -210,11 +210,44 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
     return { segura: true, atualizados: atualizados, indisponiveis: 0 };
   }
 
+  async function aplicarPasta(conexao, alteracao, sincronizacaoId) {
+    const pasta = alteracao.pasta;
+    if (!pasta || !pasta.parentId || pasta.parentId === pasta.id) {
+      return false;
+    }
+    let categoriaPaiId = null;
+    if (pasta.parentId !== alteracao.pastaRaizId) {
+      const categoriaPai = await buscarCategoriaDrive(conexao, pasta.parentId);
+      if (!categoriaPai || Number(categoriaPai.ativo) !== 1) {
+        return false;
+      }
+      categoriaPaiId = Number(categoriaPai.id);
+    }
+    const existente = await buscarCategoriaDrive(conexao, pasta.id);
+    let ordem = existente ? Number(existente.ordem) : 0;
+    if (!existente) {
+      const [registros] = await conexao.execute(
+        "SELECT COALESCE(MAX(ordem),-1)+1 AS proxima FROM categorias WHERE categoria_pai_chave=IFNULL(?,0)",
+        [categoriaPaiId]
+      );
+      ordem = Number(registros[0].proxima);
+    }
+    return Boolean(await salvarCategoriaDaSubarvore(
+      conexao,
+      pasta,
+      categoriaPaiId,
+      ordem,
+      sincronizacaoId
+    ));
+  }
+
   async function adquirirTrava() {
     const conexao = await pool.getConnection();
     const [registros] = await conexao.execute(
-      "SELECT GET_LOCK(?,0) AS adquirida",
-      [nomeTrava]
+      nomeTravaInformado
+        ? "SELECT GET_LOCK(?,0) AS adquirida"
+        : "SELECT GET_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64),0) AS adquirida",
+      nomeTravaInformado ? [String(nomeTravaInformado).slice(0, 64)] : []
     );
     if (Number(registros[0].adquirida) !== 1) {
       conexao.release();
@@ -225,7 +258,11 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
 
   async function liberarTrava(conexao) {
     try {
-      await conexao.execute("SELECT RELEASE_LOCK(?)", [nomeTrava]);
+      if (nomeTravaInformado) {
+        await conexao.execute("SELECT RELEASE_LOCK(?)", [String(nomeTravaInformado).slice(0, 64)]);
+      } else {
+        await conexao.execute("SELECT RELEASE_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64))");
+      }
     } finally {
       conexao.release();
     }
@@ -280,6 +317,14 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
             alteracao.fileId,
             sincronizacaoId
           );
+          continue;
+        }
+        if (alteracao.pasta) {
+          if (await aplicarPasta(conexao, alteracao, sincronizacaoId)) {
+            atualizados += 1;
+          } else {
+            reconciliacao = true;
+          }
           continue;
         }
         if (alteracao.subarvore) {

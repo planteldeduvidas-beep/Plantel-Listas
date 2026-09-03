@@ -194,13 +194,13 @@ function App() {
     <main className="pagina-autenticacao">
       <AlternadorTema classe="alternar-tema-login" />
       <section className="apresentacao-autenticacao" aria-label="Plantel Listas">
-        <div className="marca-completa"><span className="simbolo-marca">PL</span><span><strong>Plantel Listas</strong><small>Plantel de Dúvidas</small></span></div>
+        <div className="marca-completa"><img className="simbolo-marca" src="/plantel-logo.png" alt="" /><span><strong>Plantel Listas</strong><small>Plantel de Dúvidas</small></span></div>
         <div className="chamada-autenticacao"><span className="selo">Seus materiais em um só lugar</span><h2>Encontre.<br />Estude.<br />Avance.</h2><p>Uma biblioteca organizada para alunos, professores e administradores do Plantel de Dúvidas.</p></div>
         <ul className="beneficios-autenticacao"><li><Icone nome="buscar" /><span>Encontre materiais em segundos</span></li><li><Icone nome="acervo" /><span>Acesse em qualquer dispositivo</span></li><li><Icone nome="sucesso" /><span>Conteúdo organizado pelo Plantel</span></li></ul>
       </section>
 
       <section className="cartao-autenticacao" aria-labelledby="titulo-principal">
-        <div className="marca-mobile"><span className="simbolo-marca">PL</span><strong>Plantel Listas</strong></div>
+        <div className="marca-mobile"><img className="simbolo-marca" src="/plantel-logo.png" alt="" /><strong>Plantel Listas</strong></div>
         <span className="marca">Acesso à biblioteca</span>
         <h1 id="titulo-principal">{configuracaoDaTela.titulo}</h1>
         <p className="descricao">{configuracaoDaTela.texto}</p>

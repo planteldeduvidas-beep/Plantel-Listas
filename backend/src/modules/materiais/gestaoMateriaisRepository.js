@@ -20,6 +20,31 @@ function mapearMaterial(item) {
 }
 
 function criarGestaoMateriaisRepository(pool) {
+  async function adquirirTravaDeOperacao() {
+    const conexao = await pool.getConnection();
+    try {
+      const [registros] = await conexao.execute(
+        "SELECT GET_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64), 0) AS adquirida"
+      );
+      if (Number(registros[0].adquirida) !== 1) {
+        conexao.release();
+        return null;
+      }
+      return conexao;
+    } catch (erro) {
+      conexao.release();
+      throw erro;
+    }
+  }
+
+  async function liberarTravaDeOperacao(conexao) {
+    try {
+      await conexao.execute("SELECT RELEASE_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64))");
+    } finally {
+      conexao.release();
+    }
+  }
+
   async function buscarMaterial(id, executorInformado) {
     const executor = executorInformado || pool;
     const [registros] = await executor.execute(
@@ -185,7 +210,7 @@ function criarGestaoMateriaisRepository(pool) {
     await executor.execute("INSERT INTO auditoria_materiais (material_id,usuario_id,operacao,resultado,detalhes) VALUES (?,?,?,?,?)",[materialId,usuarioId,operacao,resultado,JSON.stringify(detalhes || {})]);
   }
 
-  return { buscarMaterial, buscarCategoria, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria };
+  return { adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria };
 }
 
 module.exports = criarGestaoMateriaisRepository;

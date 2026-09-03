@@ -126,6 +126,8 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
   const dependencias = dependenciasInformadas || {};
   const buscar = dependencias.fetch || globalThis.fetch;
   const fabricaOAuth = dependencias.OAuth2Client;
+  let clienteDeAcesso = null;
+  let refreshTokenDoCliente = null;
 
   validarConfiguracao(configuracao);
 
@@ -173,10 +175,13 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
 
   async function obterTokenDeAcesso(refreshToken) {
     try {
-      const cliente = criarClienteOAuth(configuracao, fabricaOAuth);
-      cliente.setCredentials({ refresh_token: refreshToken });
+      if (!clienteDeAcesso || refreshTokenDoCliente !== refreshToken) {
+        clienteDeAcesso = criarClienteOAuth(configuracao, fabricaOAuth);
+        clienteDeAcesso.setCredentials({ refresh_token: refreshToken });
+        refreshTokenDoCliente = refreshToken;
+      }
       const resultado = await executarComTempoLimite(
-        cliente.getAccessToken(),
+        clienteDeAcesso.getAccessToken(),
         TEMPO_LIMITE_REQUISICAO_MS
       );
       const token = typeof resultado === "string" ? resultado : resultado.token;
@@ -424,11 +429,11 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     return resposta.startPageToken;
   }
 
-  async function listarAlteracoes(refreshToken, pageToken) {
+  async function listarAlteracoes(refreshToken, pageToken, limite) {
     const token = await obterTokenDeAcesso(refreshToken);
     const url = new URL(URL_CHANGES_DRIVE);
     url.searchParams.set("pageToken", pageToken);
-    url.searchParams.set("pageSize", "1000");
+    url.searchParams.set("pageSize", String(limite || 1000));
     url.searchParams.set("spaces", "drive");
     url.searchParams.set("includeRemoved", "true");
     url.searchParams.set("supportsAllDrives", "true");

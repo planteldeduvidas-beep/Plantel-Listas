@@ -18,6 +18,7 @@
     "migrate": "npm run migrate --workspace backend",
     "classify:archive": "npm run classify:archive --workspace backend",
     "analytics:retention": "npm run analytics:retention --workspace backend",
+    "qa:load": "npm run qa:load --workspace backend",
     "bootstrap:admin": "npm run bootstrap:admin --workspace backend",
     "check": "npm run test && npm run build",
     "audit:prod": "npm audit --omit=dev"

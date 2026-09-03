@@ -15,6 +15,7 @@
     "migrate": "node scripts/executarMigrations.js",
     "classify:archive": "node scripts/classificarAcervo.js",
     "analytics:retention": "node scripts/executarRetencaoAnalytics.js",
+    "qa:load": "node scripts/medirCargaLocal.js",
     "bootstrap:admin": "node scripts/bootstrapAdmin.js"
   },
   "engines": {
