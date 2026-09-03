@@ -5,7 +5,7 @@ import {
   adicionarMaterial, editarMaterial, moverMaterial, substituirMaterial,
   enviarMaterialLixeira, listarLixeira, restaurarMaterial, excluirMaterial
 } from "./api.js";
-import { Carregando, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
+import { Esqueleto, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, obterPastaDaUrl } from "./navegacao.js";
 
 function tamanhoAmigavel(bytes) {
@@ -85,7 +85,7 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   }
 
   return <section className="painel-gestao-materiais">
-    <div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais do acervo."}</p></div><button type="button" className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div>
+    <div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais da biblioteca."}</p></div><button type="button" className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div>
     {mostrarEnvio && <form className="formulario-material" onSubmit={enviar}><label>Arquivo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><label>Adicionar na pasta<select required name="categoriaId" defaultValue={categoriaAtual && pastas.some(function mesma(item) { return item.id === categoriaAtual; }) ? categoriaAtual : ""}><option value="" disabled>Escolha uma pasta</option>{pastas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.caminho}</option>; })}</select></label><label>Nome do material <small>(opcional)</small><input name="nome" placeholder="Usar o nome do arquivo" /></label><label>Disciplina <small>(opcional)</small><select name="disciplinaId" defaultValue=""><option value="">Não informar</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><label>Concurso <small>(opcional)</small><select name="concursoId" defaultValue=""><option value="">Não informar</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Enviando..." : "Adicionar material"}</button></form>}
     {usuario.papel === "admin" && <details className="lixeira-materiais"><summary><span><Icone nome="historico" /> Lixeira</span><span className="contador">{lixeira.length}</span></summary>{!lixeira.length && <Vazio titulo="A lixeira está vazia" texto="Os materiais enviados para cá aparecerão nesta lista." />}{lixeira.map(function itemLixeira(item) { return <article key={item.id}><div><strong>{item.nome}</strong><small>{item.pasta ? "Pasta anterior: " + item.pasta : "Pasta anterior indisponível"}</small>{item.exclusaoPendente && <small>Exclusão aguardando conclusão</small>}</div><div><button type="button" className="secundario" disabled={ocupado || item.exclusaoPendente} onClick={function restaurarItem() { restaurar(item); }}>Restaurar</button><button type="button" className="perigo" disabled={ocupado} onClick={function excluirItem() { definirMaterialParaExcluir(item); definirTextoExclusao(""); }}>{item.exclusaoPendente ? "Finalizar exclusão" : "Excluir definitivamente"}</button></div></article>; })}</details>}
     {materialParaExcluir && <Modal titulo="Excluir este arquivo definitivamente?" aoFechar={function fechar() { definirMaterialParaExcluir(null); }}><form onSubmit={excluir}><p>Essa ação não poderá ser desfeita. Digite <strong>EXCLUIR</strong> para confirmar.</p><label>Confirmação<input value={textoExclusao} onChange={function mudar(evento) { definirTextoExclusao(evento.target.value); }} autoFocus autoComplete="off" /></label><div className="acoes-formulario"><button type="submit" className="perigo" disabled={ocupado || textoExclusao !== "EXCLUIR"}>{ocupado ? "Excluindo..." : "Excluir definitivamente"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirMaterialParaExcluir(null); }}>Cancelar</button></div></form></Modal>}
@@ -148,7 +148,7 @@ function AcoesDeGestao({ material, pastas, aoAtualizar, aoErro, aoMensagem }) {
       {movendo && <form className="acao-inline" onSubmit={mover}><label>Mover para<select required value={destino} onChange={function mudar(evento) { definirDestino(evento.target.value); }}><option value="" disabled>Escolha uma pasta</option>{pastas.filter(function diferente(item) { return item.id !== categoriaId; }).map(function opcao(item) { return <option key={item.id} value={item.id}>{item.caminho}</option>; })}</select></label><button type="submit" disabled={ocupado}>Mover material</button></form>}
       {substituindo && <form className="acao-inline" onSubmit={substituir}><label>Novo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><button type="submit" disabled={ocupado}>Trocar arquivo</button></form>}
       {modal === "editar" && <Modal titulo="Editar nome" aoFechar={function fechar() { definirModal(null); }}><form onSubmit={editar}><label>Nome do material<input value={nomeEmEdicao} onChange={function mudar(evento) { definirNomeEmEdicao(evento.target.value); }} autoFocus required /></label><div className="acoes-formulario"><button type="submit" disabled={ocupado}>{ocupado ? "Salvando..." : "Salvar alteração"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirModal(null); }}>Cancelar</button></div></form></Modal>}
-      {modal === "lixeira" && <Modal titulo="Enviar para a lixeira?" aoFechar={function fechar() { definirModal(null); }}><form onSubmit={lixeira}><p>O material deixará de aparecer no acervo, mas um administrador poderá restaurá-lo.</p><div className="acoes-formulario"><button type="submit" className="perigo" disabled={ocupado}>{ocupado ? "Enviando..." : "Enviar para a lixeira"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirModal(null); }}>Cancelar</button></div></form></Modal>}
+      {modal === "lixeira" && <Modal titulo="Enviar para a lixeira?" aoFechar={function fechar() { definirModal(null); }}><form onSubmit={lixeira}><p>O material deixará de aparecer na biblioteca, mas um administrador poderá restaurá-lo.</p><div className="acoes-formulario"><button type="submit" className="perigo" disabled={ocupado}>{ocupado ? "Enviando..." : "Enviar para a lixeira"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirModal(null); }}>Cancelar</button></div></form></Modal>}
     </details>
   );
 }
@@ -199,6 +199,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
   const [disciplinaLote, definirDisciplinaLote] = useState("manter");
   const [concursoLote, definirConcursoLote] = useState("manter");
   const [pastasGerenciaveis, definirPastasGerenciaveis] = useState([]);
+  const [filtrosAbertos, definirFiltrosAbertos] = useState(false);
 
   function carregar() {
     definirCarregando(true); definirErro("");
@@ -260,6 +261,9 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
   function limparFiltros() { definirBuscaDigitada(""); definirBusca(""); definirTipo(""); definirDisciplinaId(""); definirConcursoId(""); definirOrdenar("nome_asc"); definirPagina(1); }
   const possuiFiltros = Boolean(busca || tipo || disciplinaId || concursoId || ordenar !== "nome_asc");
   const filtros = dados ? dados.filtros : { disciplinas: [], concursos: [] };
+  const disciplinaAtiva = filtros.disciplinas.find(function encontrar(item) { return String(item.id) === String(disciplinaId); });
+  const concursoAtivo = filtros.concursos.find(function encontrar(item) { return String(item.id) === String(concursoId); });
+  const quantidadeFiltrosAtivos = [tipo, disciplinaId, concursoId, ordenar !== "nome_asc" ? ordenar : ""].filter(Boolean).length;
 
   return (
     <section className="biblioteca" aria-labelledby="titulo-biblioteca">
@@ -272,26 +276,32 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
         {usuario.papel === "admin" && organizacao && (
           <span className={organizacao.pastasPendentes.length ? "status-organizacao pendente" : "status-organizacao"}>
             <Icone nome={organizacao.pastasPendentes.length ? "alerta" : "sucesso"} />
-            {organizacao.pastasPendentes.length ? organizacao.pastasPendentes.length + " pastas para organizar" : "Todo o acervo está organizado"}
+            {organizacao.pastasPendentes.length ? organizacao.pastasPendentes.length + " pastas para organizar" : "Todos os materiais estão organizados"}
           </span>
         )}
+        {dados && <div className="resumo-biblioteca" aria-label="Resumo desta visualização">
+          <span className="dado-resumo"><i aria-hidden="true"><Icone nome="pasta" tamanho={23} /></i><small><strong>{dados.pastas.length.toLocaleString("pt-BR")}</strong>{dados.pastas.length === 1 ? "pasta visível" : "pastas visíveis"}</small></span>
+          <span className="dado-resumo"><i aria-hidden="true"><Icone nome="acervo" tamanho={23} /></i><small><strong>{dados.paginacao.totalItens.toLocaleString("pt-BR")}</strong>{dados.paginacao.totalItens === 1 ? "material encontrado" : "materiais encontrados"}</small></span>
+        </div>}
       </div>
 
-      <section className="painel-filtros">
+      <section className="painel-filtros" aria-label="Busca e filtros dos materiais">
         <form className="busca-acervo" onSubmit={pesquisar}>
-          <label>
-            <span>O que você procura?</span>
-            <span className="campo-com-icone"><Icone nome="buscar" /><input type="search" value={buscaDigitada} placeholder="Ex.: cinemática, AFA ou lista 3" onChange={function mudar(evento) { definirBuscaDigitada(evento.target.value); }} /></span>
+          <label aria-label="Buscar materiais">
+            <span className="campo-com-icone"><Icone nome="buscar" /><input type="search" value={buscaDigitada} placeholder="Busque por título, disciplina ou concurso" onChange={function mudar(evento) { definirBuscaDigitada(evento.target.value); }} /></span>
           </label>
-          <button type="submit" className="botao-principal"><Icone nome="buscar" />Buscar</button>
+          <button type="button" className={filtrosAbertos ? "botao-filtros ativo" : "botao-filtros"} aria-expanded={filtrosAbertos} aria-controls="filtros-do-acervo" onClick={function alternarFiltros() { definirFiltrosAbertos(!filtrosAbertos); }}><Icone nome="filtros" /><span>Filtros</span>{quantidadeFiltrosAtivos > 0 && <b>{quantidadeFiltrosAtivos}</b>}</button>
+          <button type="submit" className="botao-principal">Buscar</button>
         </form>
-        <div className="filtros-acervo">
-          <label>Formato<select value={tipo} onChange={function mudar(evento) { definirTipo(evento.target.value); definirPagina(1); }}><option value="">PDFs e vídeos</option><option value="pdf">Somente PDFs</option><option value="video">Somente vídeos</option></select></label>
-          <label>Disciplina<select value={disciplinaId} onChange={function mudar(evento) { definirDisciplinaId(evento.target.value); definirPagina(1); }}><option value="">Todas</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label>
-          <label>Concurso<select value={concursoId} onChange={function mudar(evento) { definirConcursoId(evento.target.value); definirPagina(1); }}><option value="">Todos</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label>
-          <label>Ordem<select value={ordenar} onChange={function mudar(evento) { definirOrdenar(evento.target.value); }}><option value="nome_asc">Nome: A a Z</option><option value="nome_desc">Nome: Z a A</option><option value="recente">Adicionados recentemente</option></select></label>
-          {possuiFiltros && <button type="button" className="botao-limpar" onClick={limparFiltros}>Limpar</button>}
+        <div id="filtros-do-acervo" className={filtrosAbertos ? "filtros-acervo abertos" : "filtros-acervo"}>
+          <span className="rotulo-refinamento">Refinar por</span>
+          <label><span>Formato</span><select value={tipo} onChange={function mudar(evento) { definirTipo(evento.target.value); definirPagina(1); }}><option value="">PDFs e vídeos</option><option value="pdf">Somente PDFs</option><option value="video">Somente vídeos</option></select></label>
+          <label><span>Disciplina</span><select value={disciplinaId} onChange={function mudar(evento) { definirDisciplinaId(evento.target.value); definirPagina(1); }}><option value="">Todas</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label>
+          <label><span>Concurso</span><select value={concursoId} onChange={function mudar(evento) { definirConcursoId(evento.target.value); definirPagina(1); }}><option value="">Todos</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label>
+          <label><span>Ordenar</span><select value={ordenar} onChange={function mudar(evento) { definirOrdenar(evento.target.value); }}><option value="nome_asc">Nome: A a Z</option><option value="nome_desc">Nome: Z a A</option><option value="recente">Mais recentes</option></select></label>
+          {possuiFiltros && <button type="button" className="botao-limpar" onClick={limparFiltros}>Limpar filtros</button>}
         </div>
+        {possuiFiltros && <div className="filtros-ativos" aria-label="Filtros ativos">{busca && <span>Busca: <strong>{busca}</strong></span>}{tipo && <span>{tipo === "pdf" ? "Somente PDFs" : "Somente vídeos"}</span>}{disciplinaAtiva && <span>{disciplinaAtiva.nome}</span>}{concursoAtivo && <span>{concursoAtivo.nome}</span>}{ordenar !== "nome_asc" && <span>{ordenar === "nome_desc" ? "Nome: Z a A" : "Mais recentes"}</span>}<button type="button" onClick={limparFiltros}>Limpar tudo</button></div>}
       </section>
 
       {dados && <div className="navegacao-pastas">{categoriaId && <button type="button" className="botao-voltar-navegacao" onClick={voltarPasta}><Icone nome="voltar" tamanho={18} />Voltar uma pasta</button>}<nav className="breadcrumb" aria-label="Caminho da pasta"><button type="button" onClick={function inicio() { abrirPasta(null); }}><Icone nome="acervo" tamanho={16} />Início</button>{dados.breadcrumb.map(function parte(item) { return <span key={item.id}><Icone nome="chevron" tamanho={14} /><button type="button" aria-current={item.id === categoriaId ? "page" : undefined} disabled={item.id === categoriaId} onClick={function abrir() { abrirPasta(item.id); }}>{item.nome}</button></span>; })}</nav></div>}
@@ -307,7 +317,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
       )}
 
       {erro && <div className="aviso erro" role="alert"><Icone nome="alerta" /><span>{erro}</span><button type="button" className="acao-texto" onClick={carregar}>Tentar novamente</button></div>}
-      {carregando && <Carregando texto="Buscando materiais..." />}
+      {carregando && <Esqueleto linhas={5} texto="Buscando materiais..." />}
 
       {!carregando && dados && (
         <>
@@ -337,7 +347,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
             </div>
           </section>
 
-          {!dados.pastas.length && !dados.materiais.length && <Vazio titulo="Nenhum material encontrado" texto="Tente outra busca ou altere os filtros." acao={possuiFiltros ? <button type="button" className="secundario" onClick={limparFiltros}>Limpar filtros</button> : null} />}
+          {!dados.pastas.length && !dados.materiais.length && <Vazio titulo={possuiFiltros ? "Nenhum resultado para estes filtros" : categoriaId ? "Esta pasta ainda está vazia" : "Nenhum material disponível"} texto={possuiFiltros ? "Remova um filtro ou tente um termo mais amplo." : categoriaId ? "Quando um material for adicionado, ele aparecerá aqui." : "Os materiais aparecerão aqui assim que estiverem disponíveis."} acao={possuiFiltros ? <button type="button" className="secundario" onClick={limparFiltros}>Limpar filtros</button> : null} />}
           {dados.paginacao.totalPaginas > 1 && <nav className="paginacao" aria-label="Páginas dos materiais"><button type="button" className="secundario" disabled={dados.paginacao.pagina <= 1} onClick={function anterior() { definirPagina(pagina - 1); }}><Icone nome="voltar" />Anterior</button><span>Página <strong>{dados.paginacao.pagina}</strong> de {dados.paginacao.totalPaginas}</span><button type="button" className="secundario" disabled={dados.paginacao.pagina >= dados.paginacao.totalPaginas} onClick={function proxima() { definirPagina(pagina + 1); }}>Próxima<Icone nome="chevron" /></button></nav>}
         </>
       )}

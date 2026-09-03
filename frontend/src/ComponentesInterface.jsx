@@ -1,14 +1,15 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 function Icone({ nome, tamanho }) {
-  const dimensao = tamanho || 20;
+  const dimensao = tamanho || 21;
   const propriedades = {
+    className: "icone-svg glifo-" + nome,
     width: dimensao,
     height: dimensao,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    strokeWidth: "1.8",
+    strokeWidth: "1.9",
     strokeLinecap: "round",
     strokeLinejoin: "round",
     "aria-hidden": "true"
@@ -16,18 +17,20 @@ function Icone({ nome, tamanho }) {
 
   if (nome === "menu") return <svg {...propriedades}><path d="M4 7h16M4 12h16M4 17h16" /></svg>;
   if (nome === "fechar") return <svg {...propriedades}><path d="m6 6 12 12M18 6 6 18" /></svg>;
-  if (nome === "acervo") return <svg {...propriedades}><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 5.5v16M8 7h8" /></svg>;
-  if (nome === "pasta") return <svg {...propriedades}><path d="M3 6.5h7l2 2h9v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>;
-  if (nome === "usuarios") return <svg {...propriedades}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
-  if (nome === "acessos") return <svg {...propriedades}><circle cx="8" cy="15" r="4" /><path d="M11 12 21 2M17 6l3 3M14 9l3 3" /></svg>;
-  if (nome === "organizacao") return <svg {...propriedades}><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>;
-  if (nome === "estatisticas") return <svg {...propriedades}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>;
-  if (nome === "historico") return <svg {...propriedades}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
-  if (nome === "drive") return <svg {...propriedades}><path d="m8.2 4 3.4 6H6.8L3.4 16 0 10z" transform="translate(4)" /><path d="m11.6 10 3.4 6H8.2l3.4-6" /><path d="M8.2 16h6.8l-3.4 6H4.8z" /></svg>;
+  if (nome === "acervo") return <svg {...propriedades}><path d="M5 4.5h4.5v15H5zM9.5 4.5H14v15H9.5zM15.5 5.5l3.4-.9L22 18.9l-3.5.8z" /><path d="M3 20h19" /></svg>;
+  if (nome === "pasta") return <svg {...propriedades}><path d="M3 7.5h7l2-2h3.5a2 2 0 0 1 1.7.9l.7 1.1H21v10.8a1.7 1.7 0 0 1-1.7 1.7H4.7A1.7 1.7 0 0 1 3 18.3z" /><path d="M3 10h18" /></svg>;
+  if (nome === "usuarios") return <svg {...propriedades}><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20v-1.2A4.8 4.8 0 0 1 8.3 14h1.4a4.8 4.8 0 0 1 4.8 4.8V20M15.5 5.3a3.2 3.2 0 0 1 0 6.2M17 14.2a4.8 4.8 0 0 1 3.5 4.6V20" /></svg>;
+  if (nome === "acessos") return <svg {...propriedades}><path d="M12 2.8 20 6v5.3c0 4.8-3.2 8.3-8 10-4.8-1.7-8-5.2-8-10V6z" /><path d="m8.5 12 2.2 2.2 4.8-5" /></svg>;
+  if (nome === "organizacao") return <svg {...propriedades}><rect x="8.5" y="3" width="7" height="5" rx="1.4" /><rect x="3" y="16" width="7" height="5" rx="1.4" /><rect x="14" y="16" width="7" height="5" rx="1.4" /><path d="M12 8v4M6.5 16v-2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2" /></svg>;
+  if (nome === "estatisticas") return <svg {...propriedades}><path d="M4 20V9.5h4V20M10 20V4h4v16M16 20v-7h4v7M2 20h20" /></svg>;
+  if (nome === "historico") return <svg {...propriedades}><path d="M4.4 7.1A9 9 0 1 1 3 12" /><path d="M3 5v5h5M12 7.2V12l3.3 2" /></svg>;
+  if (nome === "drive") return <svg {...propriedades}><path d="m9.2 3-6 10.4 3.1 5.4L15.4 3z" /><path d="M15.4 3 21 12.7h-6.3L9.2 3M6.3 18.8h11.5l3.2-6.1H9.8z" /></svg>;
   if (nome === "sair") return <svg {...propriedades}><path d="M10 17l5-5-5-5M15 12H3M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /></svg>;
   if (nome === "buscar") return <svg {...propriedades}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>;
-  if (nome === "pdf") return <svg {...propriedades}><path d="M6 2h8l4 4v16H6z" /><path d="M14 2v5h5M8.5 16h7M8.5 12h5" /></svg>;
-  if (nome === "video") return <svg {...propriedades}><rect x="3" y="5" width="14" height="14" rx="2" /><path d="m17 10 4-2v8l-4-2z" /></svg>;
+  if (nome === "filtros") return <svg {...propriedades}><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></svg>;
+  if (nome === "opcoes") return <svg {...propriedades}><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" /></svg>;
+  if (nome === "pdf") return <svg {...propriedades}><path d="M5 2.5h9l5 5V21.5H5z" /><path d="M14 2.5v5h5M8 16.5h2.2a1.8 1.8 0 0 0 0-3.6H8v5.3M13.5 18.2v-5.3h1.4a2.65 2.65 0 0 1 0 5.3z" /></svg>;
+  if (nome === "video") return <svg {...propriedades}><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="m10 9 5 3-5 3zM6 5V3M18 5V3" /></svg>;
   if (nome === "mais") return <svg {...propriedades}><path d="M12 5v14M5 12h14" /></svg>;
   if (nome === "download") return <svg {...propriedades}><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" /></svg>;
   if (nome === "chevron") return <svg {...propriedades}><path d="m9 18 6-6-6-6" /></svg>;
@@ -107,6 +110,11 @@ function Carregando({ texto }) {
   return <div className="estado-interface carregando" role="status"><span className="indicador-carregamento" aria-hidden="true" /><strong>{texto || "Carregando..."}</strong></div>;
 }
 
+function Esqueleto({ linhas, texto }) {
+  const quantidade = linhas || 4;
+  return <div className="esqueleto-interface" role="status" aria-label={texto || "Carregando conteúdo"}><span>{texto || "Carregando conteúdo..."}</span>{Array.from({ length: quantidade }, function criar(_, indice) { return <i key={indice}><b /><b /></i>; })}</div>;
+}
+
 function Vazio({ titulo, texto, acao }) {
   return <div className="estado-interface"><span className="icone-estado" aria-hidden="true"><Icone nome="acervo" tamanho={26} /></span><strong>{titulo}</strong>{texto && <p>{texto}</p>}{acao}</div>;
 }
@@ -115,4 +123,37 @@ function Alerta({ tipo, children }) {
   return <div className={"aviso " + tipo} role={tipo === "erro" ? "alert" : "status"}><Icone nome={tipo === "erro" ? "alerta" : "sucesso"} /><span>{children}</span></div>;
 }
 
-export { Icone, mensagemHumana, Modal, Carregando, Vazio, Alerta };
+function lerTemaSalvo() {
+  return window.localStorage.getItem("plantel-tema") === "claro" ? "claro" : "escuro";
+}
+
+function aplicarTema(tema) {
+  const raiz = document.documentElement;
+  raiz.classList.add("tema-sem-transicao");
+  raiz.dataset.tema = tema;
+  window.localStorage.setItem("plantel-tema", tema);
+  window.requestAnimationFrame(function concluirTroca() {
+    raiz.classList.remove("tema-sem-transicao");
+  });
+}
+
+function AlternadorTema({ classe, compacto }) {
+  const [tema, definirTema] = useState(lerTemaSalvo);
+
+  useEffect(function sincronizarAlternadores() {
+    function receberTema(evento) { definirTema(evento.detail); }
+    window.addEventListener("plantel-tema-alterado", receberTema);
+    return function removerEscuta() { window.removeEventListener("plantel-tema-alterado", receberTema); };
+  }, []);
+
+  function alternar() {
+    const novoTema = tema === "escuro" ? "claro" : "escuro";
+    aplicarTema(novoTema);
+    definirTema(novoTema);
+    window.dispatchEvent(new CustomEvent("plantel-tema-alterado", { detail: novoTema }));
+  }
+
+  return <button type="button" className={(compacto ? "botao-icone" : "alternar-tema") + (classe ? " " + classe : "")} onClick={alternar} aria-label={tema === "escuro" ? "Usar modo claro" : "Usar modo escuro"}><Icone nome={tema === "escuro" ? "sol" : "lua"} />{!compacto && <span>{tema === "escuro" ? "Claro" : "Escuro"}</span>}</button>;
+}
+
+export { Icone, mensagemHumana, Modal, Carregando, Esqueleto, Vazio, Alerta, AlternadorTema, aplicarTema, lerTemaSalvo };

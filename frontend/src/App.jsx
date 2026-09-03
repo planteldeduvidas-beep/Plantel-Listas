@@ -8,13 +8,11 @@ import {
   redefinirSenha
 } from "./api.js";
 import PainelAcervo from "./PainelAcervo.jsx";
-import { Alerta, Carregando, Icone, mensagemHumana } from "./ComponentesInterface.jsx";
+import { Alerta, AlternadorTema, Carregando, Icone, aplicarTema, lerTemaSalvo, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, limparParametrosTemporarios } from "./navegacao.js";
 
 function App() {
-  const [tema, definirTema] = useState(function lerTema() {
-    return window.localStorage.getItem("plantel-tema") === "claro" ? "claro" : "escuro";
-  });
+  const [temaInicial] = useState(lerTemaSalvo);
   const [retornoInicial] = useState(function lerRetornoInicial() {
     const parametros = new URLSearchParams(window.location.search);
     const token = parametros.get("tokenRecuperacao");
@@ -52,10 +50,7 @@ function App() {
       });
   }, []);
 
-  useEffect(function aplicarTema() {
-    document.documentElement.dataset.tema = tema;
-    window.localStorage.setItem("plantel-tema", tema);
-  }, [tema]);
+  useEffect(function aplicarTemaInicial() { aplicarTema(temaInicial); }, [temaInicial]);
 
   useEffect(function concluirOAuthEmJanelaSeparada() {
     if (!retornoInicial.googleDrive || !window.opener || window.opener.closed) {
@@ -77,10 +72,6 @@ function App() {
       window.removeEventListener("message", receberRetorno);
     };
   }, []);
-
-  function alternarTema() {
-    definirTema(function trocar(atual) { return atual === "escuro" ? "claro" : "escuro"; });
-  }
 
   function prepararOperacao() {
     definirProcessando(true);
@@ -181,30 +172,30 @@ function App() {
   }
 
   if (usuario) {
-    return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} tema={tema} aoAlternarTema={alternarTema} />;
+    return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} />;
   }
 
   const configuracoesDaTela = {
     login: { titulo: "Que bom ter você de volta", texto: "Entre para encontrar seus materiais de estudo.", acao: enviarLogin, botao: "Entrar" },
     cadastro: { titulo: "Crie sua conta", texto: "Seu acesso de aluno fica pronto em poucos instantes.", acao: enviarCadastro, botao: "Criar minha conta" },
     recuperar: { titulo: "Recupere seu acesso", texto: "Informe seu e-mail e enviaremos as instruções.", acao: enviarRecuperacao, botao: "Enviar instruções" },
-    redefinir: { titulo: "Crie uma nova senha", texto: "Escolha uma senha segura para voltar ao acervo.", acao: enviarRedefinicao, botao: "Salvar nova senha" }
+    redefinir: { titulo: "Crie uma nova senha", texto: "Escolha uma senha segura para voltar aos seus materiais.", acao: enviarRedefinicao, botao: "Salvar nova senha" }
   };
   const configuracaoDaTela = configuracoesDaTela[tela];
   const exibirSenha = tela !== "recuperar";
 
   return (
     <main className="pagina-autenticacao">
-      <button type="button" className="alternar-tema alternar-tema-login" onClick={alternarTema} aria-label={tema === "escuro" ? "Usar modo claro" : "Usar modo escuro"}><Icone nome={tema === "escuro" ? "sol" : "lua"} /><span>{tema === "escuro" ? "Modo claro" : "Modo escuro"}</span></button>
+      <AlternadorTema classe="alternar-tema-login" />
       <section className="apresentacao-autenticacao" aria-label="Plantel Listas">
         <div className="marca-completa"><span className="simbolo-marca">PL</span><span><strong>Plantel Listas</strong><small>Plantel de Dúvidas</small></span></div>
-        <div className="chamada-autenticacao"><span className="selo">Seu acervo em um só lugar</span><h2>Encontre.<br />Estude.<br />Avance.</h2><p>Uma biblioteca organizada para alunos, professores e administradores do Plantel de Dúvidas.</p></div>
+        <div className="chamada-autenticacao"><span className="selo">Seus materiais em um só lugar</span><h2>Encontre.<br />Estude.<br />Avance.</h2><p>Uma biblioteca organizada para alunos, professores e administradores do Plantel de Dúvidas.</p></div>
         <ul className="beneficios-autenticacao"><li><Icone nome="buscar" /><span>Encontre materiais em segundos</span></li><li><Icone nome="acervo" /><span>Acesse em qualquer dispositivo</span></li><li><Icone nome="sucesso" /><span>Conteúdo organizado pelo Plantel</span></li></ul>
       </section>
 
       <section className="cartao-autenticacao" aria-labelledby="titulo-principal">
         <div className="marca-mobile"><span className="simbolo-marca">PL</span><strong>Plantel Listas</strong></div>
-        <span className="marca">Acesso ao acervo</span>
+        <span className="marca">Acesso à biblioteca</span>
         <h1 id="titulo-principal">{configuracaoDaTela.titulo}</h1>
         <p className="descricao">{configuracaoDaTela.texto}</p>
 

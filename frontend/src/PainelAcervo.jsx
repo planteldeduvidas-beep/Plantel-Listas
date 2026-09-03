@@ -15,12 +15,21 @@ import {
 } from "./api.js";
 import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
 import AdministracaoFase7 from "./AdministracaoFase7.jsx";
-import { Alerta, Carregando, Icone, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
+import { Alerta, AlternadorTema, Carregando, Icone, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, obterAreaInicial, obterAreaPermitida, obterPastaDaUrl } from "./navegacao.js";
 
 function obterTipoDeUsuario(papel) {
   const tipos = { admin: "Administrador", professor: "Professor", aluno: "Aluno" };
   return tipos[papel] || "Usuário";
+}
+
+function obterAmbienteDoUsuario(papel) {
+  const ambientes = {
+    admin: "Gestão dos materiais",
+    professor: "Área do professor",
+    aluno: "Biblioteca do aluno"
+  };
+  return ambientes[papel] || "Materiais de estudo";
 }
 
 function obterTextoDaSincronizacao(sincronizacao) {
@@ -138,7 +147,7 @@ function FormularioCatalogo({ titulo, singular, registros, api, aoAtualizar, aoE
   return (
     <section className="bloco-admin">
       <div className="cabecalho-bloco">
-        <div><h3>{titulo}</h3><p>Organize as opções que aparecem no acervo.</p></div>
+        <div><h3>{titulo}</h3><p>Organize as opções que aparecem na biblioteca.</p></div>
         {!formularioAberto && <button type="button" onClick={iniciarCriacao}>+ Adicionar {singular.toLowerCase()}</button>}
       </div>
       {formularioAberto && (
@@ -170,7 +179,7 @@ function FormularioCatalogo({ titulo, singular, registros, api, aoAtualizar, aoE
   );
 }
 
-function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
+function PainelAcervo({ usuario, aoSair }) {
   const areaInicial = obterAreaInicial(usuario.papel);
   const [estrutura, definirEstrutura] = useState({ categorias: [], disciplinas: [], concursos: [] });
   const [categorias, definirCategorias] = useState([]);
@@ -197,6 +206,8 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
     return obterAreaPermitida(usuario.papel, window.location.search);
   });
   const [menuAberto, definirMenuAberto] = useState(false);
+  const [buscaPastasAdmin, definirBuscaPastasAdmin] = useState("");
+  const [paginaPastasAdmin, definirPaginaPastasAdmin] = useState(1);
 
   function mostrarErro(mensagem) {
     definirErro(traduzirErroDaApi(mensagem));
@@ -313,12 +324,12 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
         const novoStatus = resultado.googleDrive.ultimaSincronizacao;
         definirGoogleDrive(resultado.googleDrive);
         if (novoStatus && novoStatus.status === "concluida") {
-          carregar("Acervo sincronizado com o Google Drive.");
+          carregar("Materiais sincronizados com o Google Drive.");
         } else if (novoStatus && novoStatus.status === "falhou") {
           if (resultado.googleDrive.renovacaoNecessaria) {
             definirErro("A conexão com o Google Drive precisa ser renovada.");
           } else {
-            definirErro("Não foi possível concluir a sincronização do acervo.");
+            definirErro("Não foi possível concluir a sincronização dos materiais.");
           }
         }
       }).catch(function tratarFalha(falha) {
@@ -476,6 +487,19 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
   const categoriasAtivas = categorias.filter(function filtrarCategoria(item) {
     return item.ativo;
   });
+  const termoPastasAdmin = buscaPastasAdmin.trim().toLocaleLowerCase("pt-BR");
+  const categoriasFiltradasAdmin = termoPastasAdmin
+    ? categorias.filter(function localizarCategoria(item) {
+      return item.nome.toLocaleLowerCase("pt-BR").includes(termoPastasAdmin);
+    })
+    : categorias;
+  const limitePastasAdmin = 60;
+  const totalPaginasPastasAdmin = Math.max(1, Math.ceil(categoriasFiltradasAdmin.length / limitePastasAdmin));
+  const paginaPastasAdminSegura = Math.min(paginaPastasAdmin, totalPaginasPastasAdmin);
+  const categoriasDaPaginaAdmin = categoriasFiltradasAdmin.slice(
+    (paginaPastasAdminSegura - 1) * limitePastasAdmin,
+    paginaPastasAdminSegura * limitePastasAdmin
+  );
   const sincronizacaoEmAndamento = Boolean(
     googleDrive
     && googleDrive.ultimaSincronizacao
@@ -485,27 +509,27 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
   );
 
   const informacoesDasAreas = {
-    acervo: { titulo: "Acervo de estudos", texto: "Encontre pastas, PDFs e vídeos com facilidade." },
-    minhasPastas: { titulo: "Pastas que você gerencia", texto: "Veja onde você pode adicionar e organizar materiais." },
-    usuarios: { titulo: "Usuários", texto: "Cuide das contas e dos tipos de acesso." },
-    acessos: { titulo: "Acessos dos professores", texto: "Escolha quais pastas cada professor pode gerenciar." },
-    organizacao: { titulo: "Organização do acervo", texto: "Mantenha pastas, disciplinas e concursos fáceis de encontrar." },
-    estatisticas: { titulo: "Visão geral", texto: "Acompanhe os números e a atividade do Plantel Listas." },
-    historico: { titulo: "Histórico de atividades", texto: "Consulte as ações importantes realizadas no sistema." },
-    drive: { titulo: "Google Drive", texto: "Confira a conexão e mantenha o acervo atualizado." }
+    acervo: { codigo: "PL / 01", contexto: "Biblioteca digital", titulo: "Materiais de estudo", texto: "Encontre pastas, PDFs e vídeos com facilidade." },
+    minhasPastas: { codigo: "PL / 02", contexto: "Área do professor", titulo: "Pastas que você gerencia", texto: "Veja onde você pode adicionar e organizar materiais." },
+    usuarios: { codigo: "PL / 03", contexto: "Administração", titulo: "Usuários", texto: "Cuide das contas e dos tipos de acesso." },
+    acessos: { codigo: "PL / 04", contexto: "Administração", titulo: "Acessos dos professores", texto: "Escolha quais pastas cada professor pode gerenciar." },
+    organizacao: { codigo: "PL / 05", contexto: "Estrutura dos materiais", titulo: "Organização dos materiais", texto: "Mantenha pastas, disciplinas e concursos fáceis de encontrar." },
+    estatisticas: { codigo: "PL / 00", contexto: "Painel administrativo", titulo: "Visão geral", texto: "Acompanhe os números e a atividade do Plantel Listas." },
+    historico: { codigo: "PL / 06", contexto: "Auditoria", titulo: "Histórico de atividades", texto: "Consulte as ações importantes realizadas no sistema." },
+    drive: { codigo: "PL / 07", contexto: "Integração", titulo: "Google Drive", texto: "Confira a conexão e mantenha os materiais atualizados." }
   };
   const informacaoDaArea = informacoesDasAreas[areaAtual] || informacoesDasAreas.acervo;
 
   if (carregando) {
-    return <main className="pagina-painel carregamento-inicial"><Carregando texto="Preparando seu acervo..." /></main>;
+    return <main className="pagina-painel carregamento-inicial"><Carregando texto="Preparando seus materiais..." /></main>;
   }
 
   return (
     <main className="pagina-painel">
       <button type="button" className="fundo-menu-mobile" aria-label="Fechar menu" tabIndex={menuAberto ? 0 : -1} onClick={function fecharMenu() { definirMenuAberto(false); }} />
       <aside className={menuAberto ? "barra-lateral aberta" : "barra-lateral"} aria-label="Menu principal">
-        <div className="marca-painel"><span className="simbolo-marca">PL</span><span><strong>Plantel Listas</strong><small>Acervo de estudos</small></span><button type="button" className="botao-icone fechar-menu" aria-label="Fechar menu" onClick={function fechar() { definirMenuAberto(false); }}><Icone nome="fechar" /></button></div>
-        <div className={"perfil-lateral " + usuario.papel}><span className="icone-perfil"><Icone nome={usuario.papel === "aluno" ? "acervo" : usuario.papel === "professor" ? "pasta" : "usuarios"} /></span><span><strong>{obterTipoDeUsuario(usuario.papel)}</strong><small>Perfil ativo</small></span></div>
+        <div className="marca-painel"><span className="simbolo-marca">PL</span><span><strong>Plantel Listas</strong><small>Materiais de estudo</small></span><button type="button" className="botao-icone fechar-menu" aria-label="Fechar menu" onClick={function fechar() { definirMenuAberto(false); }}><Icone nome="fechar" /></button></div>
+        <div className={"perfil-lateral " + usuario.papel}><span className="icone-perfil"><Icone nome={usuario.papel === "aluno" ? "acervo" : usuario.papel === "professor" ? "pasta" : "usuarios"} /></span><span><small>Ambiente atual</small><strong>{obterAmbienteDoUsuario(usuario.papel)}</strong></span></div>
         <nav className="menu-principal">
           <span className="rotulo-menu">Navegação</span>
           {usuario.papel === "admin" && <ItemMenu area="estatisticas" atual={areaAtual} icone="estatisticas" texto="Visão geral" aoAbrir={navegar} />}
@@ -516,11 +540,14 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
         <div className="conta-lateral"><span className="avatar-usuario">{usuario.email.slice(0, 1).toUpperCase()}</span><span><strong>{usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small></span><button type="button" className="botao-icone" aria-label="Sair" onClick={aoSair}><Icone nome="sair" /></button></div>
       </aside>
 
-      <section className="conteudo-aplicacao">
-        <header className="cabecalho-mobile"><button type="button" className="botao-icone" aria-label="Abrir menu" onClick={function abrirMenu() { definirMenuAberto(true); }}><Icone nome="menu" /></button><div className="marca-mobile-painel"><span className="simbolo-marca pequeno">PL</span><strong>Plantel Listas</strong></div><button type="button" className="botao-icone" onClick={aoAlternarTema} aria-label={tema === "escuro" ? "Usar modo claro" : "Usar modo escuro"}><Icone nome={tema === "escuro" ? "sol" : "lua"} /></button></header>
-        <header className="cabecalho-painel"><div><h1>{informacaoDaArea.titulo}</h1><p>{new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(new Date())}</p></div><div className="controles-cabecalho"><span className="estado-online"><Icone nome="online" tamanho={12} />Online</span><button type="button" className="alternar-tema" onClick={aoAlternarTema} aria-label={tema === "escuro" ? "Usar modo claro" : "Usar modo escuro"}><Icone nome={tema === "escuro" ? "sol" : "lua"} /><span>{tema === "escuro" ? "Claro" : "Escuro"}</span></button></div></header>
+      <section className={"conteudo-aplicacao area-" + areaAtual}>
+        <header className="cabecalho-mobile"><button type="button" className="botao-icone" aria-label="Abrir menu" onClick={function abrirMenu() { definirMenuAberto(true); }}><Icone nome="menu" /></button><div className="marca-mobile-painel"><span className="simbolo-marca pequeno">PL</span><strong>Plantel Listas</strong></div><AlternadorTema compacto /></header>
+        <header className="cabecalho-painel">
+          <div className="identidade-cabecalho"><i aria-hidden="true" /><div><small>Área atual</small><h1>{informacaoDaArea.titulo}</h1></div></div>
+          <div className="controles-cabecalho"><time className="data-cabecalho" dateTime={new Date().toISOString().slice(0, 10)}>{new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(new Date())}</time><AlternadorTema /></div>
+        </header>
         {areaAtual !== areaInicial && <button type="button" className="botao-voltar-navegacao voltar-area" onClick={voltarNaNavegacao}><Icone nome="voltar" tamanho={18} />Voltar</button>}
-        <section className="introducao-area"><h2>{informacaoDaArea.titulo}</h2><p>{informacaoDaArea.texto}</p></section>
+        <section className="introducao-area"><div className="texto-introducao"><span>{informacaoDaArea.contexto}</span><h2>{informacaoDaArea.titulo}</h2><p>{informacaoDaArea.texto}</p></div><span className="codigo-area" aria-hidden="true">{informacaoDaArea.codigo}</span></section>
         <div className="avisos-globais">{mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}{erro && <Alerta tipo="erro">{erro}</Alerta>}</div>
 
         {areaAtual === "acervo" && <BibliotecaAcervo usuario={usuario} aoMensagem={definirMensagem} />}
@@ -534,11 +561,11 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
               <div>
                 <span className="icone-destaque"><Icone nome="drive" tamanho={26} /></span>
                 <h2>Conexão com o Google Drive</h2>
-                <p>O Drive guarda os arquivos. Use esta área para conferir e atualizar o acervo.</p>
+                <p>O Drive guarda os arquivos. Use esta área para conferir e atualizar os materiais.</p>
               </div>
               {googleDrive && googleDrive.conectado ? (
                 <button type="button" onClick={sincronizarAcervo} disabled={processandoGoogleDrive || sincronizacaoEmAndamento}>
-                  {processandoGoogleDrive || sincronizacaoEmAndamento ? "Atualizando acervo..." : "Atualizar acervo agora"}
+                  {processandoGoogleDrive || sincronizacaoEmAndamento ? "Atualizando materiais..." : "Atualizar materiais agora"}
                 </button>
               ) : (
                 <button type="button" onClick={conectarGoogleDrive} disabled={processandoGoogleDrive || !googleDrive || !googleDrive.configurado}>
@@ -546,14 +573,14 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
                     ? "Conectando..."
                     : googleDrive && googleDrive.renovacaoNecessaria
                       ? "Renovar conexão"
-                      : "Conectar conta do acervo"}
+                      : "Conectar conta do Google Drive"}
                 </button>
               )}
             </div>
-            {googleDrive && googleDrive.conectado && <p className="estado-integracao conectado"><Icone nome="sucesso" /> Conta do acervo conectada.</p>}
-            {googleDrive && googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente"><Icone nome="alerta" /> A conexão precisa ser renovada para continuar atualizando o acervo.</p>}
+            {googleDrive && googleDrive.conectado && <p className="estado-integracao conectado"><Icone nome="sucesso" /> Conta do Google Drive conectada.</p>}
+            {googleDrive && googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente"><Icone nome="alerta" /> A conexão precisa ser renovada para continuar atualizando os materiais.</p>}
             {googleDrive && !googleDrive.configurado && <p className="estado-integracao pendente">A conexão ainda precisa ser configurada pelo responsável técnico.</p>}
-            {googleDrive && googleDrive.configurado && !googleDrive.conectado && !googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente">Conecte a conta do acervo antes da primeira sincronização.</p>}
+            {googleDrive && googleDrive.configurado && !googleDrive.conectado && !googleDrive.renovacaoNecessaria && <p className="estado-integracao pendente">Conecte a conta do Google Drive antes da primeira sincronização.</p>}
             {googleDrive && googleDrive.ultimaSincronizacao && (
               <p className="resumo-sincronizacao">
                 Última atualização: {obterTextoDaSincronizacao(googleDrive.ultimaSincronizacao)} · {googleDrive.ultimaSincronizacao.arquivosEncontrados} arquivos encontrados.
@@ -567,9 +594,9 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
             )}
           </section>}
 
-        {usuario.papel === "admin" && areaAtual === "organizacao" && <><section className="bloco-admin painel-conteudo">
+        {usuario.papel === "admin" && areaAtual === "organizacao" && <><section className="bloco-admin painel-conteudo area-organizacao">
             <div className="cabecalho-bloco">
-              <div><h2>Pastas</h2><p>Organize o acervo em pastas e subpastas.</p></div>
+              <div><h2>Pastas</h2><p>Organize os materiais em pastas e subpastas.</p></div>
               {!formularioPastaAberto && <button type="button" className="botao-principal" onClick={iniciarCriacaoCategoria}><Icone nome="mais" />Nova pasta</button>}
             </div>
             {formularioPastaAberto && (
@@ -581,18 +608,23 @@ function PainelAcervo({ usuario, aoSair, tema, aoAlternarTema }) {
                 <div className="acoes-formulario"><button type="submit">{categoriaEmEdicao ? "Salvar alterações" : "Criar pasta"}</button><button type="button" className="secundario" onClick={limparCategoria}>Cancelar</button></div>
               </form>
             )}
+            <div className="ferramentas-lista-organizacao">
+              <label><span>Localizar pasta</span><span className="campo-com-icone"><Icone nome="buscar" /><input type="search" value={buscaPastasAdmin} placeholder="Digite o nome da pasta" onChange={function buscarPasta(evento) { definirBuscaPastasAdmin(evento.target.value); definirPaginaPastasAdmin(1); }} /></span></label>
+              <span>{categoriasFiltradasAdmin.length.toLocaleString("pt-BR")} {categoriasFiltradasAdmin.length === 1 ? "pasta" : "pastas"}</span>
+            </div>
             <ul className="lista-administrativa">
-              {categorias.map(function renderizar(categoria) {
+              {categoriasDaPaginaAdmin.map(function renderizar(categoria) {
                 const pastaPai = categorias.find(function encontrar(item) { return item.id === categoria.categoriaPaiId; });
                 return (
                   <li key={categoria.id} className={categoria.ativo ? "" : "inativo"}>
-                    <span><strong>{categoria.nome}</strong><small>{pastaPai ? "Dentro de " + pastaPai.nome : "Pasta principal"}</small>{!categoria.ativo && <small className="estado-item">Oculta para os usuários</small>}</span>
+                    <span className="identidade-pasta-admin"><span className="icone-pasta-admin"><Icone nome="pasta" tamanho={18} /></span><span><strong>{categoria.nome}</strong><small>{pastaPai ? "Dentro de " + pastaPai.nome : "Pasta principal"}</small>{!categoria.ativo && <small className="estado-item">Oculta para os usuários</small>}</span></span>
                     <div><button type="button" className="secundario" onClick={function editar() { iniciarEdicaoCategoria(categoria); }}>Editar</button><button type="button" className="secundario" onClick={function alternar() { alternarCategoria(categoria); }}>{categoria.ativo ? "Ocultar" : "Mostrar"}</button></div>
                   </li>
                 );
               })}
             </ul>
-            {!categorias.length && <p className="estado-vazio">Nenhuma pasta criada ainda.</p>}
+            {!categoriasFiltradasAdmin.length && <p className="estado-vazio">Nenhuma pasta encontrada.</p>}
+            {totalPaginasPastasAdmin > 1 && <nav className="paginacao paginacao-organizacao" aria-label="Páginas das pastas"><button type="button" className="secundario" disabled={paginaPastasAdminSegura <= 1} onClick={function anterior() { definirPaginaPastasAdmin(paginaPastasAdminSegura - 1); }}>Anterior</button><span>Página <strong>{paginaPastasAdminSegura}</strong> de {totalPaginasPastasAdmin}</span><button type="button" className="secundario" disabled={paginaPastasAdminSegura >= totalPaginasPastasAdmin} onClick={function proxima() { definirPaginaPastasAdmin(paginaPastasAdminSegura + 1); }}>Próxima</button></nav>}
           </section>
 
           <div className="grade-admin">
