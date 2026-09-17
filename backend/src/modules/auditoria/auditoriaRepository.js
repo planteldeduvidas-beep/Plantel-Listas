@@ -1,6 +1,7 @@
 function criarAuditoriaRepository(pool) {
-  async function registrar(dados) {
-    await pool.execute(
+  async function registrar(dados, executorInformado) {
+    const executor = executorInformado || pool;
+    await executor.execute(
       "INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado,contexto) VALUES (?,?,?,?,?,?)",
       [dados.atorUsuarioId || null, dados.acao, dados.entidade, dados.entidadeId || null,
         dados.resultado || "concluida", JSON.stringify(dados.contexto || {})]

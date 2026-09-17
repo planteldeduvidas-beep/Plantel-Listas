@@ -163,23 +163,21 @@ function criarIntegracaoGoogleDriveRepository(pool) {
   }
 
   async function concluirSincronizacao(conexao, sincronizacaoId, resumo) {
-    await conexao.execute(
-      "UPDATE sincronizacoes_google_drive SET status = 'concluida', "
-      + "pastas_encontradas = ?, arquivos_encontrados = ?, materiais_criados = ?, "
-      + "materiais_atualizados = ?, itens_indisponiveis = ?, concluida_em = CURRENT_TIMESTAMP(3) "
-      + "WHERE id = ? AND status = 'sincronizando'",
-      [
-        resumo.pastasEncontradas,
-        resumo.arquivosEncontrados,
-        resumo.materiaisCriados,
-        resumo.materiaisAtualizados,
-        resumo.itensIndisponiveis,
-        sincronizacaoId
-      ]
-    );
-    await conexao.execute(
-      "UPDATE estado_changes_google_drive SET reconciliacao_necessaria=0 WHERE id=1"
-    );
+    await conexao.beginTransaction();
+    try {
+      await conexao.execute(
+        "UPDATE sincronizacoes_google_drive SET status = 'concluida', "
+        + "pastas_encontradas = ?, arquivos_encontrados = ?, materiais_criados = ?, "
+        + "materiais_atualizados = ?, itens_indisponiveis = ?, concluida_em = CURRENT_TIMESTAMP(3) "
+        + "WHERE id = ? AND status = 'sincronizando'",
+        [resumo.pastasEncontradas,resumo.arquivosEncontrados,resumo.materiaisCriados,resumo.materiaisAtualizados,resumo.itensIndisponiveis,sincronizacaoId]
+      );
+      await conexao.execute("UPDATE estado_changes_google_drive SET reconciliacao_necessaria=0 WHERE id=1");
+      await conexao.commit();
+    } catch (erro) {
+      await conexao.rollback().catch(function preservar() {});
+      throw erro;
+    }
   }
 
   async function falharSincronizacao(conexao, sincronizacaoId, codigo) {

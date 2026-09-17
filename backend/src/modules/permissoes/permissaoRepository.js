@@ -1,3 +1,5 @@
+const AppError = require("../../shared/errors/AppError");
+
 function mapearPermissao(registro) {
   if (!registro) {
     return null;
@@ -31,16 +33,18 @@ const SELECAO = "SELECT permissao.id, permissao.professor_id, professor.email AS
   + "INNER JOIN categorias categoria ON categoria.id = permissao.categoria_id ";
 
 function criarPermissaoRepository(pool) {
-  async function buscarPorId(permissaoId) {
-    const [registros] = await pool.execute(
+  async function buscarPorId(permissaoId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
       SELECAO + "WHERE permissao.id = ? LIMIT 1",
       [permissaoId]
     );
     return mapearPermissao(registros[0]);
   }
 
-  async function buscarPorProfessorCategoria(professorId, categoriaId) {
-    const [registros] = await pool.execute(
+  async function buscarPorProfessorCategoria(professorId, categoriaId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
       SELECAO + "WHERE permissao.professor_id = ? AND permissao.categoria_id = ? LIMIT 1",
       [professorId, categoriaId]
     );
@@ -54,8 +58,9 @@ function criarPermissaoRepository(pool) {
     return registros.map(mapearPermissao);
   }
 
-  async function listarAtivasDoProfessor(professorId) {
-    const [registros] = await pool.execute(
+  async function listarAtivasDoProfessor(professorId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
       SELECAO
       + "WHERE permissao.professor_id = ? AND permissao.revogada_em IS NULL "
       + "AND categoria.ativo = 1 ORDER BY categoria.nome ASC",
@@ -64,8 +69,9 @@ function criarPermissaoRepository(pool) {
     return registros.map(mapearPermissao);
   }
 
-  async function conceder(professorId, categoriaId, administradorId) {
-    const [resultado] = await pool.execute(
+  async function conceder(professorId, categoriaId, administradorId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [resultado] = await executor.execute(
       "INSERT INTO permissoes_professor_categoria "
       + "(professor_id, categoria_id, concedida_por_usuario_id) VALUES (?, ?, ?) "
       + "ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), "
@@ -73,7 +79,7 @@ function criarPermissaoRepository(pool) {
       + "concedida_em = CURRENT_TIMESTAMP(3), revogada_em = NULL",
       [professorId, categoriaId, administradorId, administradorId]
     );
-    return buscarPorId(resultado.insertId);
+    return buscarPorId(resultado.insertId,executor);
   }
 
   async function revogar(permissaoId, administradorId) {
@@ -110,6 +116,20 @@ function criarPermissaoRepository(pool) {
     return listarAtivasDoProfessor(professorId);
   }
 
+  async function comTravaAdministrativa(funcao) {
+    const conexao=await pool.getConnection();let travaObtida=false;
+    try{
+      const [travas]=await conexao.execute("SELECT GET_LOCK(LEFT(CONCAT('plantel_admin_usuarios_',DATABASE()),64),5) AS obtida");
+      if(Number(travas[0].obtida)!==1)throw new AppError("Outra alteracao administrativa esta em andamento",409,"ALTERACAO_CONCORRENTE");
+      travaObtida=true;await conexao.beginTransaction();
+      try{const resultado=await funcao(conexao);await conexao.commit();return resultado;}
+      catch(erro){await conexao.rollback().catch(function preservar(){});throw erro;}
+    }finally{
+      if(travaObtida)await conexao.execute("SELECT RELEASE_LOCK(LEFT(CONCAT('plantel_admin_usuarios_',DATABASE()),64))").catch(function ignorar(){});
+      conexao.release();
+    }
+  }
+
   return {
     buscarPorId: buscarPorId,
     buscarPorProfessorCategoria: buscarPorProfessorCategoria,
@@ -117,7 +137,8 @@ function criarPermissaoRepository(pool) {
     listarAtivasDoProfessor: listarAtivasDoProfessor,
     conceder: conceder,
     revogar: revogar,
-    salvarLote: salvarLote
+    salvarLote: salvarLote,
+    comTravaAdministrativa: comTravaAdministrativa
   };
 }
 

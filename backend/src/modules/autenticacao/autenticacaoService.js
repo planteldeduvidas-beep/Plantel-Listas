@@ -55,7 +55,12 @@ function criarAutenticacaoService(dependencias) {
       new Date(),
       configuracao.seguranca.duracaoSessaoHoras
     );
-    await autenticacaoRepository.criarSessao(usuario.id, tokenHash, expiraEm);
+    const sessaoCriada = typeof autenticacaoRepository.criarSessaoSeCredencialAtual === "function"
+      ? await autenticacaoRepository.criarSessaoSeCredencialAtual(usuario.id,usuario.senhaHash,usuario.versaoSessao,tokenHash,expiraEm)
+      : (await autenticacaoRepository.criarSessao(usuario.id,tokenHash,expiraEm),true);
+    if(!sessaoCriada){
+      throw new AppError(MENSAGEM_CREDENCIAIS_INVALIDAS,401,"CREDENCIAIS_INVALIDAS");
+    }
 
     return {
       token: token,

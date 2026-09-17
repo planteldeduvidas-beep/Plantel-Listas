@@ -23,6 +23,15 @@ async function iniciarServidor() {
     });
     await aplicacao.locals.integracaoGoogleDriveService
       .recuperarSincronizacoesInterrompidas();
+    await aplicacao.locals.gestaoMateriaisService
+      .recuperarOperacoesPendentes()
+      .catch(function registrarRetomadaPendente(erro) {
+        logger.warn(
+          { codigo: erro.codigo || erro.code || "RETOMADA_DRIVE_FALHOU" },
+          "Operacoes Google Drive pendentes serao retomadas pelo monitor"
+        );
+      });
+    aplicacao.locals.gestaoMateriaisService.iniciarRetomada();
     aplicacao.locals.googleDriveChangesService.iniciarMonitor();
     const servidor = http.createServer(aplicacao);
 
@@ -48,6 +57,7 @@ async function iniciarServidor() {
         }
 
         aplicacao.locals.googleDriveChangesService.pararMonitor();
+        aplicacao.locals.gestaoMateriaisService.pararRetomada();
         try {
           await new Promise(function aguardarServidor(resolve, reject) {
             servidor.close(function finalizar(erro) {

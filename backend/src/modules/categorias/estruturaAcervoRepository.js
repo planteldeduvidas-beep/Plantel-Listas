@@ -51,57 +51,63 @@ function criarEstruturaAcervoRepository(pool) {
     return registros.map(mapearCategoria);
   }
 
-  async function buscarCategoriaPorId(categoriaId) {
-    const [registros] = await pool.execute(
+  async function buscarCategoriaPorId(categoriaId, executorInformado, bloquear) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
       "SELECT id, nome, descricao, categoria_pai_id, ordem, ativo, criado_em, atualizado_em "
-      + "FROM categorias WHERE id = ? LIMIT 1",
+      + "FROM categorias WHERE id = ? LIMIT 1" + (bloquear ? " FOR UPDATE" : ""),
       [categoriaId]
     );
     return mapearCategoria(registros[0]);
   }
 
-  async function criarCategoria(dados) {
+  async function criarCategoria(dados, executorInformado) {
+    const executor = executorInformado || pool;
     try {
-      const [resultado] = await pool.execute(
+      const [resultado] = await executor.execute(
         "INSERT INTO categorias (nome, descricao, categoria_pai_id, ordem) VALUES (?, ?, ?, ?)",
         [dados.nome, dados.descricao, dados.categoriaPaiId, dados.ordem]
       );
-      return buscarCategoriaPorId(resultado.insertId);
+      return buscarCategoriaPorId(resultado.insertId,executor);
     } catch (erro) {
       converterDuplicidade(erro, "Categoria");
     }
   }
 
-  async function atualizarCategoria(categoriaId, dados) {
+  async function atualizarCategoria(categoriaId, dados, executorInformado) {
+    const executor = executorInformado || pool;
     try {
-      await pool.execute(
+      await executor.execute(
         "UPDATE categorias SET nome = ?, descricao = ?, categoria_pai_id = ?, ordem = ? WHERE id = ?",
         [dados.nome, dados.descricao, dados.categoriaPaiId, dados.ordem, categoriaId]
       );
-      return buscarCategoriaPorId(categoriaId);
+      return buscarCategoriaPorId(categoriaId,executor);
     } catch (erro) {
       converterDuplicidade(erro, "Categoria");
     }
   }
 
-  async function atualizarCategoriaAtivo(categoriaId, ativo) {
-    await pool.execute(
+  async function atualizarCategoriaAtivo(categoriaId, ativo, executorInformado) {
+    const executor = executorInformado || pool;
+    await executor.execute(
       "UPDATE categorias SET ativo = ? WHERE id = ?",
       [ativo ? 1 : 0, categoriaId]
     );
-    return buscarCategoriaPorId(categoriaId);
+    return buscarCategoriaPorId(categoriaId,executor);
   }
 
-  async function contarFilhosAtivos(categoriaId) {
-    const [registros] = await pool.execute(
+  async function contarFilhosAtivos(categoriaId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
       "SELECT COUNT(*) AS quantidade FROM categorias WHERE categoria_pai_id = ? AND ativo = 1",
       [categoriaId]
     );
     return Number(registros[0].quantidade);
   }
 
-  async function listarIdsDaSubarvore(categoriaId) {
-    const [registros] = await pool.execute(
+  async function listarIdsDaSubarvore(categoriaId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
       "WITH RECURSIVE subarvore AS ("
       + "SELECT id FROM categorias WHERE id = ? "
       + "UNION ALL "
@@ -113,6 +119,21 @@ function criarEstruturaAcervoRepository(pool) {
     return registros.map(function mapearId(registro) {
       return Number(registro.id);
     });
+  }
+
+  async function comTransacaoHierarquia(funcao) {
+    const conexao=await pool.getConnection();let travaObtida=false;
+    try{
+      const [travas]=await conexao.execute("SELECT GET_LOCK(LEFT(CONCAT('plantel_hierarquia_',DATABASE()),64),5) AS obtida");
+      if(Number(travas[0].obtida)!==1)throw new AppError("Outra alteracao da hierarquia esta em andamento",409,"HIERARQUIA_CONCORRENTE");
+      travaObtida=true;await conexao.beginTransaction();
+      await conexao.execute("SELECT id FROM categorias ORDER BY id FOR UPDATE");
+      try{const resultado=await funcao(conexao);await conexao.commit();return resultado;}
+      catch(erro){await conexao.rollback().catch(function preservar(){});throw erro;}
+    }finally{
+      if(travaObtida)await conexao.execute("SELECT RELEASE_LOCK(LEFT(CONCAT('plantel_hierarquia_',DATABASE()),64))").catch(function ignorar(){});
+      conexao.release();
+    }
   }
 
   function criarCatalogo(tabela, entidade) {
@@ -183,6 +204,7 @@ function criarEstruturaAcervoRepository(pool) {
     atualizarCategoriaAtivo: atualizarCategoriaAtivo,
     contarFilhosAtivos: contarFilhosAtivos,
     listarIdsDaSubarvore: listarIdsDaSubarvore,
+    comTransacaoHierarquia: comTransacaoHierarquia,
     disciplinas: criarCatalogo("disciplinas", "Disciplina"),
     concursos: criarCatalogo("concursos", "Concurso")
   };

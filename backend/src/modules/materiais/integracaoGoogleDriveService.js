@@ -243,16 +243,20 @@ function criarIntegracaoGoogleDriveService(dependencias) {
   async function solicitarSincronizacaoAutomatica() {
     exigirProvider();
     const credencial = await repository.buscarCredencial();
-    if (!credencial || !credencial.autorizado_por_usuario_id) {
+    const possuiCredencialDeAmbiente = Boolean(configuracao.googleDrive.refreshToken);
+    if ((!credencial || credencial.renovacao_necessaria) && !possuiCredencialDeAmbiente) {
       return null;
     }
+    const usuarioId = credencial && credencial.autorizado_por_usuario_id
+      ? Number(credencial.autorizado_por_usuario_id)
+      : null;
     const sincronizacaoId = await repository.criarSincronizacaoAguardando(
-      Number(credencial.autorizado_por_usuario_id)
+      usuarioId
     );
     if (!sincronizacaoId) {
       return null;
     }
-    agendarSincronizacao(sincronizacaoId, Number(credencial.autorizado_por_usuario_id));
+    agendarSincronizacao(sincronizacaoId, usuarioId);
     return sincronizacaoId;
   }
 

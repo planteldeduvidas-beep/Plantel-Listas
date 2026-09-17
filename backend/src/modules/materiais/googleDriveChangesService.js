@@ -73,8 +73,12 @@ function criarGoogleDriveChangesService(dependencias) {
     if (!conexao) {
       return { processando: true };
     }
+    let resumo;
+    let erroDoProcessamento = null;
+    let deveReconciliar = false;
     try {
       const estado = await obterEstadoPreparado();
+      deveReconciliar = Boolean(estado && estado.reconciliacao_necessaria);
       const refreshToken = await integracaoService.obterRefreshTokenParaUso();
       const pageToken = estado.page_token;
       const alteracoesPreparadas = [];
@@ -87,33 +91,36 @@ function criarGoogleDriveChangesService(dependencias) {
         alteracoesPreparadas.push(await prepararAlteracao(refreshToken, alteracao));
       }
       const tokenFinal = resposta.nextPageToken || resposta.newStartPageToken || pageToken;
-      const resumo = alteracoesPreparadas.length > 0
+      resumo = alteracoesPreparadas.length > 0
         ? await repository.aplicarAlteracoes(conexao, alteracoesPreparadas, tokenFinal)
         : (await repository.registrarVerificacao(tokenFinal), {
           atualizados: 0,
           indisponiveis: 0,
           reconciliacaoNecessaria: false
         });
-      if (resumo.reconciliacaoNecessaria) {
-        await integracaoService.solicitarSincronizacaoAutomatica();
-      }
+      deveReconciliar = deveReconciliar || resumo.reconciliacaoNecessaria;
       await repository.marcarNotificacoesProcessadas();
-      return resumo;
     } catch (erro) {
       if (erro.codigo === "GOOGLE_PAGE_TOKEN_EXPIRADO") {
         const refreshToken = await integracaoService.obterRefreshTokenParaUso();
         await repository.salvarEstadoInicial(await provider.obterInicioDasAlteracoes(refreshToken));
         await repository.marcarReconciliacaoNecessaria("GOOGLE_PAGE_TOKEN_EXPIRADO");
+        deveReconciliar = true;
       } else {
         await repository.registrarErro(erro.codigo);
         if (erro.codigo === "GOOGLE_AUTORIZACAO_INVALIDA") {
           await integracaoService.registrarFalhaDeAutorizacao(erro.codigo);
         }
       }
-      throw erro;
+      erroDoProcessamento = erro;
     } finally {
       await repository.liberarTrava(conexao);
     }
+    if (deveReconciliar) {
+      await integracaoService.solicitarSincronizacaoAutomatica();
+    }
+    if (erroDoProcessamento) throw erroDoProcessamento;
+    return resumo;
   }
 
   function agendarProcessamento() {

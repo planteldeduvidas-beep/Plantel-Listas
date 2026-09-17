@@ -225,8 +225,10 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     if (!resposta.ok) {
       const codigo = resposta.status === 401 || resposta.status === 403
         ? "GOOGLE_AUTORIZACAO_INVALIDA"
-        : "GOOGLE_DRIVE_INDISPONIVEL";
-      throw new AppError("Nao foi possivel consultar o Google Drive", 503, codigo);
+        : resposta.status === 404
+          ? "GOOGLE_ARQUIVO_NAO_ENCONTRADO"
+          : "GOOGLE_DRIVE_INDISPONIVEL";
+      throw new AppError("Nao foi possivel consultar o Google Drive", resposta.status === 404 ? 409 : 503, codigo);
     }
 
     return resposta.json();
@@ -354,7 +356,12 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
           "X-Upload-Content-Type": dados.mimeType,
           "X-Upload-Content-Length": String(dados.tamanho)
         },
-        body: JSON.stringify({ name: dados.nome, mimeType: dados.mimeType, parents: [dados.pastaDriveId] }),
+        body: JSON.stringify({
+          name: dados.nome,
+          mimeType: dados.mimeType,
+          parents: [dados.pastaDriveId],
+          appProperties: dados.operacaoChave ? { plantelOperationId: dados.operacaoChave } : undefined
+        }),
         signal: AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS)
       });
     } catch (erro) {
@@ -473,6 +480,20 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       supportsAllDrives: true,
       fields: "id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,trashed,resourceKey"
     }, token);
+  }
+
+  async function buscarArquivoPorOperacao(refreshToken, operacaoChave) {
+    if (!/^[0-9a-f-]{36}$/i.test(operacaoChave || "")) return null;
+    const token = await obterTokenDeAcesso(refreshToken);
+    const resposta = await requisitarDrive("", {
+      q: "appProperties has { key='plantelOperationId' and value='" + operacaoChave + "' }",
+      spaces: "drive",
+      pageSize: 2,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+      fields: "files(id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,trashed,resourceKey,appProperties)"
+    }, token);
+    return Array.isArray(resposta.files) && resposta.files.length ? resposta.files[0] : null;
   }
 
   async function verificarDescendenteDaRaiz(refreshToken, item) {
@@ -619,6 +640,7 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     observarAlteracoes: observarAlteracoes,
     encerrarCanal: encerrarCanal,
     obterItem: obterItem,
+    buscarArquivoPorOperacao: buscarArquivoPorOperacao,
     verificarDescendenteDaRaiz: verificarDescendenteDaRaiz,
     criarPasta: criarPasta,
     criarArquivo: criarArquivo,

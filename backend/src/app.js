@@ -175,8 +175,10 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     repository: criarGestaoMateriaisRepository(pool),
     provider: googleDriveProvider,
     integracaoService: integracaoGoogleDriveService,
-    configuracao: configuracao
+    configuracao: configuracao,
+    logger: logger
   });
+  aplicacao.locals.gestaoMateriaisService = gestaoMateriaisService;
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
     controller: criarAutenticacaoController(serviceAutenticacao, configuracao),

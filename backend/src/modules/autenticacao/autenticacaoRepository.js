@@ -7,12 +7,30 @@ function criarAutenticacaoRepository(pool) {
     return resultado.insertId;
   }
 
+  async function criarSessaoSeCredencialAtual(usuarioId, senhaHashObservada, versaoObservada, tokenHash, expiraEm) {
+    const conexao=await pool.getConnection();
+    try{
+      await conexao.beginTransaction();
+      const [usuarios]=await conexao.execute(
+        "SELECT senha_hash,versao_sessao,ativo FROM usuarios WHERE id=? LIMIT 1 FOR UPDATE",
+        [usuarioId]
+      );
+      if(!usuarios[0]||Number(usuarios[0].ativo)!==1||usuarios[0].senha_hash!==senhaHashObservada||Number(usuarios[0].versao_sessao)!==Number(versaoObservada)){
+        await conexao.rollback();return false;
+      }
+      await conexao.execute("INSERT INTO sessoes (usuario_id,usuario_versao,token_hash,expira_em) VALUES (?,?,?,?)",[usuarioId,versaoObservada,tokenHash,expiraEm]);
+      await conexao.commit();return true;
+    }catch(erro){await conexao.rollback().catch(function preservar(){});throw erro;}
+    finally{conexao.release();}
+  }
+
   async function buscarSessaoAtivaPorHash(tokenHash) {
     const [registros] = await pool.execute(
       "SELECT s.id AS sessao_id, s.token_hash, s.expira_em, "
       + "u.id, u.nome, u.email, u.papel, u.ativo, u.criado_em, u.atualizado_em "
       + "FROM sessoes s INNER JOIN usuarios u ON u.id = s.usuario_id "
       + "WHERE s.token_hash = ? AND s.revogada_em IS NULL "
+      + "AND s.usuario_versao=u.versao_sessao "
       + "AND s.expira_em > CURRENT_TIMESTAMP(3) AND u.ativo = 1 LIMIT 1",
       [tokenHash]
     );
@@ -96,7 +114,7 @@ function criarAutenticacaoRepository(pool) {
 
       const recuperacao = registros[0];
       const [usuarioAtualizado] = await conexao.execute(
-        "UPDATE usuarios SET senha_hash = ? WHERE id = ? AND ativo = 1",
+        "UPDATE usuarios SET senha_hash = ?,versao_sessao=versao_sessao+1 WHERE id = ? AND ativo = 1",
         [novaSenhaHash, recuperacao.usuario_id]
       );
 
@@ -123,6 +141,7 @@ function criarAutenticacaoRepository(pool) {
 
   return {
     criarSessao: criarSessao,
+    criarSessaoSeCredencialAtual: criarSessaoSeCredencialAtual,
     buscarSessaoAtivaPorHash: buscarSessaoAtivaPorHash,
     revogarSessaoPorHash: revogarSessaoPorHash,
     revogarSessoesDoUsuario: revogarSessoesDoUsuario,

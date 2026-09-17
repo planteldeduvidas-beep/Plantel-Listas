@@ -243,17 +243,22 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
 
   async function adquirirTrava() {
     const conexao = await pool.getConnection();
-    const [registros] = await conexao.execute(
-      nomeTravaInformado
-        ? "SELECT GET_LOCK(?,0) AS adquirida"
-        : "SELECT GET_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64),0) AS adquirida",
-      nomeTravaInformado ? [String(nomeTravaInformado).slice(0, 64)] : []
-    );
-    if (Number(registros[0].adquirida) !== 1) {
+    try {
+      const [registros] = await conexao.execute(
+        nomeTravaInformado
+          ? "SELECT GET_LOCK(?,0) AS adquirida"
+          : "SELECT GET_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64),0) AS adquirida",
+        nomeTravaInformado ? [String(nomeTravaInformado).slice(0, 64)] : []
+      );
+      if (Number(registros[0].adquirida) !== 1) {
+        conexao.release();
+        return null;
+      }
+      return conexao;
+    } catch (erro) {
       conexao.release();
-      return null;
+      throw erro;
     }
-    return conexao;
   }
 
   async function liberarTrava(conexao) {

@@ -88,3 +88,53 @@ test("remove upload temporario e apaga arquivo novo quando o MySQL falha", async
   assert.deepEqual(dependencias.chamadas, ["criar", "excluir"]);
   await assert.rejects(fs.stat(caminho), function removido(erro) { return erro.code === "ENOENT"; });
 });
+
+test("commit de resultado desconhecido nao dispara compensacao externa",async function(){
+  const fases=[];const erro=new Error("resposta do commit perdida");erro.estadoCommit="desconhecido";
+  const dependencias=criarDependencias({repository:{
+    criarOperacaoDrive:async function(){},atualizarOperacaoDrive:async function(){},
+    registrarFalhaOperacaoDrive:async function(chave,fase){fases.push(fase);},
+    atualizarMaterial:async function(){throw erro;}
+  }});
+  await assert.rejects(dependencias.service.editar({id:2,papel:"admin"},1,{nome:"novo.pdf",versao:1}),/resposta do commit perdida/);
+  assert.deepEqual(dependencias.chamadas,["renomear:novo.pdf"]);
+  assert.deepEqual(fases,["commit_incerto"]);
+});
+
+test("falha da compensacao permanece registrada para retry",async function(){
+  const fases=[];let chamadasRenomeacao=0;
+  const dependencias=criarDependencias({repository:{
+    criarOperacaoDrive:async function(){},atualizarOperacaoDrive:async function(){},
+    registrarFalhaOperacaoDrive:async function(chave,fase){fases.push(fase);},
+    atualizarMaterial:async function(){throw new Error("falha banco");}
+  },provider:{renomearArquivo:async function(){chamadasRenomeacao+=1;if(chamadasRenomeacao===2)throw new Error("falha compensacao");}}});
+  await assert.rejects(dependencias.service.editar({id:2,papel:"admin"},1,{nome:"novo.pdf",versao:1}),/falha banco/);
+  assert.deepEqual(fases,["compensacao_pendente"]);
+});
+
+test("retoma exclusao permanente quando o arquivo ja nao existe no Drive",async function(){
+  const concluidas=[];
+  const pendente=Object.assign(material(),{estado:"exclusao_pendente"});
+  const dependencias=criarDependencias({repository:{
+    buscarMaterial:async function(){return pendente;},
+    listarOperacoesDrivePendentes:async function(){return[{chave:"op-1",tipo:"exclusao_definitiva",materialId:1,usuarioId:2,detalhes:{driveFileId:"driveOriginal"}}];},
+    registrarFalhaOperacaoDrive:async function(){},
+    concluirExclusao:async function(id,usuarioId,chave){concluidas.push([id,usuarioId,chave]);}
+  },provider:{excluirArquivo:async function(){throw new AppError("ausente",409,"GOOGLE_ARQUIVO_NAO_ENCONTRADO");}}});
+  const quantidade=await dependencias.service.recuperarOperacoesPendentes();
+  assert.equal(quantidade,1);
+  assert.deepEqual(concluidas,[[1,2,"op-1"]]);
+});
+
+test("retoma renomeacao pendente usando o estado confirmado no MySQL",async function(){
+  const concluidas=[];
+  const dependencias=criarDependencias({repository:{
+    listarOperacoesDrivePendentes:async function(){return[{chave:"op-2",tipo:"edicao",materialId:1,usuarioId:2,detalhes:{driveFileId:"driveOriginal",nomeNovo:"nome-incerto.pdf"}}];},
+    registrarFalhaOperacaoDrive:async function(){},
+    concluirOperacaoDrive:async function(chave){concluidas.push(chave);}
+  }});
+  const quantidade=await dependencias.service.recuperarOperacoesPendentes();
+  assert.equal(quantidade,1);
+  assert.deepEqual(dependencias.chamadas,["renomear:original.pdf"]);
+  assert.deepEqual(concluidas,["op-2"]);
+});

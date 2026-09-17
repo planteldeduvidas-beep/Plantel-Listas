@@ -46,9 +46,9 @@ function criarEstruturaAcervoService(repository) {
     return repository.listarCategorias(false);
   }
 
-  async function exigirCategoria(categoriaId) {
+  async function exigirCategoria(categoriaId, executor) {
     const id = validarId(categoriaId, "Categoria");
-    const categoria = await repository.buscarCategoriaPorId(id);
+    const categoria = await repository.buscarCategoriaPorId(id,executor);
 
     if (!categoria) {
       throw new AppError("Categoria nao encontrada", 404, "CATEGORIA_NAO_ENCONTRADA");
@@ -57,7 +57,7 @@ function criarEstruturaAcervoService(repository) {
     return categoria;
   }
 
-  async function validarPai(categoriaPaiId, categoriaId) {
+  async function validarPai(categoriaPaiId, categoriaId, executor) {
     if (categoriaPaiId === null) {
       return;
     }
@@ -66,14 +66,14 @@ function criarEstruturaAcervoService(repository) {
       throw new AppError("Categoria nao pode ser pai de si mesma", 409, "HIERARQUIA_INVALIDA");
     }
 
-    const pai = await exigirCategoria(categoriaPaiId);
+    const pai = await exigirCategoria(categoriaPaiId,executor);
 
     if (!pai.ativo) {
       throw new AppError("Categoria pai esta inativa", 409, "CATEGORIA_PAI_INATIVA");
     }
 
     if (categoriaId) {
-      const idsDaSubarvore = await repository.listarIdsDaSubarvore(categoriaId);
+      const idsDaSubarvore = await repository.listarIdsDaSubarvore(categoriaId,executor);
 
       if (idsDaSubarvore.includes(categoriaPaiId)) {
         throw new AppError("Movimentacao criaria ciclo na hierarquia", 409, "CICLO_DE_CATEGORIA");
@@ -83,42 +83,32 @@ function criarEstruturaAcervoService(repository) {
 
   async function criarCategoria(corpo) {
     const dados = validarCategoria(corpo, false);
-    await validarPai(dados.categoriaPaiId, null);
-    return repository.criarCategoria(dados);
+    return repository.comTransacaoHierarquia(async function criar(conexao){
+      await validarPai(dados.categoriaPaiId,null,conexao);
+      return repository.criarCategoria(dados,conexao);
+    });
   }
 
   async function editarCategoria(categoriaId, corpo) {
-    const categoria = await exigirCategoria(categoriaId);
-
-    if (!categoria.ativo) {
-      throw new AppError("Categoria inativa nao pode ser editada", 409, "CATEGORIA_INATIVA");
-    }
-
     const alteracoes = validarCategoria(corpo, true);
-    const dados = Object.assign({}, categoria, alteracoes);
-    await validarPai(dados.categoriaPaiId, categoria.id);
-    return repository.atualizarCategoria(categoria.id, dados);
+    return repository.comTransacaoHierarquia(async function editar(conexao){
+      const categoria=await exigirCategoria(categoriaId,conexao);
+      if(!categoria.ativo)throw new AppError("Categoria inativa nao pode ser editada",409,"CATEGORIA_INATIVA");
+      const dados=Object.assign({},categoria,alteracoes);
+      await validarPai(dados.categoriaPaiId,categoria.id,conexao);
+      return repository.atualizarCategoria(categoria.id,dados,conexao);
+    });
   }
 
   async function alterarCategoriaAtivo(categoriaId, corpo) {
-    const categoria = await exigirCategoria(categoriaId);
     const ativo = validarAtivo(corpo);
-
-    if (ativo === categoria.ativo) {
-      return categoria;
-    }
-
-    if (ativo) {
-      await validarPai(categoria.categoriaPaiId, categoria.id);
-    } else if (await repository.contarFilhosAtivos(categoria.id) > 0) {
-      throw new AppError(
-        "Desative as categorias filhas antes da categoria pai",
-        409,
-        "CATEGORIA_POSSUI_FILHAS_ATIVAS"
-      );
-    }
-
-    return repository.atualizarCategoriaAtivo(categoria.id, ativo);
+    return repository.comTransacaoHierarquia(async function alterar(conexao){
+      const categoria=await exigirCategoria(categoriaId,conexao);
+      if(ativo===categoria.ativo)return categoria;
+      if(ativo)await validarPai(categoria.categoriaPaiId,categoria.id,conexao);
+      else if(await repository.contarFilhosAtivos(categoria.id,conexao)>0)throw new AppError("Desative as categorias filhas antes da categoria pai",409,"CATEGORIA_POSSUI_FILHAS_ATIVAS");
+      return repository.atualizarCategoriaAtivo(categoria.id,ativo,conexao);
+    });
   }
 
   function criarServiceDeCatalogo(catalogo, nome, codigo) {

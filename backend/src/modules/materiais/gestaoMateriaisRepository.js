@@ -19,7 +19,47 @@ function mapearMaterial(item) {
   };
 }
 
+function mapearOperacaoDrive(item) {
+  if (!item) return null;
+  let detalhes = item.detalhes || {};
+  if (typeof detalhes === "string") {
+    try { detalhes = JSON.parse(detalhes); } catch (erro) { detalhes = {}; }
+  }
+  return {
+    id: Number(item.id),
+    chave: item.chave,
+    tipo: item.tipo,
+    materialId: item.material_id === null ? null : Number(item.material_id),
+    usuarioId: item.usuario_id === null ? null : Number(item.usuario_id),
+    fase: item.fase,
+    detalhes: detalhes,
+    tentativas: Number(item.tentativas || 0)
+  };
+}
+
 function criarGestaoMateriaisRepository(pool) {
+  async function executarTransacao(tarefa) {
+    const conexao = await pool.getConnection();
+    let commitIniciado = false;
+    try {
+      await conexao.beginTransaction();
+      const resultado = await tarefa(conexao);
+      commitIniciado = true;
+      await conexao.commit();
+      return resultado;
+    } catch (erro) {
+      if (!commitIniciado) {
+        await conexao.rollback().catch(function preservarErroOriginal() {});
+        erro.estadoCommit = "nao_confirmado";
+      } else {
+        erro.estadoCommit = "desconhecido";
+      }
+      throw erro;
+    } finally {
+      conexao.release();
+    }
+  }
+
   async function adquirirTravaDeOperacao() {
     const conexao = await pool.getConnection();
     try {
@@ -97,10 +137,17 @@ function criarGestaoMateriaisRepository(pool) {
     return registros.map(function mapear(item) { return { id: Number(item.id), nome: item.nome, caminho: item.caminho }; });
   }
 
-  async function criarMaterial(dados, usuarioId) {
-    const conexao = await pool.getConnection();
-    try {
-      await conexao.beginTransaction();
+  async function concluirOperacaoNaTransacao(conexao, chave, materialId) {
+    if (!chave) return;
+    await conexao.execute(
+      "UPDATE operacoes_google_drive_pendentes SET material_id=COALESCE(?,material_id),fase='concluida',"
+      + "concluida_em=CURRENT_TIMESTAMP(3),ultimo_erro_codigo=NULL,proxima_tentativa_em=NULL WHERE chave=?",
+      [materialId || null,chave]
+    );
+  }
+
+  async function criarMaterial(dados, usuarioId, operacaoChave) {
+    return executarTransacao(async function criar(conexao) {
       const [resultado] = await conexao.execute(
         "INSERT INTO materiais (drive_file_id,drive_parent_file_id,categoria_id,disciplina_id,concurso_id,nome,mime_type,tipo,extensao,tamanho_bytes,checksum_md5,drive_criado_em,drive_modificado_em,resource_key,disponivel,estado_gestao,ultima_sincronizacao_drive_id) "
         + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'disponivel',NULL)",
@@ -108,15 +155,12 @@ function criarGestaoMateriaisRepository(pool) {
       );
       const id = Number(resultado.insertId);
       await registrarAuditoria(conexao, id, usuarioId, "upload", "concluida", { categoriaId: dados.categoriaId, tipo: dados.tipo });
-      await conexao.commit();
-      return buscarMaterial(id);
-    } catch (erro) {
-      await conexao.rollback();
-      throw erro;
-    } finally { conexao.release(); }
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,id);
+      return buscarMaterial(id, conexao);
+    });
   }
 
-  async function atualizarMaterial(id, versao, campos, usuarioId, operacao) {
+  async function atualizarMaterial(id, versao, campos, usuarioId, operacao, operacaoChave) {
     const permitidos = {
       nome: "nome", disciplinaId: "disciplina_id", concursoId: "concurso_id",
       categoriaId: "categoria_id", driveParentFileId: "drive_parent_file_id",
@@ -128,70 +172,67 @@ function criarGestaoMateriaisRepository(pool) {
     const atribuicoes = entradas.map(function mapear(chave) { return permitidos[chave] + "=?"; });
     const valores = entradas.map(function valor(chave) { return campos[chave]; });
     atribuicoes.push("versao=versao+1");
-    const conexao = await pool.getConnection();
-    try {
-      await conexao.beginTransaction();
+    return executarTransacao(async function atualizar(conexao) {
       const [resultado] = await conexao.execute(
         "UPDATE materiais SET " + atribuicoes.join(",") + " WHERE id=? AND versao=? AND estado_gestao='disponivel'",
         valores.concat([id, versao])
       );
       if (resultado.affectedRows !== 1) throw new Error("CONCORRENCIA_MATERIAL");
       await registrarAuditoria(conexao, id, usuarioId, operacao, "concluida", { campos: entradas });
-      await conexao.commit();
-      return buscarMaterial(id);
-    } catch (erro) { await conexao.rollback(); throw erro; } finally { conexao.release(); }
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,id);
+      return buscarMaterial(id, conexao);
+    });
   }
 
-  async function enviarLixeira(id, versao, usuarioId) {
-    const conexao = await pool.getConnection();
-    try {
-      await conexao.beginTransaction();
+  async function enviarLixeira(id, versao, usuarioId, operacaoChave) {
+    return executarTransacao(async function enviar(conexao) {
       const [resultado] = await conexao.execute(
         "UPDATE materiais SET categoria_anterior_id=categoria_id,estado_gestao='lixeira',disponivel=0,enviado_lixeira_por_usuario_id=?,enviado_lixeira_em=CURRENT_TIMESTAMP(3),versao=versao+1 WHERE id=? AND versao=? AND estado_gestao='disponivel'",
         [usuarioId,id,versao]
       );
       if (resultado.affectedRows !== 1) throw new Error("CONCORRENCIA_MATERIAL");
       await registrarAuditoria(conexao,id,usuarioId,"lixeira","concluida",{});
-      await conexao.commit();
-    } catch (erro) { await conexao.rollback(); throw erro; } finally { conexao.release(); }
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,id);
+      return buscarMaterial(id, conexao);
+    });
   }
 
-  async function restaurar(id, versao, usuarioId) {
-    const conexao = await pool.getConnection();
-    try {
-      await conexao.beginTransaction();
+  async function restaurar(id, versao, usuarioId, operacaoChave) {
+    return executarTransacao(async function restaurarMaterial(conexao) {
       const [resultado] = await conexao.execute(
         "UPDATE materiais SET categoria_id=categoria_anterior_id,estado_gestao='disponivel',disponivel=1,categoria_anterior_id=NULL,enviado_lixeira_por_usuario_id=NULL,enviado_lixeira_em=NULL,versao=versao+1 WHERE id=? AND versao=? AND estado_gestao='lixeira'",
         [id,versao]
       );
       if (resultado.affectedRows !== 1) throw new Error("CONCORRENCIA_MATERIAL");
       await registrarAuditoria(conexao,id,usuarioId,"restauracao","concluida",{});
-      await conexao.commit();
-    } catch (erro) { await conexao.rollback(); throw erro; } finally { conexao.release(); }
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,id);
+      return buscarMaterial(id, conexao);
+    });
   }
 
-  async function marcarExclusao(id, versao, usuarioId) {
-    const conexao = await pool.getConnection();
-    try {
-      await conexao.beginTransaction();
+  async function marcarExclusao(id, versao, usuarioId, operacao) {
+    return executarTransacao(async function marcar(conexao) {
       const [resultado] = await conexao.execute("UPDATE materiais SET estado_gestao='exclusao_pendente',disponivel=0,versao=versao+1 WHERE id=? AND versao=? AND estado_gestao='lixeira'",[id,versao]);
       if (resultado.affectedRows !== 1) throw new Error("CONCORRENCIA_MATERIAL");
       await registrarAuditoria(conexao,id,usuarioId,"exclusao_definitiva","compensacao_pendente",{});
-      const pendente = await buscarMaterial(id, conexao);
-      await conexao.commit();
-      return pendente;
-    } catch (erro) { await conexao.rollback(); throw erro; } finally { conexao.release(); }
+      if (operacao) {
+        await conexao.execute(
+          "INSERT INTO operacoes_google_drive_pendentes (chave,tipo,material_id,usuario_id,fase,detalhes) VALUES (?,?,?,?,?,?)",
+          [operacao.chave,"exclusao_definitiva",id,usuarioId,"preparada",JSON.stringify(operacao.detalhes || {})]
+        );
+      }
+      return buscarMaterial(id, conexao);
+    });
   }
 
-  async function concluirExclusao(id, usuarioId) {
-    const conexao = await pool.getConnection();
-    try {
-      await conexao.beginTransaction();
+  async function concluirExclusao(id, usuarioId, operacaoChave) {
+    return executarTransacao(async function concluir(conexao) {
       const [resultado] = await conexao.execute("UPDATE materiais SET estado_gestao='excluido',disponivel=0,versao=versao+1 WHERE id=? AND estado_gestao='exclusao_pendente'",[id]);
       if (resultado.affectedRows !== 1) throw new Error("CONCORRENCIA_MATERIAL");
       await registrarAuditoria(conexao,id,usuarioId,"exclusao_definitiva","concluida",{});
-      await conexao.commit();
-    } catch (erro) { await conexao.rollback(); throw erro; } finally { conexao.release(); }
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,id);
+      return buscarMaterial(id, conexao);
+    });
   }
 
   async function reverterExclusao(id) {
@@ -210,7 +251,51 @@ function criarGestaoMateriaisRepository(pool) {
     await executor.execute("INSERT INTO auditoria_materiais (material_id,usuario_id,operacao,resultado,detalhes) VALUES (?,?,?,?,?)",[materialId,usuarioId,operacao,resultado,JSON.stringify(detalhes || {})]);
   }
 
-  return { adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria };
+  async function criarOperacaoDrive(dados) {
+    await pool.execute(
+      "INSERT INTO operacoes_google_drive_pendentes (chave,tipo,material_id,usuario_id,fase,detalhes) VALUES (?,?,?,?,?,?)",
+      [dados.chave,dados.tipo,dados.materialId || null,dados.usuarioId || null,dados.fase || "preparada",JSON.stringify(dados.detalhes || {})]
+    );
+    return dados.chave;
+  }
+
+  async function atualizarOperacaoDrive(chave, fase, detalhes, materialId) {
+    await pool.execute(
+      "UPDATE operacoes_google_drive_pendentes SET fase=?,detalhes=?,material_id=COALESCE(?,material_id),"
+      + "ultimo_erro_codigo=NULL,proxima_tentativa_em=NULL WHERE chave=? AND fase<>'concluida'",
+      [fase,JSON.stringify(detalhes || {}),materialId || null,chave]
+    );
+  }
+
+  async function concluirOperacaoDrive(chave) {
+    await pool.execute(
+      "UPDATE operacoes_google_drive_pendentes SET fase='concluida',concluida_em=CURRENT_TIMESTAMP(3),"
+      + "ultimo_erro_codigo=NULL,proxima_tentativa_em=NULL WHERE chave=?",
+      [chave]
+    );
+  }
+
+  async function registrarFalhaOperacaoDrive(chave, fase, codigo, detalhes) {
+    await pool.execute(
+      "UPDATE operacoes_google_drive_pendentes SET fase=?,detalhes=?,tentativas=tentativas+1,"
+      + "ultimo_erro_codigo=?,proxima_tentativa_em=DATE_ADD(CURRENT_TIMESTAMP(3),INTERVAL 30 SECOND) "
+      + "WHERE chave=? AND fase<>'concluida'",
+      [fase,JSON.stringify(detalhes || {}),String(codigo || "OPERACAO_DRIVE_PENDENTE").slice(0,100),chave]
+    );
+  }
+
+  async function listarOperacoesDrivePendentes(limite) {
+    const [registros] = await pool.execute(
+      "SELECT id,chave,tipo,material_id,usuario_id,fase,detalhes,tentativas "
+      + "FROM operacoes_google_drive_pendentes WHERE fase<>'concluida' "
+      + "AND (proxima_tentativa_em IS NULL OR proxima_tentativa_em<=CURRENT_TIMESTAMP(3)) "
+      + "ORDER BY id LIMIT ?",
+      [limite || 25]
+    );
+    return registros.map(mapearOperacaoDrive);
+  }
+
+  return { adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
 }
 
 module.exports = criarGestaoMateriaisRepository;

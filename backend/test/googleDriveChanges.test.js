@@ -98,6 +98,20 @@ test("Changes API processa somente um lote por ciclo e libera a trava", async fu
   assert.equal(cenario.chamadas.liberada, true);
 });
 
+test("reconciliacao persistida e retomada depois de liberar a named lock",async function(){
+  const cenario=criarCenario();const ordem=[];
+  cenario.repository.buscarEstado=async function(){return{page_token:"pagina-1",reconciliacao_necessaria:1};};
+  cenario.repository.liberarTrava=async function(){ordem.push("liberar");};
+  cenario.provider.listarAlteracoes=async function(){return{changes:[],newStartPageToken:"pagina-2"};};
+  cenario.service=criarService({repository:cenario.repository,provider:cenario.provider,integracaoService:{
+    obterRefreshTokenParaUso:async function(){return"refresh-seguro";},
+    registrarFalhaDeAutorizacao:async function(){},
+    solicitarSincronizacaoAutomatica:async function(){ordem.push("agendar");}
+  },configuracao:{googleDrive:{webhookUrl:"",intervaloChangesMs:60000}},agendarTarefa:function(){}});
+  await cenario.service.processarAlteracoes();
+  assert.deepEqual(ordem,["liberar","agendar"]);
+});
+
 test("mudanca fora da raiz fica indisponivel e pasta e aplicada sem varrer subarvore", async function testarLimites() {
   const cenario = criarCenario();
   cenario.provider.verificarDescendenteDaRaiz = async function fora() { return false; };

@@ -122,6 +122,14 @@ test("exige HTTPS na redirect URI Google Drive em producao", function testarRedi
   }, /GOOGLE_DRIVE_REDIRECT_URI/);
 });
 
+test("recusa pool com uma unica conexao por causa das named locks", function testarPoolInsuficiente() {
+  const variaveis = criarVariaveisValidas();
+  variaveis.DB_CONNECTION_LIMIT = "1";
+  assert.throws(function validar() {
+    validarVariaveisDeAmbiente(variaveis);
+  }, /DB_CONNECTION_LIMIT/);
+});
+
 test("recusa origem CORS com caminho e URL publica insegura", function testarUrlsPublicas() {
   const corsComCaminho = criarVariaveisValidas();
   corsComCaminho.CORS_ORIGENS = "http://localhost:5173/aplicacao";

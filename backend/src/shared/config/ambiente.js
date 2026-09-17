@@ -247,7 +247,7 @@ function validarVariaveisDeAmbiente(variaveis) {
       usuario: exigirTexto(variaveis, "DB_USER"),
       senha: variaveis.DB_PASSWORD || "",
       nome: validarNomeDoBanco(exigirTexto(variaveis, "DB_NAME")),
-      limiteDeConexoes: lerInteiro(variaveis, "DB_CONNECTION_LIMIT", 10, 1, 50),
+      limiteDeConexoes: lerInteiro(variaveis, "DB_CONNECTION_LIMIT", 10, 2, 50),
       limiteDaFila: lerInteiro(variaveis, "DB_QUEUE_LIMIT", 100, 1, 10000),
       timeoutConexaoMs: lerInteiro(variaveis, "DB_CONNECT_TIMEOUT_MS", 10000, 1000, 60000)
     }),
