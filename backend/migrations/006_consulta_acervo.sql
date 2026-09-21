@@ -26,8 +26,7 @@ VALUES
   ('Matemática', 'Conteúdos de Matemática.'),
   ('Português', 'Conteúdos de Português.'),
   ('Química', 'Conteúdos de Química.')
-AS nova
-ON DUPLICATE KEY UPDATE nome = nova.nome;
+ON DUPLICATE KEY UPDATE nome = VALUES(nome);
 
 INSERT INTO concursos (nome, descricao)
 VALUES
@@ -49,8 +48,7 @@ VALUES
   ('IME', 'Provas e materiais do IME.'),
   ('ITA', 'Provas e materiais do ITA.'),
   ('SDPM-SP', 'Provas e materiais da SDPM-SP.')
-AS nova
-ON DUPLICATE KEY UPDATE nome = nova.nome;
+ON DUPLICATE KEY UPDATE nome = VALUES(nome);
 
 UPDATE categorias categoria
 INNER JOIN disciplinas disciplina ON disciplina.nome = CASE

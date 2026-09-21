@@ -38,5 +38,5 @@ CREATE TABLE auditoria_classificacao_categorias (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO disciplinas (nome, descricao)
-VALUES ('Biologia', 'Conteudos de Biologia.') AS nova
-ON DUPLICATE KEY UPDATE nome = nova.nome;
+VALUES ('Biologia', 'Conteudos de Biologia.')
+ON DUPLICATE KEY UPDATE nome = VALUES(nome);
