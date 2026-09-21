@@ -13,6 +13,7 @@
     "start": "npm run start --workspace backend",
     "build": "npm run build --workspace frontend",
     "deploy": "npm run migrate && npm run build",
+    "deploy:bootstrap": "npm run migrate && npm run bootstrap:admin && npm run build",
     "test": "npm run test --workspace backend",
     "test:drive:write": "npm run test:drive:write --workspace backend",
     "db:create": "npm run db:create --workspace backend",
