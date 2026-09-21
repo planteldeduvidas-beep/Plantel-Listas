@@ -4,6 +4,16 @@ const AREAS_POR_PAPEL = {
   admin: ["estatisticas", "acervo", "usuarios", "acessos", "organizacao", "historico", "drive"]
 };
 
+const DOCUMENTOS_PUBLICOS = Object.freeze({
+  "/privacidade": "privacidade",
+  "/termos": "termos"
+});
+
+function obterDocumentoPublico(caminho) {
+  const caminhoNormalizado = String(caminho || "/").replace(/\/+$/, "") || "/";
+  return DOCUMENTOS_PUBLICOS[caminhoNormalizado] || null;
+}
+
 function obterAreaInicial(papel) {
   return papel === "admin" ? "estatisticas" : "acervo";
 }
@@ -40,6 +50,7 @@ function limparParametrosTemporarios(caminho, pesquisa) {
 export {
   criarUrlDaNavegacao,
   limparParametrosTemporarios,
+  obterDocumentoPublico,
   obterAreaInicial,
   obterAreaPermitida,
   obterPastaDaUrl

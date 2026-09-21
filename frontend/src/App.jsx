@@ -8,10 +8,11 @@ import {
   redefinirSenha
 } from "./api.js";
 import PainelAcervo from "./PainelAcervo.jsx";
+import PaginaInstitucional from "./PaginaInstitucional.jsx";
 import { Alerta, AlternadorTema, Carregando, Icone, aplicarTema, lerTemaSalvo, mensagemHumana } from "./ComponentesInterface.jsx";
-import { criarUrlDaNavegacao, limparParametrosTemporarios } from "./navegacao.js";
+import { criarUrlDaNavegacao, limparParametrosTemporarios, obterDocumentoPublico } from "./navegacao.js";
 
-function App() {
+function Aplicacao() {
   const [temaInicial] = useState(lerTemaSalvo);
   const [retornoInicial] = useState(function lerRetornoInicial() {
     const parametros = new URLSearchParams(window.location.search);
@@ -262,9 +263,20 @@ function App() {
             {tela !== "recuperar" && <button type="button" onClick={function abrirRecuperacao() { trocarTela("recuperar"); }}>Esqueci a senha</button>}
           </nav>
         )}
+        <nav className="links-institucionais-autenticacao" aria-label="Informações legais">
+          <a href="/privacidade">Política de Privacidade</a>
+          <a href="/termos">Termos de Uso</a>
+        </nav>
       </section>
     </main>
   );
+}
+
+function App() {
+  const documentoPublico = obterDocumentoPublico(window.location.pathname);
+  return documentoPublico
+    ? <PaginaInstitucional documento={documentoPublico} />
+    : <Aplicacao />;
 }
 
 export default App;

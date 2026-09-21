@@ -22,7 +22,7 @@ npm run build
 npm start
 ```
 
-O backend inicia com `node backend/src/server.js`. O build estatico fica em `frontend/dist`; a hospedagem deve servir esse diretorio e encaminhar `/api` para o processo Node, preservando HTTPS e os cabecalhos do proxy.
+O backend inicia com `node backend/src/server.js`. O build estatico fica em `frontend/dist`; a hospedagem deve servir esse diretorio e encaminhar `/api` para o processo Node, preservando HTTPS e os cabecalhos do proxy. Quando o build e servido pelo processo Node, o backend entrega `index.html` como fallback das rotas publicas da SPA, inclusive `/privacidade` e `/termos`. Se a Hostinger servir os arquivos estaticos diretamente, configurar o rewrite equivalente para `index.html`, sem encaminhar nem mascarar rotas `/api`.
 
 ## 3. Health check, logs e reinicio
 

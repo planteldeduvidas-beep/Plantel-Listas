@@ -281,8 +281,18 @@ function criarAplicacao(configuracao, logger, dependenciasInformadas) {
   }
 
   if (configuracao.ambiente === "production") {
-    const caminhoDoFrontend = path.resolve(__dirname, "../../frontend/dist");
+    const caminhoDoFrontend = dependencias.caminhoDoFrontend
+      || path.resolve(__dirname, "../../frontend/dist");
     aplicacao.use(express.static(caminhoDoFrontend));
+    aplicacao.use(function servirFallbackDaSpa(req, res, next) {
+      if (req.method !== "GET" || req.path.startsWith("/api/") || !req.accepts("html")) {
+        next();
+        return;
+      }
+      res.sendFile(path.join(caminhoDoFrontend, "index.html"), function concluir(erro) {
+        if (erro) next(erro);
+      });
+    });
   }
 
   aplicacao.use(tratarRotaNaoEncontrada);

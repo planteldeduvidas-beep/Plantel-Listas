@@ -57,6 +57,14 @@ test("desenvolvimento entrega conteudo pela mesma origem usando proxy seguro", f
   assert.match(vite, /target: destinoApi/);
 });
 
+test("rotas institucionais sao publicas e estritamente reconhecidas", async function testarDocumentosPublicos() {
+  const navegacao = await import(pathToFileURL(caminhoNavegacao).href);
+  assert.equal(navegacao.obterDocumentoPublico("/privacidade"), "privacidade");
+  assert.equal(navegacao.obterDocumentoPublico("/privacidade/"), "privacidade");
+  assert.equal(navegacao.obterDocumentoPublico("/termos"), "termos");
+  assert.equal(navegacao.obterDocumentoPublico("/usuarios"), null);
+});
+
 test("sidebar aproxima o site da navegacao e boas-vindas ficam exclusivas do aluno", function testarAjustesDaSidebar() {
   const painel = fs.readFileSync(path.resolve(__dirname, "../../frontend/src/PainelAcervo.jsx"), "utf8");
   const inicioDoMenu = painel.indexOf('<nav className="menu-principal">');
