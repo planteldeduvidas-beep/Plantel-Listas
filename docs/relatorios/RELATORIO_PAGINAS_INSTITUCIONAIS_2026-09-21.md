@@ -150,10 +150,10 @@ Antes da publicação definitiva, preencher e revisar:
 Depois que as páginas estiverem públicas e revisadas, cadastrar manualmente no Google Cloud:
 
 **Política de Privacidade:**  
-`https://plantelistas.planteldeduvidas.com.br/privacidade`
+`https://plantellistas.planteldeduvidas.com.br/privacidade`
 
 **Termos de Uso:**  
-`https://plantelistas.planteldeduvidas.com.br/termos`
+`https://plantellistas.planteldeduvidas.com.br/termos`
 
 ## 15. Conclusão
 
