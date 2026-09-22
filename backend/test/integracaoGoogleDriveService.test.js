@@ -63,6 +63,7 @@ function criarCenario(opcoes) {
   const service = criarIntegracaoGoogleDriveService({
     repository: repository,
     provider: provider,
+    logger: opcoes.logger,
     configuracao: {
       googleDrive: {
         refreshToken: "refresh-token-de-teste",
@@ -116,6 +117,25 @@ test("rollback com falha nao substitui erro da importacao", async function () {
     function (erro) { return erro === original; }
   );
   assert.equal(rollbackExecutado, true);
+});
+
+test("diagnostico registra etapa e local sem mensagem sensivel", async function () {
+  const mensagens = [];
+  const falha = new TypeError("segredo-na-mensagem");
+  falha.stack = "TypeError: segredo-na-mensagem\n    at executar (/app/repository.js:12:3)";
+  const cenario = criarCenario({
+    falhaAplicacao: falha,
+    logger: {
+      error: function (_dados, mensagem) { mensagens.push(mensagem); },
+      warn: function () {}
+    }
+  });
+  await cenario.service.solicitarSincronizacao(1, {});
+  await cenario.estado.tarefa();
+  assert.match(mensagens[0], /etapa=gravar_banco/);
+  assert.match(mensagens[0], /tipo=TypeError/);
+  assert.match(mensagens[0], /repository.js:12:3/);
+  assert.equal(mensagens.join("").includes("segredo-na-mensagem"), false);
 });
 
 test("preserva codigo da falha se a conexao da trava cair", async function testarQueda() {

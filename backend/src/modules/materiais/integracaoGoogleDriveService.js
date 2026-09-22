@@ -119,14 +119,25 @@ function criarIntegracaoGoogleDriveService(dependencias) {
     await repository.marcarCredencialParaRenovacao(codigo, conexao);
   }
 
-  function registrarErroDaTarefa(erro, sincronizacaoId) {
+  function registrarErroDaTarefa(erro, sincronizacaoId, etapa) {
     if (logger) {
+      const tipos = ["Error", "TypeError", "RangeError", "SyntaxError", "AppError"];
+      const tipo = tipos.includes(erro && erro.name) ? erro.name : "Error";
+      // Somente localizacoes de codigo: nunca mensagem, SQL, parametros ou tokens.
+      const locais = String(erro && erro.stack || "").split("\n").slice(1)
+        .map(function localizar(linha) {
+          const encontrado = linha.match(/([A-Za-z0-9_.-]+\.js:\d+:\d+)\)?$/);
+          return encontrado ? encontrado[1] : null;
+        }).filter(Boolean).slice(0, 4).join(",");
+      const codigo = String(obterCodigoDoErro(erro));
+      const codigoSeguro = /^[A-Z0-9_]{1,100}$/.test(codigo) ? codigo : "ERRO_SINCRONIZACAO";
       logger.error(
         {
           sincronizacaoId: sincronizacaoId,
           codigo: obterCodigoDoErro(erro)
         },
-        "Falha inesperada no worker do Google Drive"
+        "Falha Google Drive: etapa=" + (etapa || "worker") + " codigo=" + codigoSeguro
+          + " tipo=" + tipo + " locais=" + locais
       );
     }
   }
@@ -207,6 +218,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
 
     let credencialDeUso = null;
     let erroDoFluxo = null;
+    let etapa = "iniciar";
     try {
       const assumida = await repository.marcarSincronizando(
         conexao,
@@ -216,17 +228,21 @@ function criarIntegracaoGoogleDriveService(dependencias) {
         return;
       }
 
+      etapa = "credencial";
       credencialDeUso = await obterCredencialDeUso(conexao);
+      etapa = "listar_drive";
       const arvore = await listarArvoreMantendoTrava(
         conexao,
         credencialDeUso.refreshToken
       );
+      etapa = "gravar_banco";
       const resumo = await repository.aplicarSincronizacao(
         conexao,
         sincronizacaoId,
         arvore,
         provider.pastaRaizId
       );
+      etapa = "concluir";
       await repository.concluirSincronizacao(conexao, sincronizacaoId, resumo);
       if (logger) {
         logger.info(
@@ -236,6 +252,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       }
     } catch (erro) {
       erroDoFluxo = erro;
+      registrarErroDaTarefa(erro, sincronizacaoId, etapa);
       const codigo = obterCodigoDoErro(erro);
       try {
         if (codigo === "GOOGLE_AUTORIZACAO_INVALIDA") {
