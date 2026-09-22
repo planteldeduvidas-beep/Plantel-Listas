@@ -109,9 +109,19 @@ function criarIntegracaoGoogleDriveRepository(pool) {
   async function liberarTravaDeSincronizacao(conexao) {
     try {
       await conexao.execute("SELECT RELEASE_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64))");
-    } finally {
-      conexao.release();
+    } catch (erro) {
+      conexao.destroy();
+      throw erro;
     }
+    conexao.release();
+  }
+
+  async function manterTravaDeSincronizacao(conexao) {
+    const [registros] = await conexao.execute(
+      "SELECT IS_USED_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64)) "
+      + "= CONNECTION_ID() AS mantida"
+    );
+    return Number(registros[0].mantida) === 1;
   }
 
   async function criarSincronizacaoAguardando(usuarioId) {
@@ -401,6 +411,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     buscarCredencial: buscarCredencial,
     buscarUltimaSincronizacao: buscarUltimaSincronizacao,
     adquirirTravaDeSincronizacao: adquirirTravaDeSincronizacao,
+    manterTravaDeSincronizacao: manterTravaDeSincronizacao,
     liberarTravaDeSincronizacao: liberarTravaDeSincronizacao,
     criarSincronizacaoAguardando: criarSincronizacaoAguardando,
     marcarSincronizando: marcarSincronizando,

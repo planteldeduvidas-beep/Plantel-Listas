@@ -15,6 +15,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
   const configuracao = dependencias.configuracao;
   const logger = dependencias.logger;
   const agendarTarefa = dependencias.agendarTarefa || setImmediate;
+  const intervaloManutencaoTravaMs = dependencias.intervaloManutencaoTravaMs || 30000;
   const encryptionKey = configuracao.googleDrive.encryptionKey
     || configuracao.seguranca.csrfSecret;
 
@@ -123,10 +124,74 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       logger.error(
         {
           sincronizacaoId: sincronizacaoId,
-          codigo: erro.codigo || "ERRO_SINCRONIZACAO"
+          codigo: obterCodigoDoErro(erro)
         },
         "Falha inesperada no worker do Google Drive"
       );
+    }
+  }
+
+  function obterCodigoDoErro(erro) {
+    return erro && (erro.codigo || erro.code) || "ERRO_SINCRONIZACAO";
+  }
+
+  function iniciarManutencaoDaTrava(conexao) {
+    let encerrada = false;
+    let falha = null;
+    let verificacaoPendente = Promise.resolve();
+
+    function verificarTrava() {
+      if (encerrada || falha) {
+        return;
+      }
+      verificacaoPendente = verificacaoPendente.then(async function manterConexaoAtiva() {
+        if (encerrada || falha) {
+          return;
+        }
+        const mantida = await repository.manterTravaDeSincronizacao(conexao);
+        if (!mantida) {
+          throw new AppError(
+            "A trava da sincronizacao do Google Drive foi perdida",
+            503,
+            "TRAVA_SINCRONIZACAO_PERDIDA"
+          );
+        }
+      }).catch(function guardarFalha(erro) {
+        falha = erro;
+      });
+    }
+
+    const temporizador = setInterval(verificarTrava, intervaloManutencaoTravaMs);
+    if (typeof temporizador.unref === "function") {
+      temporizador.unref();
+    }
+
+    return async function encerrarManutencao() {
+      encerrada = true;
+      clearInterval(temporizador);
+      await verificacaoPendente;
+      if (falha) {
+        throw falha;
+      }
+    };
+  }
+
+  async function listarArvoreMantendoTrava(conexao, refreshToken) {
+    const encerrarManutencao = iniciarManutencaoDaTrava(conexao);
+    let erroDaListagem = null;
+    try {
+      return await provider.listarArvore(refreshToken);
+    } catch (erro) {
+      erroDaListagem = erro;
+      throw erro;
+    } finally {
+      try {
+        await encerrarManutencao();
+      } catch (erroManutencao) {
+        if (!erroDaListagem) {
+          throw erroManutencao;
+        }
+      }
     }
   }
 
@@ -141,6 +206,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
     }
 
     let credencialDeUso = null;
+    let erroDoFluxo = null;
     try {
       const assumida = await repository.marcarSincronizando(
         conexao,
@@ -151,7 +217,10 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       }
 
       credencialDeUso = await obterCredencialDeUso(conexao);
-      const arvore = await provider.listarArvore(credencialDeUso.refreshToken);
+      const arvore = await listarArvoreMantendoTrava(
+        conexao,
+        credencialDeUso.refreshToken
+      );
       const resumo = await repository.aplicarSincronizacao(
         conexao,
         sincronizacaoId,
@@ -166,30 +235,43 @@ function criarIntegracaoGoogleDriveService(dependencias) {
         );
       }
     } catch (erro) {
-      if (erro.codigo === "GOOGLE_AUTORIZACAO_INVALIDA") {
-        await registrarAutorizacaoInvalida(
-          credencialDeUso,
-          usuarioId,
-          erro.codigo,
-          conexao
+      erroDoFluxo = erro;
+      const codigo = obterCodigoDoErro(erro);
+      try {
+        if (codigo === "GOOGLE_AUTORIZACAO_INVALIDA") {
+          await registrarAutorizacaoInvalida(
+            credencialDeUso,
+            usuarioId,
+            codigo,
+            conexao
+          );
+        }
+        await repository.falharSincronizacao(
+          conexao,
+          sincronizacaoId,
+          codigo
         );
+      } catch (erroAoRegistrar) {
+        erroAoRegistrar.codigo = erroAoRegistrar.codigo || codigo;
+        throw erroAoRegistrar;
       }
-      await repository.falharSincronizacao(
-        conexao,
-        sincronizacaoId,
-        erro.codigo
-      );
       if (logger) {
         logger.warn(
           {
             sincronizacaoId: sincronizacaoId,
-            codigo: erro.codigo || "ERRO_SINCRONIZACAO"
+            codigo: codigo
           },
           "Sincronizacao do Google Drive falhou"
         );
       }
     } finally {
-      await repository.liberarTravaDeSincronizacao(conexao);
+      try {
+        await repository.liberarTravaDeSincronizacao(conexao);
+      } catch (erroAoLiberar) {
+        if (!erroDoFluxo) {
+          throw erroAoLiberar;
+        }
+      }
     }
   }
 
@@ -198,7 +280,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       registrarErroDaTarefa(erro, sincronizacaoId);
       return repository.falharSincronizacaoSemTrava(
         sincronizacaoId,
-        erro.codigo
+        obterCodigoDoErro(erro)
       ).catch(function registrarFalha(erroAoRegistrar) {
         registrarErroDaTarefa(erroAoRegistrar, sincronizacaoId);
       });
