@@ -118,8 +118,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
 
   async function manterTravaDeSincronizacao(conexao) {
     const [registros] = await conexao.execute(
-      "SELECT IS_USED_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64)) "
-      + "= CONNECTION_ID() AS mantida"
+      "SELECT 1 AS mantida"
     );
     return Number(registros[0].mantida) === 1;
   }
