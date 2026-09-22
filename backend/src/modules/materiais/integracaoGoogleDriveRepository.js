@@ -317,14 +317,14 @@ function criarIntegracaoGoogleDriveRepository(pool) {
       + "(drive_file_id, drive_parent_file_id, categoria_id, nome, mime_type, tipo, extensao, "
       + "tamanho_bytes, checksum_md5, drive_criado_em, drive_modificado_em, web_view_link, "
       + "resource_key, disponivel, ultima_sincronizacao_drive_id) "
-      + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?) AS novo "
-      + "ON DUPLICATE KEY UPDATE drive_parent_file_id = novo.drive_parent_file_id, "
-      + "categoria_id = novo.categoria_id, nome = novo.nome, mime_type = novo.mime_type, "
-      + "tipo = novo.tipo, extensao = novo.extensao, tamanho_bytes = novo.tamanho_bytes, "
-      + "checksum_md5 = novo.checksum_md5, drive_criado_em = novo.drive_criado_em, "
-      + "drive_modificado_em = novo.drive_modificado_em, web_view_link = novo.web_view_link, "
-      + "resource_key = novo.resource_key, disponivel = IF(materiais.estado_gestao='disponivel',1,materiais.disponivel), "
-      + "ultima_sincronizacao_drive_id = novo.ultima_sincronizacao_drive_id",
+      + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?) "
+      + "ON DUPLICATE KEY UPDATE drive_parent_file_id = VALUES(drive_parent_file_id), "
+      + "categoria_id = VALUES(categoria_id), nome = VALUES(nome), mime_type = VALUES(mime_type), "
+      + "tipo = VALUES(tipo), extensao = VALUES(extensao), tamanho_bytes = VALUES(tamanho_bytes), "
+      + "checksum_md5 = VALUES(checksum_md5), drive_criado_em = VALUES(drive_criado_em), "
+      + "drive_modificado_em = VALUES(drive_modificado_em), web_view_link = VALUES(web_view_link), "
+      + "resource_key = VALUES(resource_key), disponivel = IF(materiais.estado_gestao='disponivel',1,materiais.disponivel), "
+      + "ultima_sincronizacao_drive_id = VALUES(ultima_sincronizacao_drive_id)",
       valores
     );
     return existentes.length === 0 ? "criado" : "atualizado";
@@ -398,7 +398,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
         itensIndisponiveis: Number(materiaisIndisponiveis.affectedRows)
       };
     } catch (erro) {
-      await conexao.rollback();
+      await conexao.rollback().catch(function preservarErroOriginal() {});
       throw erro;
     }
   }

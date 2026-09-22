@@ -27,6 +27,7 @@ function criarCenario(opcoes) {
       return true;
     },
     aplicarSincronizacao: async function aplicar() {
+      if (opcoes.falhaAplicacao) throw opcoes.falhaAplicacao;
       return {
         pastasEncontradas: 1,
         arquivosEncontrados: 2,
@@ -84,6 +85,37 @@ test("mantem a conexao da trava ativa durante listagem longa", async function te
   assert.equal(cenario.estado.concluida, true);
   assert.equal(cenario.estado.liberada, true);
   assert.equal(cenario.estado.falhaSemTrava, null);
+});
+
+test("preserva erro SQL original quando registrar falha tambem falha", async function () {
+  const cenario = criarCenario({
+    falhaAplicacao: Object.assign(new Error("SQL invalido"), { code: "ER_PARSE_ERROR" }),
+    falhaAoRegistrar: Object.assign(new Error("Conexao perdida"), { codigo: "BANCO_INDISPONIVEL" }),
+    falhaAoLiberar: new Error("Conexao perdida")
+  });
+  await cenario.service.solicitarSincronizacao(1, {});
+  await cenario.estado.tarefa();
+  assert.equal(cenario.estado.falhaSemTrava, "ER_PARSE_ERROR");
+  assert.equal(cenario.estado.concluida, false);
+});
+
+test("rollback com falha nao substitui erro da importacao", async function () {
+  const criarRepository = require("../src/modules/materiais/integracaoGoogleDriveRepository");
+  const original = Object.assign(new Error("SQL invalido"), { code: "ER_PARSE_ERROR" });
+  let rollbackExecutado = false;
+  const conexao = {
+    beginTransaction: async function () {},
+    execute: async function () { throw original; },
+    rollback: async function () {
+      rollbackExecutado = true;
+      throw new Error("Conexao perdida");
+    }
+  };
+  await assert.rejects(
+    criarRepository({}).aplicarSincronizacao(conexao, 1, { pastas: [], arquivos: [] }, "raiz"),
+    function (erro) { return erro === original; }
+  );
+  assert.equal(rollbackExecutado, true);
 });
 
 test("preserva codigo da falha se a conexao da trava cair", async function testarQueda() {

@@ -68,12 +68,12 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
     await conexao.execute(
       "INSERT INTO materiais (drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,"
       + "extensao,tamanho_bytes,checksum_md5,drive_criado_em,drive_modificado_em,resource_key,"
-      + "disponivel,ultima_sincronizacao_drive_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?) AS novo "
-      + "ON DUPLICATE KEY UPDATE drive_parent_file_id=novo.drive_parent_file_id,categoria_id=novo.categoria_id,"
-      + "nome=novo.nome,mime_type=novo.mime_type,tipo=novo.tipo,extensao=novo.extensao,"
-      + "tamanho_bytes=novo.tamanho_bytes,checksum_md5=novo.checksum_md5,drive_criado_em=novo.drive_criado_em,"
-      + "drive_modificado_em=novo.drive_modificado_em,resource_key=novo.resource_key,disponivel=IF(materiais.estado_gestao='disponivel',1,materiais.disponivel),"
-      + "ultima_sincronizacao_drive_id=novo.ultima_sincronizacao_drive_id",
+      + "disponivel,ultima_sincronizacao_drive_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?) "
+      + "ON DUPLICATE KEY UPDATE drive_parent_file_id=VALUES(drive_parent_file_id),categoria_id=VALUES(categoria_id),"
+      + "nome=VALUES(nome),mime_type=VALUES(mime_type),tipo=VALUES(tipo),extensao=VALUES(extensao),"
+      + "tamanho_bytes=VALUES(tamanho_bytes),checksum_md5=VALUES(checksum_md5),drive_criado_em=VALUES(drive_criado_em),"
+      + "drive_modificado_em=VALUES(drive_modificado_em),resource_key=VALUES(resource_key),disponivel=IF(materiais.estado_gestao='disponivel',1,materiais.disponivel),"
+      + "ultima_sincronizacao_drive_id=VALUES(ultima_sincronizacao_drive_id)",
       [
         item.id, item.parentId, categoriaId, item.name, item.mimeType,
         identificarTipo(item.mimeType), obterExtensao(item.name),
@@ -285,8 +285,8 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
   async function salvarEstadoInicial(pageToken) {
     await pool.execute(
       "INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em) "
-      + "VALUES (1,?,CURRENT_TIMESTAMP(3)) AS novo "
-      + "ON DUPLICATE KEY UPDATE page_token=novo.page_token,atualizado_em=novo.atualizado_em,ultimo_erro_codigo=NULL",
+      + "VALUES (1,?,CURRENT_TIMESTAMP(3)) "
+      + "ON DUPLICATE KEY UPDATE page_token=VALUES(page_token),atualizado_em=VALUES(atualizado_em),ultimo_erro_codigo=NULL",
       [pageToken]
     );
   }
@@ -390,7 +390,7 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
       await conexao.commit();
       return { atualizados: atualizados, indisponiveis: indisponiveis, reconciliacaoNecessaria: reconciliacao };
     } catch (erro) {
-      await conexao.rollback();
+      await conexao.rollback().catch(function preservarErroOriginal() {});
       throw erro;
     }
   }
@@ -426,7 +426,7 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
       }
       await conexao.commit();
     } catch (erro) {
-      await conexao.rollback();
+      await conexao.rollback().catch(function preservarErroOriginal() {});
       throw erro;
     } finally {
       conexao.release();

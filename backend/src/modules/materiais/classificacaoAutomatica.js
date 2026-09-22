@@ -116,7 +116,7 @@ async function garantirConcurso(executor, nome, concursos) {
     return concursos.get(chave);
   }
   await executor.execute(
-    "INSERT INTO concursos (nome,descricao) VALUES (?,?) AS novo ON DUPLICATE KEY UPDATE nome=novo.nome",
+    "INSERT INTO concursos (nome,descricao) VALUES (?,?) ON DUPLICATE KEY UPDATE nome=VALUES(nome)",
     [nome, "Provas e materiais de " + nome + "."]
   );
   const [registros] = await executor.execute("SELECT id FROM concursos WHERE nome=? LIMIT 1", [nome]);
@@ -153,8 +153,8 @@ async function registrarMudanca(executor, categoria, dimensao, recomendacao, ref
 
 async function aplicarClassificacaoAutomatica(executor) {
   await executor.execute(
-    "INSERT INTO disciplinas (nome,descricao) VALUES ('Biologia','Conteudos de Biologia.') AS novo "
-    + "ON DUPLICATE KEY UPDATE nome=novo.nome"
+    "INSERT INTO disciplinas (nome,descricao) VALUES ('Biologia','Conteudos de Biologia.') "
+    + "ON DUPLICATE KEY UPDATE nome=VALUES(nome)"
   );
   const [categorias] = await executor.execute(
     "SELECT id,nome,categoria_pai_id,disciplina_id,disciplina_estado,disciplina_origem,"

@@ -252,8 +252,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
           codigo
         );
       } catch (erroAoRegistrar) {
-        erroAoRegistrar.codigo = erroAoRegistrar.codigo || codigo;
-        throw erroAoRegistrar;
+        throw erro;
       }
       if (logger) {
         logger.warn(
