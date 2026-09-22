@@ -49,11 +49,13 @@ function criarIntegracaoGoogleDriveRepository(pool) {
       "INSERT INTO credenciais_google_drive "
       + "(id, refresh_token_criptografado, escopo, renovacao_necessaria, erro_codigo, "
       + "invalidada_em, autorizado_por_usuario_id, autorizado_em) "
-      + "VALUES (1, ?, ?, 0, NULL, NULL, ?, CURRENT_TIMESTAMP(3)) AS nova "
-      + "ON DUPLICATE KEY UPDATE refresh_token_criptografado = nova.refresh_token_criptografado, "
-      + "escopo = nova.escopo, renovacao_necessaria = 0, erro_codigo = NULL, "
-      + "invalidada_em = NULL, autorizado_por_usuario_id = nova.autorizado_por_usuario_id, "
-      + "autorizado_em = nova.autorizado_em",
+      + "VALUES (1, ?, ?, 0, NULL, NULL, ?, CURRENT_TIMESTAMP(3)) "
+      + "ON DUPLICATE KEY UPDATE "
+      + "refresh_token_criptografado = VALUES(refresh_token_criptografado), "
+      + "escopo = VALUES(escopo), renovacao_necessaria = 0, erro_codigo = NULL, "
+      + "invalidada_em = NULL, "
+      + "autorizado_por_usuario_id = VALUES(autorizado_por_usuario_id), "
+      + "autorizado_em = VALUES(autorizado_em)",
       [refreshTokenCriptografado, escopo, usuarioId]
     );
   }
