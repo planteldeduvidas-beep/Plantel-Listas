@@ -331,6 +331,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
         if (novoStatus && novoStatus.status === "concluida") {
           carregar("Materiais sincronizados com o Google Drive.");
         } else if (novoStatus && novoStatus.status === "falhou") {
+          definirMensagem("");
           if (resultado.googleDrive.renovacaoNecessaria) {
             definirErro("A conexão com o Google Drive precisa ser renovada.");
           } else {

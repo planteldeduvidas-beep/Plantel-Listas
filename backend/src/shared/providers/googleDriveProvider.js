@@ -126,6 +126,10 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
   const dependencias = dependenciasInformadas || {};
   const buscar = dependencias.fetch || globalThis.fetch;
   const fabricaOAuth = dependencias.OAuth2Client;
+  const concorrenciaListagem = Math.max(
+    1,
+    Math.min(10, Number(dependencias.concorrenciaListagem) || 5)
+  );
   let clienteDeAcesso = null;
   let refreshTokenDoCliente = null;
 
@@ -541,6 +545,28 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     return itens;
   }
 
+  async function listarFilhosEmParalelo(pastas, tokenDeAcesso) {
+    const resultados = new Array(pastas.length);
+    let proximoIndice = 0;
+
+    async function executarWorker() {
+      while (proximoIndice < pastas.length) {
+        const indice = proximoIndice;
+        proximoIndice += 1;
+        resultados[indice] = {
+          pasta: pastas[indice],
+          filhos: await listarFilhos(pastas[indice].id, tokenDeAcesso)
+        };
+      }
+    }
+
+    const quantidadeWorkers = Math.min(concorrenciaListagem, pastas.length);
+    await Promise.all(
+      Array.from({ length: quantidadeWorkers }, executarWorker)
+    );
+    return resultados;
+  }
+
   async function listarArvore(refreshToken) {
     const tokenDeAcesso = await obterTokenDeAcesso(refreshToken);
     const raiz = await requisitarDrive("/" + encodeURIComponent(configuracao.pastaRaizId), {
@@ -558,24 +584,27 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
 
     const pastas = [];
     const arquivos = [];
-    const fila = [{ id: raiz.id, nivel: -1 }];
+    let nivelAtual = [{ id: raiz.id, nivel: -1 }];
 
-    for (let indice = 0; indice < fila.length; indice += 1) {
-      const pastaAtual = fila[indice];
-      const filhos = await listarFilhos(pastaAtual.id, tokenDeAcesso);
+    while (nivelAtual.length > 0) {
+      const grupos = await listarFilhosEmParalelo(nivelAtual, tokenDeAcesso);
+      const proximoNivel = [];
 
-      filhos.forEach(function classificarItem(item) {
-        const registro = Object.assign({}, item, {
-          parentId: pastaAtual.id,
-          nivel: pastaAtual.nivel + 1
+      grupos.forEach(function classificarGrupo(grupo) {
+        grupo.filhos.forEach(function classificarItem(item) {
+          const registro = Object.assign({}, item, {
+            parentId: grupo.pasta.id,
+            nivel: grupo.pasta.nivel + 1
+          });
+          if (item.mimeType === MIME_PASTA) {
+            pastas.push(registro);
+            proximoNivel.push({ id: item.id, nivel: registro.nivel });
+          } else {
+            arquivos.push(registro);
+          }
         });
-        if (item.mimeType === MIME_PASTA) {
-          pastas.push(registro);
-          fila.push({ id: item.id, nivel: registro.nivel });
-        } else {
-          arquivos.push(registro);
-        }
       });
+      nivelAtual = proximoNivel;
     }
 
     return {

@@ -259,6 +259,73 @@ test("lista recursivamente apenas descendentes da raiz e respeita paginacao", as
   });
 });
 
+test("limita a concorrencia ao listar pastas sem perder arquivos", async function testarConcorrenciaDaArvore() {
+  const configuracao = criarConfiguracao();
+  let requisicoesAtivas = 0;
+  let maximoDeRequisicoesAtivas = 0;
+
+  async function buscar(urlInformada) {
+    const url = new URL(urlInformada);
+    if (url.pathname.endsWith("/files/" + configuracao.pastaRaizId)) {
+      return criarResposta({
+        id: configuracao.pastaRaizId,
+        name: "Acervo",
+        mimeType: "application/vnd.google-apps.folder",
+        trashed: false
+      });
+    }
+
+    const query = url.searchParams.get("q") || "";
+    if (query.includes(configuracao.pastaRaizId)) {
+      return criarResposta({
+        files: Array.from({ length: 6 }, function criarPasta(_item, indice) {
+          return {
+            id: "pastaConcorrente" + indice,
+            name: "Pasta " + indice,
+            mimeType: "application/vnd.google-apps.folder"
+          };
+        })
+      });
+    }
+
+    const pastaEncontrada = query.match(/pastaConcorrente(\d+)/);
+    if (pastaEncontrada) {
+      requisicoesAtivas += 1;
+      maximoDeRequisicoesAtivas = Math.max(maximoDeRequisicoesAtivas, requisicoesAtivas);
+      await new Promise(function aguardar(resolve) {
+        setTimeout(resolve, 15);
+      });
+      requisicoesAtivas -= 1;
+      return criarResposta({
+        files: [{
+          id: "arquivoConcorrente" + pastaEncontrada[1],
+          name: "arquivo-" + pastaEncontrada[1] + ".pdf",
+          mimeType: "application/pdf"
+        }]
+      });
+    }
+
+    throw new Error("Consulta inesperada");
+  }
+
+  const provider = criarGoogleDriveProvider(configuracao, {
+    OAuth2Client: OAuth2ClientFake,
+    fetch: buscar,
+    concorrenciaListagem: 3
+  });
+  const arvore = await provider.listarArvore("refresh-token-de-teste");
+
+  assert.equal(arvore.pastas.length, 6);
+  assert.equal(arvore.arquivos.length, 6);
+  assert.equal(maximoDeRequisicoesAtivas, 3);
+  assert.deepEqual(
+    arvore.arquivos.map(function obterNome(arquivo) { return arquivo.name; }),
+    Array.from({ length: 6 }, function criarNome(_item, indice) {
+      return "arquivo-" + indice + ".pdf";
+    })
+  );
+});
+
 test("verifica canDownload antes de transmitir e preserva Range", async function testarDownloadPermitido() {
   const chamadas = [];
   const provider = criarGoogleDriveProvider(criarConfiguracao(), {
