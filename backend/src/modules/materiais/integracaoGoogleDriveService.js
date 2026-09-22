@@ -15,7 +15,6 @@ function criarIntegracaoGoogleDriveService(dependencias) {
   const configuracao = dependencias.configuracao;
   const logger = dependencias.logger;
   const agendarTarefa = dependencias.agendarTarefa || setImmediate;
-  const intervaloManutencaoTravaMs = dependencias.intervaloManutencaoTravaMs || 30000;
   const encryptionKey = configuracao.googleDrive.encryptionKey
     || configuracao.seguranca.csrfSecret;
 
@@ -146,68 +145,9 @@ function criarIntegracaoGoogleDriveService(dependencias) {
     return erro && (erro.codigo || erro.code) || "ERRO_SINCRONIZACAO";
   }
 
-  function iniciarManutencaoDaTrava(conexao) {
-    let encerrada = false;
-    let falha = null;
-    let verificacaoPendente = Promise.resolve();
-
-    function verificarTrava() {
-      if (encerrada || falha) {
-        return;
-      }
-      verificacaoPendente = verificacaoPendente.then(async function manterConexaoAtiva() {
-        if (encerrada || falha) {
-          return;
-        }
-        const mantida = await repository.manterTravaDeSincronizacao(conexao);
-        if (!mantida) {
-          throw new AppError(
-            "A trava da sincronizacao do Google Drive foi perdida",
-            503,
-            "TRAVA_SINCRONIZACAO_PERDIDA"
-          );
-        }
-      }).catch(function guardarFalha(erro) {
-        falha = erro;
-      });
-    }
-
-    const temporizador = setInterval(verificarTrava, intervaloManutencaoTravaMs);
-    if (typeof temporizador.unref === "function") {
-      temporizador.unref();
-    }
-
-    return async function encerrarManutencao() {
-      encerrada = true;
-      clearInterval(temporizador);
-      await verificacaoPendente;
-      if (falha) {
-        throw falha;
-      }
-    };
-  }
-
-  async function listarArvoreMantendoTrava(conexao, refreshToken) {
-    const encerrarManutencao = iniciarManutencaoDaTrava(conexao);
-    let erroDaListagem = null;
-    try {
-      return await provider.listarArvore(refreshToken);
-    } catch (erro) {
-      erroDaListagem = erro;
-      throw erro;
-    } finally {
-      try {
-        await encerrarManutencao();
-      } catch (erroManutencao) {
-        if (!erroDaListagem) {
-          throw erroManutencao;
-        }
-      }
-    }
-  }
-
   async function executarSincronizacao(sincronizacaoId, usuarioId) {
-    const conexao = await repository.adquirirTravaDeSincronizacao();
+    let conexao = await repository.adquirirTravaDeSincronizacao();
+    let travaAtiva = Boolean(conexao);
     if (!conexao) {
       await repository.falharSincronizacaoSemTrava(
         sincronizacaoId,
@@ -231,10 +171,20 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       etapa = "credencial";
       credencialDeUso = await obterCredencialDeUso(conexao);
       etapa = "listar_drive";
-      const arvore = await listarArvoreMantendoTrava(
-        conexao,
-        credencialDeUso.refreshToken
-      );
+      await repository.liberarTravaDeSincronizacao(conexao);
+      conexao = null;
+      travaAtiva = false;
+      const arvore = await provider.listarArvore(credencialDeUso.refreshToken);
+      etapa = "trava_gravacao";
+      conexao = await repository.adquirirTravaDeSincronizacao();
+      travaAtiva = Boolean(conexao);
+      if (!conexao) {
+        throw new AppError(
+          "Nao foi possivel reservar a gravacao da sincronizacao",
+          503,
+          "SINCRONIZACAO_CONCORRENTE"
+        );
+      }
       etapa = "gravar_banco";
       const resumo = await repository.aplicarSincronizacao(
         conexao,
@@ -255,6 +205,14 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       registrarErroDaTarefa(erro, sincronizacaoId, etapa);
       const codigo = obterCodigoDoErro(erro);
       try {
+        if (!conexao) {
+          conexao = await repository.adquirirTravaDeSincronizacao();
+          travaAtiva = Boolean(conexao);
+        }
+        if (!conexao) {
+          await repository.falharSincronizacaoSemTrava(sincronizacaoId, codigo);
+          return;
+        }
         if (codigo === "GOOGLE_AUTORIZACAO_INVALIDA") {
           await registrarAutorizacaoInvalida(
             credencialDeUso,
@@ -281,11 +239,13 @@ function criarIntegracaoGoogleDriveService(dependencias) {
         );
       }
     } finally {
-      try {
-        await repository.liberarTravaDeSincronizacao(conexao);
-      } catch (erroAoLiberar) {
-        if (!erroDoFluxo) {
-          throw erroAoLiberar;
+      if (travaAtiva && conexao) {
+        try {
+          await repository.liberarTravaDeSincronizacao(conexao);
+        } catch (erroAoLiberar) {
+          if (!erroDoFluxo) {
+            throw erroAoLiberar;
+          }
         }
       }
     }

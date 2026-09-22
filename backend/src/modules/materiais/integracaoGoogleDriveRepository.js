@@ -116,13 +116,6 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     conexao.release();
   }
 
-  async function manterTravaDeSincronizacao(conexao) {
-    const [registros] = await conexao.execute(
-      "SELECT 1 AS mantida"
-    );
-    return Number(registros[0].mantida) === 1;
-  }
-
   async function criarSincronizacaoAguardando(usuarioId) {
     const conexao = await pool.getConnection();
     let travaAdquirida = false;
@@ -410,7 +403,6 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     buscarCredencial: buscarCredencial,
     buscarUltimaSincronizacao: buscarUltimaSincronizacao,
     adquirirTravaDeSincronizacao: adquirirTravaDeSincronizacao,
-    manterTravaDeSincronizacao: manterTravaDeSincronizacao,
     liberarTravaDeSincronizacao: liberarTravaDeSincronizacao,
     criarSincronizacaoAguardando: criarSincronizacaoAguardando,
     marcarSincronizando: marcarSincronizando,

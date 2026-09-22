@@ -7,7 +7,7 @@ const criarIntegracaoGoogleDriveService = require(
 
 function criarCenario(opcoes) {
   const estado = {
-    manutencoes: 0,
+    aquisicoes: 0,
     concluida: false,
     liberada: false,
     falhaSemTrava: null,
@@ -17,15 +17,11 @@ function criarCenario(opcoes) {
   const repository = {
     buscarCredencial: async function buscarCredencial() { return null; },
     criarSincronizacaoAguardando: async function criar() { return 1; },
-    adquirirTravaDeSincronizacao: async function adquirir() { return conexao; },
-    marcarSincronizando: async function marcar() { return true; },
-    manterTravaDeSincronizacao: async function manter() {
-      estado.manutencoes += 1;
-      if (opcoes.falhaManutencao) {
-        throw opcoes.falhaManutencao;
-      }
-      return true;
+    adquirirTravaDeSincronizacao: async function adquirir() {
+      estado.aquisicoes += 1;
+      return conexao;
     },
+    marcarSincronizando: async function marcar() { return true; },
     aplicarSincronizacao: async function aplicar() {
       if (opcoes.falhaAplicacao) throw opcoes.falhaAplicacao;
       return {
@@ -77,12 +73,12 @@ function criarCenario(opcoes) {
   return { estado: estado, service: service };
 }
 
-test("mantem a conexao da trava ativa durante listagem longa", async function testarManutencao() {
+test("libera a trava durante a listagem e a readquire antes de gravar", async function testarTravaDaListagem() {
   const cenario = criarCenario({});
   await cenario.service.solicitarSincronizacao(1, {});
   await cenario.estado.tarefa();
 
-  assert.ok(cenario.estado.manutencoes >= 2);
+  assert.equal(cenario.estado.aquisicoes, 2);
   assert.equal(cenario.estado.concluida, true);
   assert.equal(cenario.estado.liberada, true);
   assert.equal(cenario.estado.falhaSemTrava, null);
@@ -91,8 +87,7 @@ test("mantem a conexao da trava ativa durante listagem longa", async function te
 test("preserva erro SQL original quando registrar falha tambem falha", async function () {
   const cenario = criarCenario({
     falhaAplicacao: Object.assign(new Error("SQL invalido"), { code: "ER_PARSE_ERROR" }),
-    falhaAoRegistrar: Object.assign(new Error("Conexao perdida"), { codigo: "BANCO_INDISPONIVEL" }),
-    falhaAoLiberar: new Error("Conexao perdida")
+    falhaAoRegistrar: Object.assign(new Error("Conexao perdida"), { codigo: "BANCO_INDISPONIVEL" })
   });
   await cenario.service.solicitarSincronizacao(1, {});
   await cenario.estado.tarefa();
@@ -138,23 +133,14 @@ test("diagnostico registra etapa e local sem mensagem sensivel", async function 
   assert.equal(mensagens.join("").includes("segredo-na-mensagem"), false);
 });
 
-test("preserva codigo da falha se a conexao da trava cair", async function testarQueda() {
+test("registra a falha da listagem depois de readquirir a trava", async function testarFalhaDaListagem() {
   const cenario = criarCenario({
-    falhaManutencao: new AppError(
-      "Conexao da trava perdida",
-      503,
-      "TRAVA_SINCRONIZACAO_PERDIDA"
-    ),
-    falhaAoRegistrar: new Error("Conexao encerrada"),
-    falhaAoLiberar: new Error("Conexao encerrada")
+    falhaAplicacao: new AppError("Falha de gravacao", 503, "BANCO_INDISPONIVEL")
   });
   await cenario.service.solicitarSincronizacao(1, {});
   await cenario.estado.tarefa();
 
   assert.equal(cenario.estado.concluida, false);
+  assert.equal(cenario.estado.aquisicoes, 2);
   assert.equal(cenario.estado.liberada, true);
-  assert.equal(
-    cenario.estado.falhaSemTrava,
-    "TRAVA_SINCRONIZACAO_PERDIDA"
-  );
 });
