@@ -74,3 +74,42 @@ test("service worker guarda apenas asset versionado e ignora API, páginas e arq
   ouvintes.get("message")({ data: { tipo: "ATIVAR_NOVA_VERSAO" } });
   assert.equal(ativacoes, 1);
 });
+
+test("convite de instalacao e capturado antes da interface e informa cada plataforma", () => {
+  const registro = readFileSync(new URL("src/pwa/registro.js", base), "utf8");
+  const instalacao = readFileSync(new URL("src/pwa/InstalacaoPwa.jsx", base), "utf8");
+
+  assert.match(registro, /window\.addEventListener\("beforeinstallprompt"/);
+  assert.match(registro, /observarConviteDeInstalacao/);
+  assert.match(registro, /consumirConviteDeInstalacao/);
+  assert.match(instalacao, /escolha\.outcome === "accepted"/);
+  assert.match(instalacao, /const pararRegistro = registrarPwa/);
+  assert.match(instalacao, /Safari/);
+  assert.match(instalacao, /Chrome\/Edge/);
+  assert.match(instalacao, /Abrindo confirma/);
+});
+
+test("convite recebido antes da interface continua disponivel ate ser consumido", async () => {
+  const janelaAnterior = globalThis.window;
+  const ouvintes = new Map();
+  globalThis.window = {
+    addEventListener(tipo, ouvinte) { ouvintes.set(tipo, ouvinte); }
+  };
+
+  try {
+    const registro = await import(`../src/pwa/registro.js?teste=${Date.now()}`);
+    const convite = { preventDefault() { this.prevenido = true; } };
+    ouvintes.get("beforeinstallprompt")(convite);
+    assert.equal(convite.prevenido, true);
+
+    const observados = [];
+    const parar = registro.observarConviteDeInstalacao((evento) => observados.push(evento));
+    assert.equal(observados[0], convite);
+
+    registro.consumirConviteDeInstalacao();
+    assert.equal(observados[1], null);
+    parar();
+  } finally {
+    globalThis.window = janelaAnterior;
+  }
+});

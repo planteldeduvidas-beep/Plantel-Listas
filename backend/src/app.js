@@ -55,6 +55,10 @@ const criarParceiroRepository = require("./modules/parceiros/parceiroRepository"
 const criarParceiroService = require("./modules/parceiros/parceiroService");
 const criarParceiroController = require("./modules/parceiros/parceiroController");
 const criarParceiroRoutes = require("./modules/parceiros/parceiroRoutes");
+const criarAvisoRepository = require("./modules/avisos/avisoRepository");
+const criarAvisoService = require("./modules/avisos/avisoService");
+const criarAvisoController = require("./modules/avisos/avisoController");
+const criarAvisoRoutes = require("./modules/avisos/avisoRoutes");
 const criarSuporteService = require("./modules/suporte/suporteService");
 const criarSuporteController = require("./modules/suporte/suporteController");
 const criarSuporteRoutes = require("./modules/suporte/suporteRoutes");
@@ -257,6 +261,11 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin,
     rateLimiter: rateLimiters.upload
+  }));
+  aplicacao.use("/api/avisos", criarAvisoRoutes({
+    controller: criarAvisoController(criarAvisoService(criarAvisoRepository(pool), auditoriaRepository)),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin
   }));
 }
 

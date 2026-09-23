@@ -9,6 +9,7 @@ export default function ParceirosSidebar({ versao }) {
   const [movimentoReduzido, definirMovimentoReduzido] = useState(false);
   const [imagemFalhou, definirImagemFalhou] = useState(false);
   const [feedback, definirFeedback] = useState("");
+  const [direcao, definirDirecao] = useState("proximo");
 
   useEffect(() => {
     let ativo = true;
@@ -31,7 +32,10 @@ export default function ParceirosSidebar({ versao }) {
 
   useEffect(() => {
     if (parceiros.length < 2 || pausado || movimentoReduzido || paginaOculta) return undefined;
-    const temporizador = window.setTimeout(() => definirIndice(atual => (atual + 1) % parceiros.length), 6500);
+    const temporizador = window.setTimeout(() => {
+      definirDirecao("proximo");
+      definirIndice(atual => (atual + 1) % parceiros.length);
+    }, 6500);
     return () => window.clearTimeout(temporizador);
   }, [parceiros.length, indice, pausado, movimentoReduzido, paginaOculta]);
 
@@ -45,7 +49,16 @@ export default function ParceirosSidebar({ versao }) {
 
   if (!parceiros.length) return null;
   const parceiro = parceiros[indice] || parceiros[0];
-  const mudar = deslocamento => definirIndice(atual => (atual + deslocamento + parceiros.length) % parceiros.length);
+  const mudar = deslocamento => {
+    definirDirecao(deslocamento > 0 ? "proximo" : "anterior");
+    definirIndice(atual => (atual + deslocamento + parceiros.length) % parceiros.length);
+  };
+
+  function escolher(posicao) {
+    if (posicao === indice) return;
+    definirDirecao(posicao > indice ? "proximo" : "anterior");
+    definirIndice(posicao);
+  }
 
   async function copiarCupom() {
     try {
@@ -62,7 +75,8 @@ export default function ParceirosSidebar({ versao }) {
       onFocus={() => definirPausado(true)}
       onBlur={evento => { if (!evento.currentTarget.contains(evento.relatedTarget)) definirPausado(false); }}>
       <span className="parceiros-sidebar-rotulo">Parceiros Plantel</span>
-      <div className="parceiros-sidebar-conteudo" key={parceiro.id}>
+      <div className="parceiros-sidebar-vitrine">
+      <div className={"parceiros-sidebar-conteudo entrando-" + direcao} key={parceiro.id}>
         <a className="parceiros-sidebar-imagem" href={parceiro.link} target="_blank" rel="noopener noreferrer" aria-label={"Conhecer " + parceiro.nome}>
           {parceiro.imagemUrl && !imagemFalhou
             ? <img src={parceiro.imagemUrl} alt={"Logo de " + parceiro.nome} onError={() => definirImagemFalhou(true)} />
@@ -78,6 +92,7 @@ export default function ParceirosSidebar({ versao }) {
           {parceiro.textoBotao || "Conhecer parceiro"}<span aria-hidden="true">↗</span>
         </a>
       </div>
+      </div>
       <span className="parceiros-sidebar-feedback" role="status">{feedback}</span>
       {parceiros.length > 1 && <div className="parceiros-sidebar-controles">
         <button type="button" aria-label="Parceiro anterior" onClick={() => mudar(-1)}>←</button>
@@ -85,7 +100,7 @@ export default function ParceirosSidebar({ versao }) {
           {parceiros.map((item, posicao) => <button key={item.id} type="button"
             className={posicao === indice ? "ativo" : ""} aria-label={"Mostrar " + item.nome}
             aria-current={posicao === indice ? "true" : undefined}
-            onClick={() => definirIndice(posicao)} />)}
+            onClick={() => escolher(posicao)} />)}
         </span>
         <button type="button" aria-label="Próximo parceiro" onClick={() => mudar(1)}>→</button>
       </div>}

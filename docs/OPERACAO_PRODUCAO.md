@@ -5,7 +5,7 @@ Este guia prepara a operacao, mas nao autoriza deploy. Valores reais devem exist
 ## 1. Antes de publicar
 
 1. Confirmar o commit aprovado e registrar um backup MySQL restauravel.
-2. Configurar `listas.planteldeduvidas.com.br` sem substituir a Home de `planteldeduvidas.com.br`.
+2. Configurar `plantellistas.planteldeduvidas.com.br` sem substituir a Home de `planteldeduvidas.com.br`.
 3. Confirmar no plano Hostinger: Node.js 22 ou superior, MySQL, limite de upload maior que o maior `UPLOAD_MAX_*`, timeout do proxy e logs persistentes.
 4. Preencher as variaveis de `.env.example`, com `NODE_ENV=production`, URLs HTTPS exatas, `TRUST_PROXY=1`, SMTP completo e segredos exclusivos.
 5. No Google Cloud, cadastrar o callback e o webhook HTTPS finais, publicar/configurar o consentimento para producao e concluir verificacao e eventual security assessment aplicaveis ao scope `https://www.googleapis.com/auth/drive`.
@@ -24,9 +24,11 @@ npm start
 
 O backend inicia com `node backend/src/server.js`. O build estatico fica em `frontend/dist`; a hospedagem deve servir esse diretorio e encaminhar `/api` para o processo Node, preservando HTTPS e os cabecalhos do proxy. Quando o build e servido pelo processo Node, o backend entrega `index.html` como fallback das rotas publicas da SPA, inclusive `/privacidade` e `/termos`. Se a Hostinger servir os arquivos estaticos diretamente, configurar o rewrite equivalente para `index.html`, sem encaminhar nem mascarar rotas `/api`.
 
+Na Hostinger, publicar a branch Git aprovada como aplicacao Node.js com Node 22, tipo `express`, raiz e saida `.`, script `deploy` e entrada `backend/src/server.js`. Nao usar a deteccao automatica de um ZIP do monorepo: ela pode selecionar tipo `other`, script `build` e nenhuma entrada Node, deixando o site em HTTP 503. Depois de cada build, confirmar `/api/saude`, a pagina inicial e os assets do frontend antes de encerrar a publicacao.
+
 ## 3. Health check, logs e reinicio
 
-- Health check: `GET https://listas.planteldeduvidas.com.br/api/saude`, esperando HTTP 200 e `{"status":"ok"}`.
+- Health check: `GET https://plantellistas.planteldeduvidas.com.br/api/saude`, esperando HTTP 200 e `{"status":"ok"}`.
 - Logs: acompanhar stdout/stderr do processo Node no painel da hospedagem. Procurar codigos de erro de autenticacao, SMTP, Drive e sincronizacao; nunca copiar tokens, cookies ou segredos.
 - Reinicio: usar o controle de restart da aplicacao Node da Hostinger. `SIGTERM`/`SIGINT` interrompem o monitor, fecham o servidor e encerram o pool MySQL.
 - Depois do reinicio: validar health, login, uma leitura do acervo e os status administrativos do Drive/Changes API.

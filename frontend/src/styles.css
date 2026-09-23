@@ -507,16 +507,21 @@ p, small {
   white-space: nowrap;
 }
 
-/* Parceiros: card compacto no fim da navegacao, sem ocupar espaco quando vazio. */
+/* Parceiros: vitrine discreta, ancorada acima da conta quando houver campanhas ativas. */
 .parceiros-sidebar {
   flex: 0 0 auto;
-  margin: 20px 2px 16px;
+  margin: auto 2px 16px;
   padding: 13px;
-  border: 1px solid rgb(255 255 255 / 18%);
+  border: 1px solid rgb(131 205 185 / 24%);
   border-radius: 12px;
   color: #f4fbf8;
-  background: rgb(255 255 255 / 7%);
+  background:
+    radial-gradient(circle at 100% 0, rgb(45 133 109 / 27%), transparent 48%),
+    linear-gradient(145deg, #1a2523, #101715 74%);
+  box-shadow: inset 0 1px rgb(255 255 255 / 6%), 0 10px 22px rgb(0 0 0 / 15%);
 }
+
+.parceiros-sidebar + .conta-lateral { margin-top: 0; }
 
 .parceiros-sidebar-rotulo {
   display: block;
@@ -528,7 +533,13 @@ p, small {
   text-transform: uppercase;
 }
 
-.parceiros-sidebar-conteudo { animation: aparecer-parceiro 220ms ease-out; }
+.parceiros-sidebar-vitrine { min-height: 202px; overflow: hidden; }
+.parceiros-sidebar-conteudo {
+  animation: entrar-parceiro-direita 380ms cubic-bezier(.2, .8, .2, 1) both;
+}
+.parceiros-sidebar-conteudo.entrando-anterior {
+  animation-name: entrar-parceiro-esquerda;
+}
 .parceiros-sidebar-imagem {
   display: grid;
   width: 100%;
@@ -538,7 +549,7 @@ p, small {
   place-items: center;
   border-radius: 8px;
   color: #dff7f0;
-  background: rgb(255 255 255 / 11%);
+  background: linear-gradient(135deg, #29433d, #182421);
   font-size: 1.6rem;
   font-weight: 800;
 }
@@ -548,7 +559,7 @@ p, small {
   display: -webkit-box;
   margin: 5px 0 9px;
   overflow: hidden;
-  color: #d0e1da;
+  color: #c6d7d0;
   font-size: .75rem;
   line-height: 1.35;
   -webkit-box-orient: vertical;
@@ -590,7 +601,14 @@ p, small {
 .parceiros-sidebar-pontos button.ativo { background: #d9f5e6; }
 .parceiros-sidebar :is(a, button):focus-visible { outline: 2px solid #f6d586; outline-offset: 3px; }
 
-@keyframes aparecer-parceiro { from { opacity: .55; } to { opacity: 1; } }
+@keyframes entrar-parceiro-direita {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes entrar-parceiro-esquerda {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 @media (prefers-reduced-motion: reduce) { .parceiros-sidebar-conteudo { animation: none; } }
 
 .formulario-parceiro { display: grid; gap: 14px; margin: 18px 0; padding: 20px; border: 1px solid var(--cor-borda); border-radius: 10px; }
@@ -6695,6 +6713,112 @@ textarea {
     width: 100%;
   }
 }
+
+/* Avisos editoriais: faixa discreta, sem cobrir a biblioteca ou a navegacao. */
+.faixa-avisos {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 1540px;
+  min-height: 46px;
+  margin: 0 auto 22px;
+  overflow: hidden;
+  border-radius: 9px;
+  color: #f4f7f6;
+  background: #23312f;
+}
+
+.faixa-avisos-rotulo {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 17px;
+  color: #f2fff8;
+  background: #135b51;
+  font-size: .7rem;
+  font-weight: 850;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.faixa-avisos-janela { display: flex; flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.faixa-avisos-trilho {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: max-content;
+  animation: correr-avisos var(--duracao-avisos, 30s) linear infinite;
+}
+.faixa-avisos-grupo {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex: 0 0 auto;
+  min-width: var(--largura-avisos, 100%);
+  min-height: 46px;
+  gap: 40px;
+  margin: 0;
+  padding: 0 28px 0 0;
+  list-style: none;
+  white-space: nowrap;
+}
+.faixa-avisos-item { display: flex; align-items: center; flex: 0 0 auto; gap: 12px; font-size: .81rem; font-weight: 620; }
+.faixa-avisos-separador { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: #9bd5b5; }
+.faixa-avisos-pausa {
+  flex: 0 0 auto;
+  min-width: 78px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 0;
+  color: #e3efec;
+  background: #23312f;
+  font-size: .73rem;
+  font-weight: 700;
+}
+.faixa-avisos-pausa:hover { background: #31423f; }
+.faixa-avisos :focus-visible { outline: 2px solid #f5d887; outline-offset: -3px; }
+.faixa-avisos[data-pausada="true"] .faixa-avisos-trilho,
+.faixa-avisos:hover .faixa-avisos-trilho,
+.faixa-avisos:focus-within .faixa-avisos-trilho { animation-play-state: paused; }
+@keyframes correr-avisos { to { transform: translateX(-50%); } }
+
+:root[data-tema="escuro"] .faixa-avisos { border: 1px solid #38514b; background: #1c2927; }
+:root[data-tema="escuro"] .faixa-avisos-pausa { background: #1c2927; }
+:root[data-tema="escuro"] .faixa-avisos-pausa:hover { background: #2b3d39; }
+
+.formulario-aviso { display: grid; gap: 14px; margin: 18px 0; padding: 20px; border: 1px solid var(--cor-borda); border-radius: 10px; }
+.formulario-aviso h3, .previa-avisos h3 { margin: 0; }
+.formulario-aviso label { display: grid; min-width: 0; gap: 6px; font-weight: 700; }
+.formulario-aviso-opcoes { display: flex; align-items: end; flex-wrap: wrap; gap: 18px; }
+.formulario-aviso-opcoes > label:first-child { flex: 0 1 180px; }
+.formulario-aviso .formulario-aviso-ativo { display: flex; align-items: center; gap: 9px; min-height: 43px; }
+.formulario-aviso-ativo input { width: auto; }
+.previa-avisos { margin: 26px 0; }
+.previa-avisos h3 { margin-bottom: 12px; font-size: .95rem; }
+.previa-avisos .faixa-avisos { margin-bottom: 0; }
+.lista-avisos-admin { margin: 16px 0 0; padding: 0; list-style: none; }
+.lista-avisos-admin li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 15px 0; border-top: 1px solid var(--cor-borda); }
+.lista-avisos-admin li > span { display: grid; flex: 1 1 260px; gap: 5px; }
+.lista-avisos-admin li small { color: var(--cor-texto-suave); }
+.lista-avisos-admin-acoes { display: flex; gap: 7px; }
+
+@media (max-width: 720px) {
+  .faixa-avisos { min-height: 42px; margin-bottom: 16px; }
+  .faixa-avisos-rotulo { padding: 0 10px; font-size: .61rem; }
+  .faixa-avisos-grupo { min-height: 42px; gap: 24px; }
+  .faixa-avisos-item { font-size: .74rem; }
+  .faixa-avisos-pausa { min-width: 59px; padding: 0 7px; font-size: .65rem; }
+  .formulario-aviso { padding: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faixa-avisos { align-items: stretch; }
+  .faixa-avisos-trilho { width: 100%; animation: none; }
+  .faixa-avisos-grupo { flex-wrap: wrap; justify-content: flex-start; min-width: 0; white-space: normal; gap: 8px 18px; padding: 10px 14px; }
+  .faixa-avisos-copia { display: none; }
+}
+
 /* Instalação/atualização PWA: aviso curto, dispensável e fora da navegação. */
 .aviso-pwa {
   position: fixed;

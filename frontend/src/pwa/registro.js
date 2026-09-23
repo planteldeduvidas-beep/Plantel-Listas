@@ -1,3 +1,33 @@
+let conviteDeInstalacao = null;
+const ouvintesDoConvite = new Set();
+
+function avisarConvite() {
+  ouvintesDoConvite.forEach(function avisar(ouvinte) {
+    ouvinte(conviteDeInstalacao);
+  });
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", function guardarConvite(evento) {
+    evento.preventDefault();
+    conviteDeInstalacao = evento;
+    avisarConvite();
+  });
+}
+
+function observarConviteDeInstalacao(ouvinte) {
+  ouvintesDoConvite.add(ouvinte);
+  ouvinte(conviteDeInstalacao);
+  return function pararObservacao() {
+    ouvintesDoConvite.delete(ouvinte);
+  };
+}
+
+function consumirConviteDeInstalacao() {
+  conviteDeInstalacao = null;
+  avisarConvite();
+}
+
 export function registrarPwa(aoAtualizar) {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator) ||
       !(location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
@@ -34,3 +64,5 @@ export function registrarPwa(aoAtualizar) {
     instalando?.removeEventListener("statechange", avisarSeAguardando);
   };
 }
+
+export { observarConviteDeInstalacao, consumirConviteDeInstalacao };

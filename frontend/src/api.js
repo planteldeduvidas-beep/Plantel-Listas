@@ -147,6 +147,10 @@ function enviarImagemParceiro(id, arquivo) {
   return requisitar("/parceiros/" + id + "/imagem", { method: "POST", body: dados });
 }
 function removerImagemParceiro(id) { return requisitar("/parceiros/" + id + "/imagem", { method: "DELETE" }); }
+function listarAvisos() { return requisitar("/avisos", { method: "GET" }); }
+function listarAvisosAdmin() { return requisitar("/avisos/admin", { method: "GET" }); }
+function criarAviso(dados) { return requisitar("/avisos", { method: "POST", body: JSON.stringify(dados) }); }
+function editarAviso(id, dados) { return requisitar("/avisos/" + id, { method: "PATCH", body: JSON.stringify(dados) }); }
 
 function criarOperacoesDeCatalogo(caminho, nomeSingular) {
   return {
@@ -337,6 +341,10 @@ export {
   editarParceiro,
   enviarImagemParceiro,
   removerImagemParceiro,
+  listarAvisos,
+  listarAvisosAdmin,
+  criarAviso,
+  editarAviso,
   categorias,
   disciplinas,
   concursos,

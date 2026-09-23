@@ -78,3 +78,13 @@ test("sidebar aproxima o site da navegacao e boas-vindas ficam exclusivas do alu
   assert.match(painel, /boasVindasAlunoAberta && usuario\.papel === "aluno"/);
   assert.match(painel, /className="email-conta-lateral"/);
 });
+
+test("faixa de avisos fica restrita a biblioteca do aluno e respeita movimento reduzido", function testarFaixaDeAvisos() {
+  const painel = fs.readFileSync(path.resolve(__dirname, "../../frontend/src/PainelAcervo.jsx"), "utf8");
+  const faixa = fs.readFileSync(path.resolve(__dirname, "../../frontend/src/FaixaAvisos.jsx"), "utf8");
+
+  assert.match(painel, /usuario\.papel === "aluno" && areaAtual === "acervo" && <FaixaAvisos/);
+  assert.match(painel, /area="avisos"/);
+  assert.match(faixa, /prefers-reduced-motion: reduce/);
+  assert.match(faixa, /Pausar avisos/);
+});
