@@ -134,10 +134,11 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
 
   async function adicionar(evento) {
     evento.preventDefault();
-    const formulario = new FormData(evento.currentTarget);
+    const elementoFormulario = evento.currentTarget;
+    const formulario = new FormData(elementoFormulario);
     try {
       await criarUsuario({ nome: formulario.get("nome"), email: formulario.get("email"), senha: formulario.get("senha"), papel: formulario.get("papel") });
-      evento.currentTarget.reset();
+      elementoFormulario.reset();
       definirNovoAberto(false);
       aoMensagem("Usuário criado com sucesso.");
       await carregarUsuarios();

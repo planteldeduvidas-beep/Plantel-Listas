@@ -72,10 +72,13 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
 
   async function enviar(evento) {
     evento.preventDefault();
-    const formulario = new FormData(evento.currentTarget);
-    await executar(function adicionar() { return adicionarMaterial(formulario); }, "Material adicionado.");
-    evento.currentTarget.reset();
-    definirMostrarEnvio(false);
+    const elementoFormulario = evento.currentTarget;
+    const formulario = new FormData(elementoFormulario);
+    const enviado = await executar(function adicionar() { return adicionarMaterial(formulario); }, "Material adicionado.");
+    if (enviado) {
+      elementoFormulario.reset();
+      definirMostrarEnvio(false);
+    }
   }
 
   async function criarPasta(evento) {
