@@ -2836,6 +2836,21 @@ select option:checked {
     position: fixed;
     z-index: 40;
     width: min(86vw, 300px);
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(169 226 216 / 38%) transparent;
+  }
+
+  .barra-lateral::-webkit-scrollbar { width: 5px; }
+  .barra-lateral::-webkit-scrollbar-track { background: transparent; }
+  .barra-lateral::-webkit-scrollbar-thumb {
+    border-radius: 5px;
+    background: rgb(169 226 216 / 38%);
   }
 
   .conteudo-aplicacao {
