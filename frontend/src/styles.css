@@ -3114,16 +3114,24 @@ body:has(.barra-lateral.aberta) {
   border-radius: 8px;
 }
 
-/* Areas de professor e administrador funcionam como paginas, nao cartoes soltos. */
+/* Mantem respiro interno nas secoes compartilhadas pelos tres perfis. */
 .cartao-painel.painel-conteudo,
 .administracao-fase7 > .bloco-admin,
-.conteudo-aplicacao > .bloco-admin.painel-conteudo {
+.conteudo-aplicacao > .bloco-admin.painel-conteudo:not(.painel-suporte) {
   margin-bottom: 26px;
-  padding: 0;
+  padding: clamp(20px, 2.2vw, 32px);
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .cartao-painel.painel-conteudo,
+  .administracao-fase7 > .bloco-admin,
+  .conteudo-aplicacao > .bloco-admin.painel-conteudo:not(.painel-suporte) {
+    padding: 16px;
+  }
 }
 
 .cartao-painel.painel-conteudo > .cabecalho-bloco,
