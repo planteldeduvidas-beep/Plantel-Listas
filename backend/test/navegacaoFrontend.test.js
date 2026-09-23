@@ -10,6 +10,8 @@ test("navegacao do frontend limita areas e representa pastas na URL", async func
   const navegacao = await import(pathToFileURL(caminhoNavegacao).href);
 
   assert.equal(navegacao.obterAreaPermitida("admin", "?area=usuarios"), "usuarios");
+  assert.equal(navegacao.obterAreaPermitida("admin", "?area=parceiros"), "parceiros");
+  assert.equal(navegacao.obterAreaPermitida("aluno", "?area=parceiros"), "acervo");
   assert.equal(navegacao.obterAreaPermitida("aluno", "?area=usuarios"), "acervo");
   assert.equal(navegacao.obterAreaPermitida("professor", "?area=minhasPastas"), "minhasPastas");
   assert.equal(navegacao.obterPastaDaUrl("?area=acervo&pasta=47"), 47);

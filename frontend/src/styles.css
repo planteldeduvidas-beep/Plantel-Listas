@@ -507,6 +507,111 @@ p, small {
   white-space: nowrap;
 }
 
+/* Parceiros: card compacto no fim da navegacao, sem ocupar espaco quando vazio. */
+.parceiros-sidebar {
+  flex: 0 0 auto;
+  margin: 20px 2px 16px;
+  padding: 13px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 12px;
+  color: #f4fbf8;
+  background: rgb(255 255 255 / 7%);
+}
+
+.parceiros-sidebar-rotulo {
+  display: block;
+  margin-bottom: 11px;
+  color: #a9e2d8;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.parceiros-sidebar-conteudo { animation: aparecer-parceiro 220ms ease-out; }
+.parceiros-sidebar-imagem {
+  display: grid;
+  width: 100%;
+  height: 67px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 8px;
+  color: #dff7f0;
+  background: rgb(255 255 255 / 11%);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+.parceiros-sidebar-imagem img { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+.parceiros-sidebar-conteudo > strong { display: block; color: #f4fbf8; line-height: 1.25; overflow-wrap: anywhere; }
+.parceiros-sidebar-conteudo > p {
+  display: -webkit-box;
+  margin: 5px 0 9px;
+  overflow: hidden;
+  color: #d0e1da;
+  font-size: .75rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.parceiros-sidebar-beneficio { display: grid; justify-items: start; gap: 3px; margin-bottom: 9px; }
+.parceiros-sidebar-beneficio button {
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 1px dashed rgb(185 241 219 / 55%);
+  border-radius: 5px;
+  color: #f3fff8;
+  background: rgb(33 132 106 / 30%);
+  font-size: .72rem;
+  overflow-wrap: anywhere;
+}
+.parceiros-sidebar-beneficio small { color: #c7e9d5; font-size: .72rem; }
+.parceiros-sidebar-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  gap: 5px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  color: #123f35;
+  background: #dff4eb;
+  font-size: .76rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+.parceiros-sidebar-link:hover { background: #fff; }
+.parceiros-sidebar-feedback { display: block; min-height: 0; color: #dff4eb; font-size: .7rem; }
+.parceiros-sidebar-feedback:empty { display: none; }
+.parceiros-sidebar-controles { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.parceiros-sidebar-controles > button { width: 28px; height: 28px; padding: 0; border: 0; color: #effaf7; background: transparent; }
+.parceiros-sidebar-pontos { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.parceiros-sidebar-pontos button { width: 8px; height: 8px; min-height: 8px; padding: 0; border: 0; border-radius: 50%; background: #829e94; }
+.parceiros-sidebar-pontos button.ativo { background: #d9f5e6; }
+.parceiros-sidebar :is(a, button):focus-visible { outline: 2px solid #f6d586; outline-offset: 3px; }
+
+@keyframes aparecer-parceiro { from { opacity: .55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .parceiros-sidebar-conteudo { animation: none; } }
+
+.formulario-parceiro { display: grid; gap: 14px; margin: 18px 0; padding: 20px; border: 1px solid var(--cor-borda); border-radius: 10px; }
+.formulario-parceiro h3 { margin: 0; }
+.formulario-parceiro label { display: grid; gap: 6px; min-width: 0; font-weight: 700; }
+.formulario-parceiro-linha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.formulario-parceiro .formulario-parceiro-ativo { display: flex; align-items: center; gap: 9px; }
+.formulario-parceiro-ativo input { width: auto; }
+.lista-parceiros-admin { margin: 14px 0 0; padding: 0; list-style: none; }
+.lista-parceiros-admin li { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 13px 0; border-top: 1px solid var(--cor-borda); }
+.lista-parceiros-admin-logo { display: grid; flex: 0 0 48px; width: 48px; height: 48px; place-items: center; overflow: hidden; border-radius: 8px; background: var(--cor-superficie-suave); font-weight: 800; }
+.lista-parceiros-admin-logo img { width: 100%; height: 100%; object-fit: contain; }
+.lista-parceiros-admin-identidade { display: grid; flex: 1 1 220px; min-width: 0; gap: 3px; }
+.lista-parceiros-admin-identidade small { color: var(--cor-texto-suave); overflow-wrap: anywhere; }
+.lista-parceiros-admin-acoes { display: flex; flex-wrap: wrap; gap: 7px; }
+@media (max-width: 720px) {
+  .formulario-parceiro { padding: 16px; }
+  .formulario-parceiro-linha { grid-template-columns: 1fr; }
+  .lista-parceiros-admin-acoes { width: 100%; }
+}
+
 .avatar-usuario {
   display: inline-grid;
   width: 42px;

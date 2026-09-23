@@ -18,6 +18,8 @@ import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
 import AdministracaoFase7 from "./AdministracaoFase7.jsx";
 import MeuHistorico from "./MeuHistorico.jsx";
 import Suporte from "./Suporte.jsx";
+import ParceirosSidebar from "./ParceirosSidebar.jsx";
+import ParceirosAdmin from "./ParceirosAdmin.jsx";
 import { Alerta, AlternadorTema, Carregando, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, obterAreaInicial, obterAreaPermitida, obterPastaDaUrl } from "./navegacao.js";
 
@@ -211,6 +213,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
     return obterAreaPermitida(usuario.papel, window.location.search);
   });
   const [menuAberto, definirMenuAberto] = useState(false);
+  const [versaoParceiros, definirVersaoParceiros] = useState(0);
   const [boasVindasAlunoAberta, definirBoasVindasAlunoAberta] = useState(
     mostrarBoasVindas && usuario.papel === "aluno"
   );
@@ -537,7 +540,8 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
     organizacao: { codigo: "PL / 05", contexto: "Estrutura dos materiais", titulo: "Organização dos materiais", texto: "Mantenha pastas, disciplinas e concursos fáceis de encontrar." },
     estatisticas: { codigo: "PL / 00", contexto: "Painel administrativo", titulo: "Visão geral", texto: "Acompanhe os números e a atividade do Plantel Listas." },
     historico: { codigo: "PL / 06", contexto: "Auditoria", titulo: "Histórico de atividades", texto: "Consulte as ações importantes realizadas no sistema." },
-    drive: { codigo: "PL / 07", contexto: "Integração", titulo: "Google Drive", texto: "Confira a conexão e mantenha os materiais atualizados." }
+    drive: { codigo: "PL / 07", contexto: "Integração", titulo: "Google Drive", texto: "Confira a conexão e mantenha os materiais atualizados." },
+    parceiros: { codigo: "PL / 10", contexto: "Administração", titulo: "Parceiros Plantel", texto: "Gerencie os parceiros exibidos na sidebar." }
   };
   const informacaoDaArea = informacoesDasAreas[areaAtual] || informacoesDasAreas.acervo;
 
@@ -559,8 +563,9 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           {usuario.papel === "professor" && <ItemMenu area="minhasPastas" atual={areaAtual} icone="pasta" texto="Pastas liberadas" aoAbrir={navegar} />}
           {["aluno", "professor"].includes(usuario.papel) && <ItemMenu area="suporte" atual={areaAtual} icone="suporte" texto="Suporte" aoAbrir={navegar} />}
           <a className="item-menu-link" href="https://planteldeduvidas.com.br" target="_blank" rel="noreferrer"><Icone nome="inicio" /><span>Site do Plantel</span></a>
-          {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /></>}
+          {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /><ItemMenu area="parceiros" atual={areaAtual} icone="parceiros" texto="Parceiros" aoAbrir={navegar} /></>}
         </nav>
+        <ParceirosSidebar versao={versaoParceiros} />
         <div className="conta-lateral"><span className="avatar-usuario">{(usuario.nome || usuario.email).slice(0, 1).toUpperCase()}</span><span><strong>{usuario.nome || usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small><small className="email-conta-lateral">{usuario.email}</small></span><button type="button" className="botao-icone" aria-label="Sair" title="Sair" onClick={aoSair}><Icone nome="sair" /></button></div>
       </aside>
 
@@ -581,6 +586,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
         {usuario.papel === "professor" && areaAtual === "minhasPastas" && <section className="cartao-painel painel-conteudo"><div className="cabecalho-bloco"><div><h2>Pastas liberadas para você</h2><p>Você pode adicionar, editar e mover materiais somente nestas pastas.</p></div></div><ul className="lista-pastas-professor">{minhasPermissoes.map(function renderizar(item) { return <li key={item.id}><span className="icone-lista"><Icone nome="pasta" /></span><span><strong>{item.categoria.nome}</strong><small>Você pode gerenciar os materiais desta pasta.</small></span></li>; })}</ul>{!minhasPermissoes.length && <Vazio titulo="Nenhuma pasta liberada" texto="Quando um administrador liberar uma pasta, ela aparecerá aqui." />}</section>}
 
         {usuario.papel === "admin" && ["usuarios", "estatisticas", "historico"].includes(areaAtual) && <AdministracaoFase7 usuario={usuario} area={areaAtual} aoMensagem={definirMensagem} aoErro={mostrarErro} />}
+        {usuario.papel === "admin" && areaAtual === "parceiros" && <ParceirosAdmin aoMensagem={definirMensagem} aoErro={mostrarErro} aoAlterar={() => definirVersaoParceiros(atual => atual + 1)} />}
 
         {usuario.papel === "admin" && areaAtual === "drive" && <section className="bloco-admin integracao-drive painel-conteudo">
             <div className="cabecalho-bloco">

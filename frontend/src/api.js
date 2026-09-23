@@ -137,6 +137,16 @@ function obterAuditoria(filtros) {
 function obterUrlRelatorio(periodo) { return API_BASE + "/analytics/relatorio.csv?periodo=" + periodo; }
 function enviarSuporte(assunto, mensagem) { return requisitar("/suporte", { method: "POST", body: JSON.stringify({ assunto: assunto, mensagem: mensagem }) }); }
 function obterMeuHistorico(pagina, limite) { return requisitar("/meu-historico?pagina=" + pagina + "&limite=" + limite, { method: "GET" }); }
+function listarParceiros() { return requisitar("/parceiros", { method: "GET" }); }
+function listarParceirosAdmin() { return requisitar("/parceiros/admin", { method: "GET" }); }
+function criarParceiro(dados) { return requisitar("/parceiros", { method: "POST", body: JSON.stringify(dados) }); }
+function editarParceiro(id, dados) { return requisitar("/parceiros/" + id, { method: "PATCH", body: JSON.stringify(dados) }); }
+function enviarImagemParceiro(id, arquivo) {
+  const dados = new FormData();
+  dados.append("imagem", arquivo);
+  return requisitar("/parceiros/" + id + "/imagem", { method: "POST", body: dados });
+}
+function removerImagemParceiro(id) { return requisitar("/parceiros/" + id + "/imagem", { method: "DELETE" }); }
 
 function criarOperacoesDeCatalogo(caminho, nomeSingular) {
   return {
@@ -321,6 +331,12 @@ export {
   obterUrlRelatorio,
   enviarSuporte,
   obterMeuHistorico,
+  listarParceiros,
+  listarParceirosAdmin,
+  criarParceiro,
+  editarParceiro,
+  enviarImagemParceiro,
+  removerImagemParceiro,
   categorias,
   disciplinas,
   concursos,

@@ -51,6 +51,10 @@ const criarAuditoriaRepository = require("./modules/auditoria/auditoriaRepositor
 const criarAuditoriaService = require("./modules/auditoria/auditoriaService");
 const criarAuditoriaController = require("./modules/auditoria/auditoriaController");
 const criarAuditoriaRoutes = require("./modules/auditoria/auditoriaRoutes");
+const criarParceiroRepository = require("./modules/parceiros/parceiroRepository");
+const criarParceiroService = require("./modules/parceiros/parceiroService");
+const criarParceiroController = require("./modules/parceiros/parceiroController");
+const criarParceiroRoutes = require("./modules/parceiros/parceiroRoutes");
 const criarSuporteService = require("./modules/suporte/suporteService");
 const criarSuporteController = require("./modules/suporte/suporteController");
 const criarSuporteRoutes = require("./modules/suporte/suporteRoutes");
@@ -247,6 +251,12 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     controller: criarAuditoriaController(criarAuditoriaService(auditoriaRepository)),
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
+  }));
+  aplicacao.use("/api/parceiros", criarParceiroRoutes({
+    controller: criarParceiroController(criarParceiroService(criarParceiroRepository(pool), auditoriaRepository)),
+    autenticar: autenticar,
+    autorizarAdmin: autorizarAdmin,
+    rateLimiter: rateLimiters.upload
   }));
 }
 
