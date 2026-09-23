@@ -149,7 +149,7 @@ function CampoSenha(propriedades) {
 }
 
 function lerTemaSalvo() {
-  return window.localStorage.getItem("plantel-tema") === "claro" ? "claro" : "escuro";
+  return window.localStorage.getItem("plantel-tema") === "escuro" ? "escuro" : "claro";
 }
 
 function aplicarTema(tema) {
