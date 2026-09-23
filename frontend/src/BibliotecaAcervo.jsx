@@ -215,7 +215,6 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
   const [pagina, definirPagina] = useState(1);
   const [carregando, definirCarregando] = useState(true);
   const [erro, definirErro] = useState("");
-  const [materialAberto, definirMaterialAberto] = useState(null);
   const [organizacao, definirOrganizacao] = useState(null);
   const [selecionadas, definirSelecionadas] = useState([]);
   const [disciplinaLote, definirDisciplinaLote] = useState("manter");
@@ -239,7 +238,6 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
       definirPagina(1);
       definirBusca("");
       definirBuscaDigitada("");
-      definirMaterialAberto(null);
     }
     window.addEventListener("popstate", acompanharVoltarDoNavegador);
     return function removerAcompanhamento() {
@@ -365,7 +363,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
                     <span className={"icone-material " + item.tipo}><Icone nome={item.tipo === "pdf" ? "pdf" : "video"} tamanho={23} /></span>
                     <div className="informacao-material"><div className="linha-nome-material"><h3>{item.nome}</h3><span className="tipo-material">{nomeDoTipo(item.tipo)}</span></div><p title={item.caminho}>{item.caminho}</p></div>
                     <small className="tamanho-material">{tamanhoAmigavel(item.tamanhoBytes)}</small>
-                    <div className="acoes-material"><button type="button" className="botao-principal" onClick={function visualizar() { definirMaterialAberto(item); }}>{item.tipo === "pdf" ? "Abrir" : "Assistir"}</button><a className="botao-secundario" href={obterUrlDoMaterial(item.id, true)} aria-label={"Baixar " + item.nome}><Icone nome="download" />Baixar</a></div>
+                    <div className="acoes-material"><a className="botao-principal" href={obterUrlDoMaterial(item.id, false)} target="_blank" rel="noopener noreferrer" aria-label={(item.tipo === "pdf" ? "Abrir " : "Assistir ") + item.nome}>{item.tipo === "pdf" ? "Abrir" : "Assistir"}</a><a className="botao-secundario" href={obterUrlDoMaterial(item.id, true)} aria-label={"Baixar " + item.nome}><Icone nome="download" />Baixar</a></div>
                     {podeGerenciar && <AcoesDeGestao material={item} pastas={pastasGerenciaveis} aoAtualizar={recarregarTudo} aoErro={definirErro} />}
                   </article>
                 );
@@ -378,7 +376,6 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
         </>
       )}
 
-      {materialAberto && <Modal titulo={materialAberto.nome} descricao={materialAberto.tipo === "pdf" ? "Visualização do PDF" : "Reprodução do vídeo"} aoFechar={function fechar() { definirMaterialAberto(null); }} classe="modal-visualizador"><div className="visualizador">{materialAberto.tipo === "pdf" ? <iframe title={materialAberto.nome} src={obterUrlDoMaterial(materialAberto.id, false)} /> : <video controls preload="metadata" crossOrigin="use-credentials" src={obterUrlDoMaterial(materialAberto.id, false)}>Seu navegador não consegue reproduzir este vídeo.</video>}</div></Modal>}
     </section>
   );
 }

@@ -1318,6 +1318,8 @@ a.botao-secundario:hover {
 }
 
 .aviso {
+  display: flex;
+  align-items: center;
   color: #155d55;
   background: #e2f5f1;
 }
@@ -6767,4 +6769,35 @@ textarea {
   }
   .conteudo-aplicacao { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
   .pagina-autenticacao { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+}
+
+/* Visão geral: manter os indicadores e o título afastados das bordas do painel. */
+.area-estatisticas .administracao-fase7 > .bloco-admin {
+  padding: clamp(24px, 2.5vw, 36px);
+  border-radius: 12px;
+}
+
+.area-estatisticas .grade-estatisticas {
+  gap: 12px;
+  margin: 26px 0 30px;
+}
+
+.area-estatisticas .grade-estatisticas .cartao-estatistica:nth-child(n) {
+  min-height: 132px;
+  padding: 24px 22px;
+  border-radius: 9px;
+}
+
+.area-estatisticas .grade-estatisticas .cartao-estatistica::before {
+  left: 22px;
+}
+
+@media (max-width: 720px) {
+  .area-estatisticas .administracao-fase7 > .bloco-admin { padding: 20px; }
+  .area-estatisticas .grade-estatisticas { gap: 10px; margin: 22px 0 26px; }
+  .area-estatisticas .grade-estatisticas .cartao-estatistica:nth-child(n) { min-height: 118px; padding: 20px; }
+}
+
+@media (max-width: 480px) {
+  .area-estatisticas .administracao-fase7 > .bloco-admin { padding: 16px; }
 }
