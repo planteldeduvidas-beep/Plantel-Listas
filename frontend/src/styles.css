@@ -6693,3 +6693,78 @@ textarea {
     width: 100%;
   }
 }
+/* Instalação/atualização PWA: aviso curto, dispensável e fora da navegação. */
+.aviso-pwa {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: min(440px, calc(100vw - 32px));
+  padding: 12px 56px 12px 15px;
+  border: 1px solid var(--cor-borda);
+  border-radius: 11px;
+  color: var(--cor-texto);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra-card);
+  font-size: .83rem;
+}
+
+.aviso-pwa > span { flex: 1 1 170px; }
+.aviso-pwa > button:not(.aviso-pwa-fechar) { min-height: 44px; padding: 7px 12px; font-size: .79rem; }
+.aviso-pwa .aviso-pwa-fechar {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  color: var(--cor-texto-suave);
+  background: transparent;
+  font-size: 1.3rem;
+}
+.aviso-pwa .aviso-pwa-fechar:hover { color: var(--cor-texto); background: var(--cor-superficie-suave); }
+
+@media (max-width: 900px) {
+  .pagina-autenticacao { position: relative; }
+  .pagina-autenticacao .alternar-tema-login { position: absolute; }
+}
+
+@media (max-width: 720px) {
+  .pagina-autenticacao .botao-principal,
+  .pagina-autenticacao .acoes-secundarias button,
+  .pagina-autenticacao .alternar-tema-login,
+  .pagina-autenticacao .links-institucionais-autenticacao a {
+    min-height: 44px;
+  }
+
+  .pagina-autenticacao .links-institucionais-autenticacao a {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .pagina-autenticacao .campo-senha .alternar-senha {
+    right: 0;
+    width: 44px;
+    min-height: 44px;
+  }
+
+  body:has(.aviso-pwa) .pagina-autenticacao,
+  body:has(.aviso-pwa) .conteudo-aplicacao {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (display-mode: standalone) {
+  .pagina-painel, .pagina-autenticacao, .pagina-institucional { min-height: 100dvh; }
+  .barra-lateral {
+    height: 100dvh;
+    padding-top: max(28px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+  .conteudo-aplicacao { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+  .pagina-autenticacao { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+}
