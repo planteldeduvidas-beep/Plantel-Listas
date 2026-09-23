@@ -381,7 +381,7 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     }, token);
   }
 
-  async function criarPasta(refreshToken, nome, pastaPaiDriveId) {
+  async function criarPasta(refreshToken, nome, pastaPaiDriveId, operacaoChave) {
     const token = await obterTokenDeAcesso(refreshToken);
     const url = new URL(URL_API_DRIVE);
     url.searchParams.set("supportsAllDrives", "true");
@@ -392,7 +392,8 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       body: JSON.stringify({
         name: nome,
         mimeType: MIME_PASTA,
-        parents: [pastaPaiDriveId]
+        parents: [pastaPaiDriveId],
+        appProperties: operacaoChave ? { plantelOperationId: operacaoChave } : undefined
       })
     }, token);
   }

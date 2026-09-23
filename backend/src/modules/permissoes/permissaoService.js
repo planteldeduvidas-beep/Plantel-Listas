@@ -15,6 +15,8 @@ function criarPermissaoService(dependencias) {
     return repository.listarTodas();
   }
 
+  function listarDisciplinas() { return repository.listarTodasDisciplinas(); }
+
   async function listarMinhas(usuario) {
     if (!usuario || usuario.papel !== "professor") {
       throw new AppError("Usuario sem permissao", 403, "SEM_PERMISSAO");
@@ -64,20 +66,31 @@ function criarPermissaoService(dependencias) {
 
   async function salvarLote(professorIdInformado, corpo, administrador) {
     const professorId = validarId(professorIdInformado, "Professor");
-    const categoriaIds = validarLote(corpo);
+    const { categoriaIds, disciplinaIds } = validarLote(corpo);
     return repository.comTravaAdministrativa(async function salvarComSeguranca(conexao){
       const professor=await usuarioRepository.buscarPorId(professorId,conexao,true);
       if(!professor||!professor.ativo||professor.papel!=="professor")throw new AppError("Professor ativo nao encontrado",404,"PROFESSOR_NAO_ENCONTRADO");
       for(const categoriaId of categoriaIds){const categoria=await estruturaRepository.buscarCategoriaPorId(categoriaId,conexao,true);if(!categoria||!categoria.ativo)throw new AppError("Pasta ativa nao encontrada",404,"CATEGORIA_NAO_ENCONTRADA");}
+      if (disciplinaIds !== null) {
+        for (const disciplinaId of disciplinaIds) {
+          const [disciplinas] = await conexao.execute("SELECT id FROM disciplinas WHERE id=? AND ativo=1 LIMIT 1 FOR UPDATE", [disciplinaId]);
+          if (!disciplinas.length) throw new AppError("Disciplina ativa nao encontrada",404,"DISCIPLINA_NAO_ENCONTRADA");
+        }
+      }
       await conexao.execute("UPDATE permissoes_professor_categoria SET revogada_em=CURRENT_TIMESTAMP(3),revogada_por_usuario_id=? WHERE professor_id=? AND revogada_em IS NULL",[administrador.id,professorId]);
       for(const categoriaId of categoriaIds){await conexao.execute("INSERT INTO permissoes_professor_categoria (professor_id,categoria_id,concedida_por_usuario_id) VALUES (?,?,?) ON DUPLICATE KEY UPDATE concedida_por_usuario_id=?,concedida_em=CURRENT_TIMESTAMP(3),revogada_por_usuario_id=NULL,revogada_em=NULL",[professorId,categoriaId,administrador.id,administrador.id]);}
-      await auditoriaRepository.registrar({atorUsuarioId:administrador.id,acao:"acessos_professor_atualizados",entidade:"professor",entidadeId:professorId,contexto:{quantidadePastas:categoriaIds.length}},conexao);
+      if (disciplinaIds !== null) {
+        await conexao.execute("DELETE FROM professor_disciplinas WHERE professor_id=?", [professorId]);
+        for (const disciplinaId of disciplinaIds) await conexao.execute("INSERT INTO professor_disciplinas (professor_id,disciplina_id,concedida_por_usuario_id) VALUES (?,?,?)", [professorId,disciplinaId,administrador.id]);
+      }
+      await auditoriaRepository.registrar({atorUsuarioId:administrador.id,acao:"acessos_professor_atualizados",entidade:"professor",entidadeId:professorId,contexto:{quantidadePastas:categoriaIds.length,quantidadeDisciplinas:disciplinaIds===null?null:disciplinaIds.length}},conexao);
       return repository.listarAtivasDoProfessor(professorId,conexao);
     });
   }
 
   return {
     listarTodas: listarTodas,
+    listarDisciplinas: listarDisciplinas,
     listarMinhas: listarMinhas,
     conceder: conceder,
     revogar: revogar,

@@ -116,6 +116,20 @@ function criarPermissaoRepository(pool) {
     return listarAtivasDoProfessor(professorId);
   }
 
+  async function listarDisciplinasDoProfessor(professorId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
+      "SELECT pd.disciplina_id AS id,d.nome FROM professor_disciplinas pd INNER JOIN disciplinas d ON d.id=pd.disciplina_id "
+      + "WHERE pd.professor_id=? AND d.ativo=1 ORDER BY d.nome", [professorId]
+    );
+    return registros.map(function mapear(item) { return { id:Number(item.id), nome:item.nome }; });
+  }
+
+  async function listarTodasDisciplinas() {
+    const [registros] = await pool.execute("SELECT professor_id,disciplina_id FROM professor_disciplinas ORDER BY professor_id,disciplina_id");
+    return registros.map(function mapear(item) { return { professorId:Number(item.professor_id), disciplinaId:Number(item.disciplina_id) }; });
+  }
+
   async function comTravaAdministrativa(funcao) {
     const conexao=await pool.getConnection();let travaObtida=false;
     try{
@@ -135,6 +149,8 @@ function criarPermissaoRepository(pool) {
     buscarPorProfessorCategoria: buscarPorProfessorCategoria,
     listarTodas: listarTodas,
     listarAtivasDoProfessor: listarAtivasDoProfessor,
+    listarDisciplinasDoProfessor: listarDisciplinasDoProfessor,
+    listarTodasDisciplinas: listarTodasDisciplinas,
     conceder: conceder,
     revogar: revogar,
     salvarLote: salvarLote,

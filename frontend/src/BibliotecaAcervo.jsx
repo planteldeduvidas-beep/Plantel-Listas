@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   consultarAcervo, obterUrlDoMaterial, classificarPasta,
   obterOrganizacaoAcervo, classificarPastas, listarPastasGerenciaveis,
+  criarPastaNoDrive, renomearPastaNoDrive,
   adicionarMaterial, editarMaterial, moverMaterial, substituirMaterial,
   enviarMaterialLixeira, listarLixeira, restaurarMaterial, excluirMaterial
 } from "./api.js";
@@ -37,6 +38,9 @@ function OpcoesClassificacao({ itens, incluirManter }) {
 function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtualizar, aoErro, aoMensagem }) {
   const [lixeira, definirLixeira] = useState([]);
   const [mostrarEnvio, definirMostrarEnvio] = useState(false);
+  const [mostrarNovaPasta, definirMostrarNovaPasta] = useState(false);
+  const [nomeNovaPasta, definirNomeNovaPasta] = useState("");
+  const [paiNovaPasta, definirPaiNovaPasta] = useState("");
   const [ocupado, definirOcupado] = useState(false);
   const [materialParaExcluir, definirMaterialParaExcluir] = useState(null);
   const [textoExclusao, definirTextoExclusao] = useState("");
@@ -57,8 +61,10 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
       await acao();
       await Promise.all([aoAtualizar(), carregarLixeira()]);
       if (mensagem) aoMensagem(mensagem);
+      return true;
     } catch (falha) {
       aoErro(mensagemHumana(falha));
+      return false;
     } finally {
       definirOcupado(false);
     }
@@ -70,6 +76,15 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
     await executar(function adicionar() { return adicionarMaterial(formulario); }, "Material adicionado.");
     evento.currentTarget.reset();
     definirMostrarEnvio(false);
+  }
+
+  async function criarPasta(evento) {
+    evento.preventDefault();
+    const criada = await executar(function criar() { return criarPastaNoDrive(nomeNovaPasta,Number(paiNovaPasta)); }, "Pasta criada no Google Drive.");
+    if (criada) {
+      definirNomeNovaPasta("");
+      definirMostrarNovaPasta(false);
+    }
   }
 
   async function restaurar(item) {
@@ -85,7 +100,8 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   }
 
   return <section className="painel-gestao-materiais">
-    <div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais da biblioteca."}</p></div><button type="button" className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div>
+    <div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais da biblioteca."}</p></div><div className="acoes-gestao-pastas"><button type="button" className="botao-secundario" onClick={function alternar() { definirMostrarNovaPasta(!mostrarNovaPasta); }}><Icone nome={mostrarNovaPasta ? "fechar" : "mais"} />{mostrarNovaPasta ? "Cancelar" : "Nova pasta"}</button><button type="button" className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div></div>
+    {mostrarNovaPasta && <form className="formulario-material" onSubmit={criarPasta}><label>Nome da nova pasta<input required maxLength="120" value={nomeNovaPasta} onChange={function mudar(evento) { definirNomeNovaPasta(evento.target.value); }} /></label><label>Criar dentro de<select required value={paiNovaPasta} onChange={function mudar(evento) { definirPaiNovaPasta(evento.target.value); }}><option value="" disabled>Escolha uma pasta autorizada</option>{pastas.filter(function permitida(item) { return item.podeCriar; }).map(function opcao(item) { return <option key={item.id} value={item.id}>{item.caminho}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Criando..." : "Criar pasta"}</button></form>}
     {mostrarEnvio && <form className="formulario-material" onSubmit={enviar}><label>Arquivo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><label>Adicionar na pasta<select required name="categoriaId" defaultValue={categoriaAtual && pastas.some(function mesma(item) { return item.id === categoriaAtual; }) ? categoriaAtual : ""}><option value="" disabled>Escolha uma pasta</option>{pastas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.caminho}</option>; })}</select></label><label>Nome do material <small>(opcional)</small><input name="nome" placeholder="Usar o nome do arquivo" /></label><label>Disciplina <small>(opcional)</small><select name="disciplinaId" defaultValue=""><option value="">Não informar</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><label>Concurso <small>(opcional)</small><select name="concursoId" defaultValue=""><option value="">Não informar</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Enviando..." : "Adicionar material"}</button></form>}
     {usuario.papel === "admin" && <details className="lixeira-materiais"><summary><span><Icone nome="historico" /> Lixeira</span><span className="contador">{lixeira.length}</span></summary>{!lixeira.length && <Vazio titulo="A lixeira está vazia" texto="Os materiais enviados para cá aparecerão nesta lista." />}{lixeira.map(function itemLixeira(item) { return <article key={item.id}><div><strong>{item.nome}</strong><small>{item.pasta ? "Pasta anterior: " + item.pasta : "Pasta anterior indisponível"}</small>{item.exclusaoPendente && <small>Exclusão aguardando conclusão</small>}</div><div><button type="button" className="secundario" disabled={ocupado || item.exclusaoPendente} onClick={function restaurarItem() { restaurar(item); }}>Restaurar</button><button type="button" className="perigo" disabled={ocupado} onClick={function excluirItem() { definirMaterialParaExcluir(item); definirTextoExclusao(""); }}>{item.exclusaoPendente ? "Finalizar exclusão" : "Excluir definitivamente"}</button></div></article>; })}</details>}
     {materialParaExcluir && <Modal titulo="Excluir este arquivo definitivamente?" aoFechar={function fechar() { definirMaterialParaExcluir(null); }}><form onSubmit={excluir}><p>Essa ação não poderá ser desfeita. Digite <strong>EXCLUIR</strong> para confirmar.</p><label>Confirmação<input value={textoExclusao} onChange={function mudar(evento) { definirTextoExclusao(evento.target.value); }} autoFocus autoComplete="off" /></label><div className="acoes-formulario"><button type="submit" className="perigo" disabled={ocupado || textoExclusao !== "EXCLUIR"}>{ocupado ? "Excluindo..." : "Excluir definitivamente"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirMaterialParaExcluir(null); }}>Cancelar</button></div></form></Modal>}
@@ -163,10 +179,12 @@ function resumoPasta(pasta) {
   return resumoPastas + " · " + resumoMateriais;
 }
 
-function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar }) {
+function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar, podeRenomear, aoRenomear }) {
   const [editando, definirEditando] = useState(false);
   const [disciplina, definirDisciplina] = useState(valorInicial(pasta, "disciplina"));
   const [concurso, definirConcurso] = useState(valorInicial(pasta, "concurso"));
+  const [renomeando, definirRenomeando] = useState(false);
+  const [nomeNovo, definirNomeNovo] = useState(pasta.nome);
   async function salvar(evento) {
     evento.preventDefault();
     await aoClassificar(pasta.id, lerEscolha(disciplina), lerEscolha(concurso));
@@ -175,6 +193,7 @@ function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar }) {
   return <article className="item-pasta">
     <button type="button" className="abrir-pasta" onClick={function abrir() { aoAbrir(pasta.id); }}><span className="icone-item" aria-hidden="true"><Icone nome="pasta" tamanho={24} /></span><span><strong>{pasta.nome}</strong><small>{resumoPasta(pasta)}</small></span><Icone nome="chevron" /></button>
     {(pasta.disciplina || pasta.concurso) && <div className="etiquetas">{pasta.disciplina && <span>{pasta.disciplina.nome}</span>}{pasta.concurso && <span>{pasta.concurso.nome}</span>}</div>}
+    {podeRenomear && <div className="gestao-pasta">{!renomeando ? <button type="button" className="acao-texto" onClick={function abrirRenomeacao() { definirNomeNovo(pasta.nome); definirRenomeando(true); }}>Renomear pasta</button> : <form onSubmit={async function salvarNome(evento) { evento.preventDefault(); const sucesso=await aoRenomear(pasta.id,nomeNovo); if(sucesso)definirRenomeando(false); }}><label>Novo nome<input required maxLength="120" value={nomeNovo} onChange={function mudar(evento) { definirNomeNovo(evento.target.value); }} /></label><button type="submit">Salvar</button><button type="button" className="secundario" onClick={function cancelar() { definirRenomeando(false); }}>Cancelar</button></form>}</div>}
     {usuario.papel === "admin" && <div className="classificacao-pasta">{!editando && <button type="button" className="acao-texto" onClick={function editar() { definirEditando(true); }}>Organizar pasta</button>}{editando && <form onSubmit={salvar}><label>Disciplina<select value={disciplina} onChange={function mudar(evento) { definirDisciplina(evento.target.value); }}><OpcoesClassificacao itens={filtros.disciplinas} /></select></label><label>Concurso<select value={concurso} onChange={function mudar(evento) { definirConcurso(evento.target.value); }}><OpcoesClassificacao itens={filtros.concursos} /></select></label><div><button type="submit">Salvar</button><button type="button" className="secundario" onClick={function cancelar() { definirEditando(false); }}>Cancelar</button></div></form>}</div>}
   </article>;
 }
@@ -247,6 +266,10 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
   function pesquisar(evento) { evento.preventDefault(); definirPagina(1); definirBusca(buscaDigitada.trim()); }
   async function salvarClassificacao(id, disciplina, concurso) {
     try { await classificarPasta(id, disciplina, concurso); aoMensagem("Organização da pasta atualizada."); await Promise.all([carregar(), carregarOrganizacao()]); } catch (falha) { definirErro(mensagemHumana(falha)); }
+  }
+  async function salvarNomePasta(id,nome) {
+    try { await renomearPastaNoDrive(id,nome); aoMensagem("Pasta renomeada no Google Drive."); await recarregarTudo(); return true; }
+    catch (falha) { definirErro(mensagemHumana(falha)); return false; }
   }
   function alternar(id) { definirSelecionadas(function atualizar(atuais) { return atuais.includes(id) ? atuais.filter(function remover(item) { return item !== id; }) : atuais.concat(id); }); }
   async function salvarLote(evento) {
@@ -324,7 +347,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
           {dados.pastas.length > 0 && (
             <section className="grupo-resultados">
               <div className="titulo-grupo"><div><span className="sobrelinha">Navegue</span><h3>Pastas</h3></div><span className="contador">{dados.pastas.length}</span></div>
-              <div className="grade-pastas">{dados.pastas.map(function pasta(item) { return <Pasta key={item.id} pasta={item} aoAbrir={abrirPasta} usuario={usuario} filtros={filtros} aoClassificar={salvarClassificacao} />; })}</div>
+              <div className="grade-pastas">{dados.pastas.map(function pasta(item) { return <Pasta key={item.id} pasta={item} aoAbrir={abrirPasta} usuario={usuario} filtros={filtros} aoClassificar={salvarClassificacao} podeRenomear={usuario.papel === "admin" || pastasGerenciaveis.some(function autorizada(pasta) { return pasta.id === item.id; })} aoRenomear={salvarNomePasta} />; })}</div>
             </section>
           )}
 

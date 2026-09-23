@@ -6,6 +6,7 @@ import {
   disciplinas as apiDisciplinas,
   concursos as apiConcursos,
   listarPermissoes,
+  listarDisciplinasDosProfessores,
   listarMinhasPermissoes,
   salvarAcessosProfessor,
   obterStatusGoogleDrive,
@@ -189,6 +190,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
   const [concursos, definirConcursos] = useState([]);
   const [usuarios, definirUsuarios] = useState([]);
   const [permissoes, definirPermissoes] = useState([]);
+  const [disciplinasDosProfessores, definirDisciplinasDosProfessores] = useState([]);
   const [minhasPermissoes, definirMinhasPermissoes] = useState([]);
   const [categoriaEmEdicao, definirCategoriaEmEdicao] = useState(null);
   const [nomeCategoria, definirNomeCategoria] = useState("");
@@ -198,6 +200,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
   const [formularioPastaAberto, definirFormularioPastaAberto] = useState(false);
   const [professorId, definirProfessorId] = useState("");
   const [pastasSelecionadas, definirPastasSelecionadas] = useState([]);
+  const [disciplinasSelecionadas, definirDisciplinasSelecionadas] = useState([]);
   const [googleDrive, definirGoogleDrive] = useState(null);
   const [acompanhamentoDrive, definirAcompanhamentoDrive] = useState(null);
   const [processandoGoogleDrive, definirProcessandoGoogleDrive] = useState(false);
@@ -257,13 +260,14 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
         const resultados = await Promise.all([
           apiCategorias.listar(), apiDisciplinas.listar(), apiConcursos.listar(),
           listarUsuarios({ papel: "professor", ativo: true, limite: 100 }), listarPermissoes(), obterStatusGoogleDrive(),
-          obterStatusDasAtualizacoesGoogleDrive()
+          obterStatusDasAtualizacoesGoogleDrive(), listarDisciplinasDosProfessores()
         ]);
         definirCategorias(resultados[0].categorias);
         definirDisciplinas(resultados[1].disciplinas);
         definirConcursos(resultados[2].concursos);
         definirUsuarios(resultados[3].usuarios);
         definirPermissoes(resultados[4].permissoes);
+        definirDisciplinasDosProfessores(resultados[7].disciplinas);
         definirGoogleDrive(resultados[5].googleDrive);
         definirAcompanhamentoDrive(resultados[6].acompanhamento);
       } else if (usuario.papel === "professor") {
@@ -420,6 +424,15 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
         return item.categoria.id;
       })
     );
+    definirDisciplinasSelecionadas(disciplinasDosProfessores.filter(function filtrar(item) {
+      return item.professorId === Number(novoProfessorId);
+    }).map(function mapear(item) { return item.disciplinaId; }));
+  }
+
+  function alternarDisciplinaSelecionada(id) {
+    definirDisciplinasSelecionadas(function atualizar(atuais) {
+      return atuais.includes(id) ? atuais.filter(function remover(item) { return item !== id; }) : atuais.concat(id);
+    });
   }
 
   function alternarPastaSelecionada(categoriaId) {
@@ -434,7 +447,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
     evento.preventDefault();
     const professorIdNumerico = Number(professorId);
     try {
-      await salvarAcessosProfessor(professorIdNumerico, pastasSelecionadas);
+      await salvarAcessosProfessor(professorIdNumerico, pastasSelecionadas, disciplinasSelecionadas);
       await carregar("Acessos do professor salvos com sucesso.");
     } catch (falha) {
       mostrarErro(falha.message);
@@ -646,12 +659,21 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           </div></>}
 
         {usuario.papel === "admin" && areaAtual === "acessos" && <section className="bloco-admin painel-conteudo">
-            <div className="cabecalho-bloco"><div><h2>Acessos dos professores</h2><p>Escolha um professor e marque as pastas que ele poderá gerenciar.</p></div></div>
+            <div className="cabecalho-bloco"><div><h2>Acessos dos professores</h2><p>Escolha as disciplinas do professor. Todos os ramos classificados nelas e seus descendentes serão liberados. Acessos antigos por pasta continuam disponíveis.</p></div></div>
             <form className="formulario-acessos" onSubmit={salvarAcessos}>
               <label>Professor<select value={professorId} onChange={selecionarProfessor} required><option value="">Selecione um professor</option>{professores.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.email}</option>; })}</select></label>
               {professorId && (
                 <fieldset>
-                  <legend>Quais pastas este professor pode gerenciar?</legend>
+                  <legend>Disciplinas autorizadas</legend>
+                  <p>Uma escolha libera todos os ramos classificados nessa disciplina, inclusive subpastas.</p>
+                  <div className="lista-selecao">{disciplinas.filter(function ativa(item) { return item.ativo; }).map(function opcao(item) {
+                    return <label key={item.id} className="opcao-pasta"><input type="checkbox" checked={disciplinasSelecionadas.includes(item.id)} onChange={function alternar() { alternarDisciplinaSelecionada(item.id); }} /><span>{item.nome}</span></label>;
+                  })}</div>
+                </fieldset>
+              )}
+              {professorId && (
+                <fieldset>
+                  <legend>Acessos específicos por pasta (modelo anterior)</legend>
                   <div className="lista-selecao">
                     {categoriasAtivas.map(function opcao(categoria) {
                       return <label key={categoria.id} className="opcao-pasta"><input type="checkbox" checked={pastasSelecionadas.includes(categoria.id)} onChange={function alternar() { alternarPastaSelecionada(categoria.id); }} /><span className="icone-opcao"><Icone nome="pasta" /></span><span>{categoria.nome}</span></label>;

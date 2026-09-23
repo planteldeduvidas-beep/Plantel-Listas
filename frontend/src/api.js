@@ -126,7 +126,8 @@ function editarUsuario(id, nome, email) { return requisitar("/usuarios/" + id, {
 function alterarPapelUsuario(id, papel) { return requisitar("/usuarios/" + id + "/papel", { method: "PATCH", body: JSON.stringify({ papel: papel }) }); }
 function alterarEstadoUsuario(id, ativo) { return requisitar("/usuarios/" + id + "/ativo", { method: "PATCH", body: JSON.stringify({ ativo: ativo }) }); }
 function iniciarRedefinicaoUsuario(id) { return requisitar("/usuarios/" + id + "/redefinicao-senha", { method: "POST", body: JSON.stringify({}) }); }
-function salvarAcessosProfessor(id, categoriaIds) { return requisitar("/permissoes/professores/" + id, { method: "PUT", body: JSON.stringify({ categoriaIds: categoriaIds }) }); }
+function salvarAcessosProfessor(id, categoriaIds, disciplinaIds) { return requisitar("/permissoes/professores/" + id, { method: "PUT", body: JSON.stringify({ categoriaIds: categoriaIds, disciplinaIds: disciplinaIds }) }); }
+function listarDisciplinasDosProfessores() { return requisitar("/permissoes/disciplinas", { method: "GET" }); }
 function obterAnalytics(periodo) { return requisitar("/analytics?periodo=" + periodo, { method: "GET" }); }
 function obterAuditoria(filtros) {
   const parametros = new URLSearchParams();
@@ -251,6 +252,14 @@ function listarPastasGerenciaveis() {
   return requisitar("/gestao-materiais/pastas", { method: "GET" });
 }
 
+function criarPastaNoDrive(nome, categoriaPaiId) {
+  return requisitar("/gestao-materiais/pastas", { method:"POST", body:JSON.stringify({nome:nome,categoriaPaiId:categoriaPaiId}) });
+}
+
+function renomearPastaNoDrive(id, nome) {
+  return requisitar("/gestao-materiais/pastas/" + id + "/nome", { method:"PATCH", body:JSON.stringify({nome:nome}) });
+}
+
 function adicionarMaterial(formulario) {
   return requisitar("/gestao-materiais", { method: "POST", body: formulario });
 }
@@ -306,6 +315,7 @@ export {
   alterarEstadoUsuario,
   iniciarRedefinicaoUsuario,
   salvarAcessosProfessor,
+  listarDisciplinasDosProfessores,
   obterAnalytics,
   obterAuditoria,
   obterUrlRelatorio,
@@ -328,6 +338,8 @@ export {
   obterOrganizacaoAcervo,
   classificarPastas,
   listarPastasGerenciaveis,
+  criarPastaNoDrive,
+  renomearPastaNoDrive,
   adicionarMaterial,
   editarMaterial,
   moverMaterial,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 function Icone({ nome, tamanho }) {
   const dimensao = tamanho || 21;
@@ -39,6 +39,8 @@ function Icone({ nome, tamanho }) {
   if (nome === "voltar") return <svg {...propriedades}><path d="m15 18-6-6 6-6" /></svg>;
   if (nome === "sucesso") return <svg {...propriedades}><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></svg>;
   if (nome === "alerta") return <svg {...propriedades}><path d="M10.3 3.4 2.2 18a2 2 0 0 0 1.8 3h16a2 2 0 0 0 1.8-3L13.7 3.4a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></svg>;
+  if (nome === "olho") return <svg {...propriedades}><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
+  if (nome === "olho-fechado") return <svg {...propriedades}><path d="M3 3l18 18M9.5 6.3A11.6 11.6 0 0 1 12 6c6.5 0 10 6 10 6a14 14 0 0 1-3.3 3.8M6.2 8.3A14 14 0 0 0 2 12s3.5 6 10 6c1.3 0 2.5-.2 3.6-.7" /><path d="M10 10a3 3 0 0 0 4 4" /></svg>;
   if (nome === "sol") return <svg {...propriedades}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42" /></svg>;
   if (nome === "lua") return <svg {...propriedades}><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z" /></svg>;
   if (nome === "online") return <svg {...propriedades}><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" /></svg>;
@@ -139,6 +141,12 @@ function Alerta({ tipo, children }) {
   return <div className={"aviso " + tipo} role={tipo === "erro" ? "alert" : "status"}><Icone nome={tipo === "erro" ? "alerta" : "sucesso"} /><span>{children}</span></div>;
 }
 
+function CampoSenha(propriedades) {
+  const [visivel, definirVisivel] = useState(false);
+  const referencia = useRef(null);
+  return <span className="campo-senha"><input {...propriedades} ref={referencia} type={visivel ? "text" : "password"} /><button type="button" className="alternar-senha" aria-label={visivel ? "Ocultar senha" : "Mostrar senha"} aria-pressed={visivel} onClick={function alternar() { definirVisivel(!visivel); referencia.current?.focus(); }}><Icone nome={visivel ? "olho-fechado" : "olho"} tamanho={19} /></button></span>;
+}
+
 function lerTemaSalvo() {
   return window.localStorage.getItem("plantel-tema") === "claro" ? "claro" : "escuro";
 }
@@ -172,4 +180,4 @@ function AlternadorTema({ classe, compacto }) {
   return <button type="button" className={(compacto ? "botao-icone" : "alternar-tema") + (classe ? " " + classe : "")} onClick={alternar} aria-label={tema === "escuro" ? "Usar modo claro" : "Usar modo escuro"}><Icone nome={tema === "escuro" ? "sol" : "lua"} />{!compacto && <span>{tema === "escuro" ? "Claro" : "Escuro"}</span>}</button>;
 }
 
-export { Icone, mensagemHumana, Modal, Carregando, Esqueleto, Vazio, Alerta, AlternadorTema, aplicarTema, lerTemaSalvo };
+export { Icone, mensagemHumana, Modal, Carregando, Esqueleto, Vazio, Alerta, CampoSenha, AlternadorTema, aplicarTema, lerTemaSalvo };

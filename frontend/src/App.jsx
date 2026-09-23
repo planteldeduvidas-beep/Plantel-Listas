@@ -9,7 +9,7 @@ import {
 } from "./api.js";
 import PainelAcervo from "./PainelAcervo.jsx";
 import PaginaInstitucional from "./PaginaInstitucional.jsx";
-import { Alerta, AlternadorTema, Carregando, Icone, aplicarTema, lerTemaSalvo, mensagemHumana } from "./ComponentesInterface.jsx";
+import { Alerta, AlternadorTema, CampoSenha, Carregando, Icone, aplicarTema, lerTemaSalvo, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, limparParametrosTemporarios, obterDocumentoPublico } from "./navegacao.js";
 
 function Aplicacao() {
@@ -236,8 +236,7 @@ function Aplicacao() {
           {exibirSenha && (
             <label>
               {tela === "redefinir" ? "Nova senha" : "Senha"}
-              <input
-                type="password"
+              <CampoSenha
                 minLength="12"
                 maxLength="128"
                 autoComplete={tela === "login" ? "current-password" : "new-password"}

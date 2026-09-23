@@ -9,6 +9,8 @@ function criarGestaoMateriaisRoutes(dependencias){
   router.use(impedirCachePrivado);
   router.use(dependencias.autenticar);
   router.get("/pastas",dependencias.controller.listarPastas);
+  router.post("/pastas",protegerContraCsrf,dependencias.controller.criarPasta);
+  router.patch("/pastas/:categoriaId/nome",protegerContraCsrf,dependencias.controller.renomearPasta);
   router.post("/",protegerContraCsrf,dependencias.rateLimiter,upload,dependencias.controller.adicionar);
   router.patch("/:materialId",protegerContraCsrf,dependencias.controller.editar);
   router.patch("/:materialId/mover",protegerContraCsrf,dependencias.controller.mover);

@@ -138,3 +138,27 @@ test("retoma renomeacao pendente usando o estado confirmado no MySQL",async func
   assert.deepEqual(dependencias.chamadas,["renomear:original.pdf"]);
   assert.deepEqual(concluidas,["op-2"]);
 });
+
+test("pasta criada no Drive e removida se a transacao MySQL falhar",async function(){
+  const dependencias=criarDependencias({
+    repository:{criarPasta:async function falhar(){throw new Error("falha banco");}},
+    provider:{criarPasta:async function criar(token,nome,pai){dependencias.chamadas.push("criar-pasta:"+nome+":"+pai);return{id:"drivePastaNova",name:nome};}}
+  });
+  await assert.rejects(dependencias.service.criarPasta({id:2,papel:"admin"},{nome:"Nova pasta",categoriaPaiId:10}),/falha banco/);
+  assert.deepEqual(dependencias.chamadas,["criar-pasta:Nova pasta:drivePasta10","excluir"]);
+});
+
+test("renomeacao de pasta compensa falha SQL e preserva nome anterior",async function(){
+  const dependencias=criarDependencias({
+    repository:{buscarCategoria:async function buscar(id){return{id:id,nome:"Pasta antiga",drivePastaId:"drivePasta"+id,categoriaPaiId:5,ativo:true};},renomearPasta:async function falhar(){throw new Error("falha banco");}},
+    provider:{obterItem:async function obter(token,id){return{id:id,mimeType:"application/vnd.google-apps.folder",parents:["drivePasta5"],trashed:false};}}
+  });
+  await assert.rejects(dependencias.service.renomearPasta({id:2,papel:"admin"},10,{nome:"Pasta nova"}),/falha banco/);
+  assert.deepEqual(dependencias.chamadas,["renomear:Pasta nova","renomear:Pasta antiga"]);
+});
+
+test("professor nao cria pasta fora de disciplina vinculada",async function(){
+  const dependencias=criarDependencias({repository:{buscarDisciplinaEfetiva:async()=>9,professorPossuiDisciplina:async()=>false}});
+  await assert.rejects(dependencias.service.criarPasta({id:7,papel:"professor"},{nome:"Tentativa",categoriaPaiId:10}),function verificar(erro){return erro.codigo==="SEM_PERMISSAO_DISCIPLINA";});
+  assert.deepEqual(dependencias.chamadas,[]);
+});

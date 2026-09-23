@@ -6,6 +6,9 @@ function criarPermissaoController(service) {
       next(erro);
     }
   }
+  async function listarDisciplinas(req,res,next) {
+    try { res.status(200).json({ disciplinas:await service.listarDisciplinas() }); } catch (erro) { next(erro); }
+  }
 
   async function listarMinhas(req, res, next) {
     try {
@@ -38,6 +41,7 @@ function criarPermissaoController(service) {
 
   return {
     listarTodas: listarTodas,
+    listarDisciplinas: listarDisciplinas,
     listarMinhas: listarMinhas,
     conceder: conceder,
     revogar: revogar,

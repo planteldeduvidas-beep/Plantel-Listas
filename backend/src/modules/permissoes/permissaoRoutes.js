@@ -8,6 +8,7 @@ function criarPermissaoRoutes(dependencias) {
   router.use(impedirCachePrivado);
   router.use(dependencias.autenticar);
   router.get("/minhas", dependencias.controller.listarMinhas);
+  router.get("/disciplinas", dependencias.autorizarAdmin, dependencias.controller.listarDisciplinas);
   router.get("/", dependencias.autorizarAdmin, dependencias.controller.listarTodas);
   router.post(
     "/",

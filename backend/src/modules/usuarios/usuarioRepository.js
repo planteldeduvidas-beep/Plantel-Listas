@@ -140,6 +140,7 @@ function criarUsuarioRepository(pool) {
       + "WHERE professor_id=? AND revogada_em IS NULL",
       [administradorId, usuarioId]
     );
+    await executor.execute("DELETE FROM professor_disciplinas WHERE professor_id=?", [usuarioId]);
   }
 
   async function comTravaAdministrativa(funcao) {

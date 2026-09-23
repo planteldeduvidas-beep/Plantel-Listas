@@ -97,22 +97,70 @@ function criarGestaoMateriaisRepository(pool) {
 
   async function buscarCategoria(id) {
     const [registros] = await pool.execute(
-      "SELECT id,nome,drive_pasta_id,ativo FROM categorias WHERE id=? LIMIT 1",
+      "SELECT id,nome,drive_pasta_id,categoria_pai_id,ativo FROM categorias WHERE id=? LIMIT 1",
       [id]
     );
     if (!registros[0]) return null;
-    return { id: Number(registros[0].id), nome: registros[0].nome, drivePastaId: registros[0].drive_pasta_id, ativo: Boolean(registros[0].ativo) };
+    return { id: Number(registros[0].id), nome: registros[0].nome, drivePastaId: registros[0].drive_pasta_id, categoriaPaiId: registros[0].categoria_pai_id === null ? null : Number(registros[0].categoria_pai_id), ativo: Boolean(registros[0].ativo) };
+  }
+
+  async function buscarDisciplinaEfetiva(categoriaId) {
+    const [registros] = await pool.execute(
+      "WITH RECURSIVE ancestrais AS (SELECT id,categoria_pai_id,disciplina_id,disciplina_estado,0 AS nivel FROM categorias WHERE id=? AND ativo=1 "
+      + "UNION ALL SELECT c.id,c.categoria_pai_id,c.disciplina_id,c.disciplina_estado,a.nivel+1 FROM categorias c INNER JOIN ancestrais a ON a.categoria_pai_id=c.id WHERE c.ativo=1) "
+      + "SELECT disciplina_id,disciplina_estado FROM ancestrais WHERE disciplina_estado<>'herdar' ORDER BY nivel LIMIT 1", [categoriaId]
+    );
+    return registros.length && registros[0].disciplina_estado === "definida" ? Number(registros[0].disciplina_id) : null;
+  }
+
+  async function professorPossuiDisciplina(professorId, disciplinaId) {
+    const [registros] = await pool.execute(
+      "SELECT 1 FROM professor_disciplinas pd INNER JOIN disciplinas d ON d.id=pd.disciplina_id AND d.ativo=1 WHERE pd.professor_id=? AND pd.disciplina_id=? LIMIT 1",
+      [professorId, disciplinaId]
+    );
+    return registros.length > 0;
+  }
+
+  async function buscarCategoriaPorDriveId(driveFileId) {
+    const [registros] = await pool.execute("SELECT id FROM categorias WHERE drive_pasta_id=? LIMIT 1", [driveFileId]);
+    return registros.length ? buscarCategoria(Number(registros[0].id)) : null;
+  }
+
+  async function criarPasta(dados, usuarioId, operacaoChave) {
+    return executarTransacao(async function criar(conexao) {
+      const [resultado] = await conexao.execute(
+        "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id,ativo,disciplina_estado) VALUES (?,?,?,1,'herdar')",
+        [dados.nome,dados.categoriaPaiId,dados.drivePastaId]
+      );
+      const id = Number(resultado.insertId);
+      await conexao.execute("INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado,contexto) VALUES (?,'pasta_criada','pasta',?,'concluida',?)", [usuarioId,id,JSON.stringify({categoriaPaiId:dados.categoriaPaiId})]);
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,null);
+      return {id:id,nome:dados.nome,categoriaPaiId:dados.categoriaPaiId};
+    });
+  }
+
+  async function renomearPasta(categoria, nome, usuarioId, operacaoChave) {
+    return executarTransacao(async function renomear(conexao) {
+      const [resultado] = await conexao.execute("UPDATE categorias SET nome=? WHERE id=? AND nome=? AND ativo=1", [nome,categoria.id,categoria.nome]);
+      if (resultado.affectedRows !== 1) throw new Error("CONCORRENCIA_PASTA");
+      await conexao.execute("INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado,contexto) VALUES (?,'pasta_renomeada','pasta',?,'concluida',?)", [usuarioId,categoria.id,JSON.stringify({nomeAnterior:categoria.nome,nomeNovo:nome})]);
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,null);
+      return {id:categoria.id,nome:nome,categoriaPaiId:categoria.categoriaPaiId};
+    });
   }
 
   async function professorPodeAcessarCategoria(professorId, categoriaId) {
     const [registros] = await pool.execute(
-      "WITH RECURSIVE ancestrais AS (SELECT id,categoria_pai_id FROM categorias WHERE id=? AND ativo=1 "
-      + "UNION ALL SELECT p.id,p.categoria_pai_id FROM categorias p INNER JOIN ancestrais a ON a.categoria_pai_id=p.id WHERE p.ativo=1) "
-      + "SELECT 1 AS permitido FROM ancestrais a INNER JOIN permissoes_professor_categoria pc ON pc.categoria_id=a.id "
-      + "WHERE pc.professor_id=? AND pc.revogada_em IS NULL LIMIT 1",
+      "WITH RECURSIVE ancestrais AS (SELECT id,categoria_pai_id,disciplina_id,disciplina_estado,0 AS nivel FROM categorias WHERE id=? AND ativo=1 "
+      + "UNION ALL SELECT p.id,p.categoria_pai_id,p.disciplina_id,p.disciplina_estado,a.nivel+1 FROM categorias p INNER JOIN ancestrais a ON a.categoria_pai_id=p.id WHERE p.ativo=1) "
+      + "SELECT a.id,a.disciplina_id,a.disciplina_estado,a.nivel,pc.id AS permissao_legada FROM ancestrais a "
+      + "LEFT JOIN permissoes_professor_categoria pc ON pc.categoria_id=a.id AND pc.professor_id=? AND pc.revogada_em IS NULL ORDER BY a.nivel",
       [categoriaId, professorId]
     );
-    return registros.length === 1;
+    if (registros.some(function legado(item) { return item.permissao_legada !== null; })) return true;
+    const classificada = registros.find(function definida(item) { return item.disciplina_estado !== "herdar"; });
+    return Boolean(classificada && classificada.disciplina_estado === "definida"
+      && await professorPossuiDisciplina(professorId,Number(classificada.disciplina_id)));
   }
 
   async function listarPastasGerenciaveis(usuario) {
@@ -121,20 +169,25 @@ function criarGestaoMateriaisRepository(pool) {
       [registros] = await pool.execute(
         "WITH RECURSIVE arvore AS (SELECT id,nome,categoria_pai_id,drive_pasta_id,CAST(nome AS CHAR(4000)) caminho FROM categorias WHERE categoria_pai_id IS NULL AND ativo=1 "
         + "UNION ALL SELECT c.id,c.nome,c.categoria_pai_id,c.drive_pasta_id,CONCAT(a.caminho,' / ',c.nome) FROM categorias c INNER JOIN arvore a ON c.categoria_pai_id=a.id WHERE c.ativo=1) "
-        + "SELECT id,nome,caminho FROM arvore WHERE drive_pasta_id IS NOT NULL ORDER BY caminho"
+        + "SELECT id,nome,caminho,1 AS pode_criar FROM arvore WHERE drive_pasta_id IS NOT NULL ORDER BY caminho"
       );
     } else {
       [registros] = await pool.execute(
-        "WITH RECURSIVE permitidas AS (SELECT c.id,c.nome,c.categoria_pai_id,c.drive_pasta_id,CAST(c.nome AS CHAR(4000)) caminho "
-        + "FROM categorias c INNER JOIN permissoes_professor_categoria p ON p.categoria_id=c.id "
-        + "WHERE p.professor_id=? AND p.revogada_em IS NULL AND c.ativo=1 "
-        + "UNION DISTINCT SELECT c.id,c.nome,c.categoria_pai_id,c.drive_pasta_id,CONCAT(p.caminho,' / ',c.nome) "
-        + "FROM categorias c INNER JOIN permitidas p ON c.categoria_pai_id=p.id WHERE c.ativo=1) "
-        + "SELECT id,nome,caminho FROM permitidas WHERE drive_pasta_id IS NOT NULL ORDER BY caminho",
-        [usuario.id]
+        "WITH RECURSIVE arvore AS (SELECT c.id,c.nome,c.categoria_pai_id,c.drive_pasta_id,CAST(c.nome AS CHAR(4000)) caminho, "
+        + "CASE WHEN c.disciplina_estado='definida' THEN c.disciplina_id ELSE NULL END AS disciplina_efetiva, "
+        + "EXISTS(SELECT 1 FROM permissoes_professor_categoria pc WHERE pc.categoria_id=c.id AND pc.professor_id=? AND pc.revogada_em IS NULL) AS legado "
+        + "FROM categorias c WHERE c.categoria_pai_id IS NULL AND c.ativo=1 "
+        + "UNION ALL SELECT c.id,c.nome,c.categoria_pai_id,c.drive_pasta_id,CONCAT(a.caminho,' / ',c.nome), "
+        + "CASE WHEN c.disciplina_estado='definida' THEN c.disciplina_id WHEN c.disciplina_estado='nao_se_aplica' THEN NULL ELSE a.disciplina_efetiva END, "
+        + "(a.legado OR EXISTS(SELECT 1 FROM permissoes_professor_categoria pc WHERE pc.categoria_id=c.id AND pc.professor_id=? AND pc.revogada_em IS NULL)) "
+        + "FROM categorias c INNER JOIN arvore a ON c.categoria_pai_id=a.id WHERE c.ativo=1) "
+        + "SELECT a.id,a.nome,a.caminho,EXISTS(SELECT 1 FROM professor_disciplinas pd INNER JOIN disciplinas d ON d.id=pd.disciplina_id AND d.ativo=1 WHERE pd.professor_id=? AND pd.disciplina_id=a.disciplina_efetiva) AS pode_criar FROM arvore a WHERE a.drive_pasta_id IS NOT NULL AND "
+        + "(a.legado=1 OR EXISTS(SELECT 1 FROM professor_disciplinas pd INNER JOIN disciplinas d ON d.id=pd.disciplina_id AND d.ativo=1 "
+        + "WHERE pd.professor_id=? AND pd.disciplina_id=a.disciplina_efetiva)) ORDER BY a.caminho",
+        [usuario.id,usuario.id,usuario.id,usuario.id]
       );
     }
-    return registros.map(function mapear(item) { return { id: Number(item.id), nome: item.nome, caminho: item.caminho }; });
+    return registros.map(function mapear(item) { return { id: Number(item.id), nome: item.nome, caminho: item.caminho, podeCriar:Boolean(item.pode_criar) }; });
   }
 
   async function concluirOperacaoNaTransacao(conexao, chave, materialId) {
@@ -295,7 +348,7 @@ function criarGestaoMateriaisRepository(pool) {
     return registros.map(mapearOperacaoDrive);
   }
 
-  return { adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
+  return { adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
 }
 
 module.exports = criarGestaoMateriaisRepository;
