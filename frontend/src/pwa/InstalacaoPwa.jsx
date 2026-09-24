@@ -126,7 +126,7 @@ export default function InstalacaoPwa() {
 
   return <aside className="aviso-pwa" aria-label="Instalação do Plantel Listas">
     <span>{resultadoDaInstalacao || "Tenha o Plantel Listas na tela inicial do seu dispositivo."}</span>
-    <button type="button" onClick={instalar} disabled={instalando}>{instalando ? "Abrindo confirmação..." : convite ? "Instalar Plantel Listas" : "Como instalar"}</button>
+    <button type="button" onClick={instalar} disabled={instalando}>{instalando ? "Abrindo confirmação..." : "Instalar Plantel Listas"}</button>
     <button type="button" className="aviso-pwa-fechar" onClick={() => definirDispensado(true)} aria-label="Dispensar orientação de instalação">×</button>
   </aside>;
 }

@@ -118,7 +118,8 @@ test("orientacao de instalacao permanece acessivel sem convite nativo, inclusive
   const instalacao = readFileSync(new URL("src/pwa/InstalacaoPwa.jsx", base), "utf8");
   assert.match(instalacao, /if \(!convite\) \{\s*definirResultadoDaInstalacao\(instrucaoManual\(ios\)\)/);
   assert.match(instalacao, /if \(instalado \|\| dispensado\) return null/);
-  assert.match(instalacao, /convite \? "Instalar Plantel Listas" : "Como instalar"/);
+  assert.match(instalacao, /"Instalar Plantel Listas"/);
+  assert.doesNotMatch(instalacao, /"Como instalar"/);
   assert.match(instalacao, /No Firefox para Android/);
   assert.match(instalacao, /No Firefox para Windows/);
 });
