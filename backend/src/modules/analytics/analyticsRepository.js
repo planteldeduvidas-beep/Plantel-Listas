@@ -4,12 +4,13 @@ function criarAnalyticsRepository(pool) {
     await executor.execute(
       "INSERT INTO historico_materiais_usuario "
       + "(usuario_id,material_id,ultima_acao,ultima_visualizacao_em,ultimo_download_em,atualizado_em) "
-      + "VALUES (?,?,?,IF(?='visualizacao',CURRENT_TIMESTAMP(3),NULL),IF(?='download',CURRENT_TIMESTAMP(3),NULL),CURRENT_TIMESTAMP(3)) "
-      + "ON DUPLICATE KEY UPDATE ultima_acao=VALUES(ultima_acao),"
-      + "ultima_visualizacao_em=IF(VALUES(ultima_visualizacao_em) IS NULL,ultima_visualizacao_em,VALUES(ultima_visualizacao_em)),"
-      + "ultimo_download_em=IF(VALUES(ultimo_download_em) IS NULL,ultimo_download_em,VALUES(ultimo_download_em)),"
-      + "atualizado_em=VALUES(atualizado_em)",
-      [usuario.id, materialId, tipo, tipo, tipo]
+      + "VALUES (?,?,?,CASE WHEN ?='visualizacao' THEN CURRENT_TIMESTAMP(3) ELSE NULL END,"
+      + "CASE WHEN ?='download' THEN CURRENT_TIMESTAMP(3) ELSE NULL END,CURRENT_TIMESTAMP(3)) "
+      + "ON DUPLICATE KEY UPDATE ultima_acao=?,"
+      + "ultima_visualizacao_em=CASE WHEN ?='visualizacao' THEN CURRENT_TIMESTAMP(3) ELSE ultima_visualizacao_em END,"
+      + "ultimo_download_em=CASE WHEN ?='download' THEN CURRENT_TIMESTAMP(3) ELSE ultimo_download_em END,"
+      + "atualizado_em=CURRENT_TIMESTAMP(3)",
+      [usuario.id, materialId, tipo, tipo, tipo, tipo, tipo, tipo]
     );
   }
 

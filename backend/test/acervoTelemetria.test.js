@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const criarAcervoService = require("../src/modules/materiais/acervoService");
 const criarAnalyticsService = require("../src/modules/analytics/analyticsService");
+const criarAnalyticsRepository = require("../src/modules/analytics/analyticsRepository");
 
 test("falha de analytics nao bloqueia consulta nem abertura de material e e registrada", async function() {
   const avisos = [];
@@ -62,4 +63,26 @@ test("falha do evento preserva historico pessoal quando o banco ainda permite", 
   });
   await assert.rejects(analytics.registrarUso({ id: 9, papel: "aluno" }, 7, "visualizacao"));
   assert.deepEqual(historico, { usuarioId: 9, materialId: 7, tipo: "visualizacao" });
+});
+
+test("historico usa upsert compativel com MariaDB sem VALUES no UPDATE", async function() {
+  const comandos = [];
+  const conexao = {
+    beginTransaction: async function() {},
+    execute: async function(sql, parametros) { comandos.push({ sql: sql, parametros: parametros }); },
+    commit: async function() {},
+    rollback: async function() {},
+    release: function() {}
+  };
+  const repository = criarAnalyticsRepository({ getConnection: async function() { return conexao; } });
+
+  await repository.registrarUso({ id: 9, papel: "aluno" }, 7, "visualizacao", "visualizacao:9:7:teste");
+
+  const historico = comandos.find(function encontrar(comando) {
+    return comando.sql.includes("historico_materiais_usuario");
+  });
+  assert.ok(historico);
+  assert.equal(historico.sql.includes("VALUES(ultima_"), false);
+  assert.match(historico.sql, /CASE WHEN \?='visualizacao'/);
+  assert.deepEqual(historico.parametros, [9, 7, "visualizacao", "visualizacao", "visualizacao", "visualizacao", "visualizacao", "visualizacao"]);
 });
