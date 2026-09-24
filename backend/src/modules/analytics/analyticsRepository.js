@@ -1,16 +1,21 @@
 function criarAnalyticsRepository(pool) {
   async function registrarHistorico(executor, usuario, materialId, tipo) {
     if (usuario.papel !== "aluno") return;
+    const foiDownload = tipo === "download";
+    const datasDeInsercao = foiDownload
+      ? "NULL,CURRENT_TIMESTAMP(3)"
+      : "CURRENT_TIMESTAMP(3),NULL";
+    const campoDaAcao = foiDownload
+      ? "ultimo_download_em"
+      : "ultima_visualizacao_em";
     await executor.execute(
       "INSERT INTO historico_materiais_usuario "
       + "(usuario_id,material_id,ultima_acao,ultima_visualizacao_em,ultimo_download_em,atualizado_em) "
-      + "VALUES (?,?,?,CASE WHEN ?='visualizacao' THEN CURRENT_TIMESTAMP(3) ELSE NULL END,"
-      + "CASE WHEN ?='download' THEN CURRENT_TIMESTAMP(3) ELSE NULL END,CURRENT_TIMESTAMP(3)) "
+      + "VALUES (?,?,?," + datasDeInsercao + ",CURRENT_TIMESTAMP(3)) "
       + "ON DUPLICATE KEY UPDATE ultima_acao=?,"
-      + "ultima_visualizacao_em=CASE WHEN ?='visualizacao' THEN CURRENT_TIMESTAMP(3) ELSE ultima_visualizacao_em END,"
-      + "ultimo_download_em=CASE WHEN ?='download' THEN CURRENT_TIMESTAMP(3) ELSE ultimo_download_em END,"
+      + campoDaAcao + "=CURRENT_TIMESTAMP(3),"
       + "atualizado_em=CURRENT_TIMESTAMP(3)",
-      [usuario.id, materialId, tipo, tipo, tipo, tipo, tipo, tipo]
+      [usuario.id, materialId, tipo, tipo]
     );
   }
 

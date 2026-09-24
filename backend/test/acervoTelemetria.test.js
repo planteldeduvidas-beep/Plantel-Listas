@@ -68,7 +68,7 @@ test("falha do evento preserva historico pessoal quando o banco ainda permite", 
   assert.deepEqual(historico, { usuarioId: 9, materialId: 7, tipo: "visualizacao" });
 });
 
-test("historico usa upsert compativel com MariaDB sem VALUES no UPDATE", async function() {
+test("historico usa upsert compativel com MariaDB sem comparacao de collations", async function() {
   const comandos = [];
   const conexao = {
     beginTransaction: async function() {},
@@ -86,6 +86,29 @@ test("historico usa upsert compativel com MariaDB sem VALUES no UPDATE", async f
   });
   assert.ok(historico);
   assert.equal(historico.sql.includes("VALUES(ultima_"), false);
-  assert.match(historico.sql, /CASE WHEN \?='visualizacao'/);
-  assert.deepEqual(historico.parametros, [9, 7, "visualizacao", "visualizacao", "visualizacao", "visualizacao", "visualizacao", "visualizacao"]);
+  assert.equal(historico.sql.includes("?='visualizacao'"), false);
+  assert.match(historico.sql, /ultima_visualizacao_em=CURRENT_TIMESTAMP\(3\)/);
+  assert.deepEqual(historico.parametros, [9, 7, "visualizacao", "visualizacao"]);
+});
+
+test("historico de download atualiza somente a data de download", async function() {
+  const comandos = [];
+  const conexao = {
+    beginTransaction: async function() {},
+    execute: async function(sql, parametros) { comandos.push({ sql: sql, parametros: parametros }); },
+    commit: async function() {},
+    rollback: async function() {},
+    release: function() {}
+  };
+  const repository = criarAnalyticsRepository({ getConnection: async function() { return conexao; } });
+
+  await repository.registrarUso({ id: 9, papel: "aluno" }, 7, "download", "download:9:7:teste");
+
+  const historico = comandos.find(function encontrar(comando) {
+    return comando.sql.includes("historico_materiais_usuario");
+  });
+  assert.ok(historico);
+  assert.match(historico.sql, /ultimo_download_em=CURRENT_TIMESTAMP\(3\)/);
+  assert.equal(historico.sql.includes("ultima_visualizacao_em=CURRENT_TIMESTAMP(3)"), false);
+  assert.deepEqual(historico.parametros, [9, 7, "download", "download"]);
 });
