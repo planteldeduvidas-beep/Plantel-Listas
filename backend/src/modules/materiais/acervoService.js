@@ -22,9 +22,12 @@ function criarAcervoService(dependencias) {
     } catch (erro) {
       if (logger) {
         const codigo = String(erro && (erro.codigo || erro.code) || "ANALYTICS_INDISPONIVEL");
+        const codigoSeguro = /^[A-Z0-9_]{1,100}$/.test(codigo)
+          ? codigo
+          : "ANALYTICS_INDISPONIVEL";
         logger.warn(
-          { codigo: /^[A-Z0-9_]{1,100}$/.test(codigo) ? codigo : "ANALYTICS_INDISPONIVEL" },
-          "Nao foi possivel registrar analytics do acervo"
+          { codigo: codigoSeguro },
+          "Nao foi possivel registrar analytics do acervo: " + codigoSeguro
         );
       }
     }

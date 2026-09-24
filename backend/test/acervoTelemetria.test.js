@@ -31,6 +31,9 @@ test("falha de analytics nao bloqueia consulta nem abertura de material e e regi
   assert.equal(arquivo.resposta.status, 200);
   assert.equal(avisos.length, 2);
   assert.equal(JSON.stringify(avisos).includes("dados privados"), false);
+  assert.ok(avisos.every(function temCodigoSeguro(aviso) {
+    return aviso.mensagem.includes("ER_LOCK_WAIT_TIMEOUT");
+  }));
 });
 
 test("403 de permissao do Drive nao invalida a credencial OAuth global", async function() {
