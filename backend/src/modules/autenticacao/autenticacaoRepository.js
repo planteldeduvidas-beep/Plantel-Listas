@@ -73,18 +73,32 @@ function criarAutenticacaoRepository(pool) {
   }
 
   async function criarRecuperacaoSenha(usuarioId, tokenHash, expiraEm) {
-    await pool.execute(
-      "UPDATE recuperacoes_senha "
-      + "SET usada_em = COALESCE(usada_em, CURRENT_TIMESTAMP(3)) "
-      + "WHERE usuario_id = ? AND usada_em IS NULL",
-      [usuarioId]
-    );
-    const [resultado] = await pool.execute(
-      "INSERT INTO recuperacoes_senha (usuario_id, token_hash, expira_em) "
-      + "VALUES (?, ?, ?)",
-      [usuarioId, tokenHash, expiraEm]
-    );
-    return resultado.insertId;
+    const conexao = await pool.getConnection();
+    let aberta = false;
+    try {
+      await conexao.beginTransaction();
+      aberta = true;
+      await conexao.execute("SELECT id FROM usuarios WHERE id = ? FOR UPDATE", [usuarioId]);
+      await conexao.execute(
+        "UPDATE recuperacoes_senha "
+        + "SET usada_em = COALESCE(usada_em, CURRENT_TIMESTAMP(3)) "
+        + "WHERE usuario_id = ? AND usada_em IS NULL",
+        [usuarioId]
+      );
+      const [resultado] = await conexao.execute(
+        "INSERT INTO recuperacoes_senha (usuario_id, token_hash, expira_em) "
+        + "VALUES (?, ?, ?)",
+        [usuarioId, tokenHash, expiraEm]
+      );
+      await conexao.commit();
+      aberta = false;
+      return resultado.insertId;
+    } catch (erro) {
+      if (aberta) await conexao.rollback().catch(function preservarErroOriginal() {});
+      throw erro;
+    } finally {
+      conexao.release();
+    }
   }
 
   async function invalidarRecuperacao(recuperacaoId) {

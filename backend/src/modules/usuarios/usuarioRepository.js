@@ -38,13 +38,14 @@ function criarUsuarioRepository(pool) {
     return mapearUsuario(registros[0]);
   }
 
-  async function criar(nome, email, senhaHash, papel) {
+  async function criar(nome, email, senhaHash, papel, executorInformado) {
+    const executor = executorInformado || pool;
     try {
-      const [resultado] = await pool.execute(
+      const [resultado] = await executor.execute(
         "INSERT INTO usuarios (nome, email, senha_hash, papel) VALUES (?, ?, ?, ?)",
         [nome, email, senhaHash, papel]
       );
-      return buscarPorId(resultado.insertId);
+      return buscarPorId(resultado.insertId, executor);
     } catch (erro) {
       if (erro && erro.code === "ER_DUP_ENTRY") {
         throw new AppError("Email ja cadastrado", 409, "EMAIL_JA_CADASTRADO");
@@ -114,9 +115,10 @@ function criarUsuarioRepository(pool) {
     }
   }
 
-  async function atualizarDados(usuarioId, nome, email) {
+  async function atualizarDados(usuarioId, nome, email, executorInformado) {
+    const executor = executorInformado || pool;
     try {
-      const [resultado] = await pool.execute(
+      const [resultado] = await executor.execute(
         "UPDATE usuarios SET nome=?,email=? WHERE id=?",
         [nome, email, usuarioId]
       );

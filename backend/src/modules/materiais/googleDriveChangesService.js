@@ -51,11 +51,20 @@ function criarGoogleDriveChangesService(dependencias) {
       if (!dentroDaRaiz) {
         return { fileId: item.id, disponivel: false, removerSubarvore: true };
       }
+      if (await repository.ehPastaConhecida(item.id)) {
+        return {
+          fileId: item.id,
+          disponivel: true,
+          pastaRaizId: provider.pastaRaizId,
+          pasta: Object.assign({}, item, { parentId: item.parents[0] })
+        };
+      }
+      const subarvore = await provider.listarSubarvore(refreshToken, item);
       return {
         fileId: item.id,
         disponivel: true,
         pastaRaizId: provider.pastaRaizId,
-        pasta: Object.assign({}, item, { parentId: item.parents[0] })
+        subarvore: subarvore
       };
     }
     const dentroDaRaiz = await provider.verificarDescendenteDaRaiz(refreshToken, item);
@@ -78,28 +87,34 @@ function criarGoogleDriveChangesService(dependencias) {
     let deveReconciliar = false;
     try {
       const estado = await obterEstadoPreparado();
-      deveReconciliar = Boolean(estado && estado.reconciliacao_necessaria);
-      const refreshToken = await integracaoService.obterRefreshTokenParaUso();
-      const pageToken = estado.page_token;
-      const alteracoesPreparadas = [];
-      const resposta = await provider.listarAlteracoes(
-        refreshToken,
-        pageToken,
-        LIMITE_ALTERACOES_POR_CICLO
-      );
-      for (const alteracao of resposta.changes || []) {
-        alteracoesPreparadas.push(await prepararAlteracao(refreshToken, alteracao));
+      deveReconciliar = Boolean(estado && (estado.reconciliacao_necessaria || estado.bootstrap_necessario));
+      if (deveReconciliar) {
+        // O cursor foi capturado antes da varredura. So avanca depois que a
+        // varredura completa confirmou o estado, para repetir mudancas ocorridas nela.
+        resumo = { atualizados: 0, indisponiveis: 0, reconciliacaoNecessaria: true };
+      } else {
+        const refreshToken = await integracaoService.obterRefreshTokenParaUso();
+        const pageToken = estado.page_token;
+        const alteracoesPreparadas = [];
+        const resposta = await provider.listarAlteracoes(
+          refreshToken,
+          pageToken,
+          LIMITE_ALTERACOES_POR_CICLO
+        );
+        for (const alteracao of resposta.changes || []) {
+          alteracoesPreparadas.push(await prepararAlteracao(refreshToken, alteracao));
+        }
+        const tokenFinal = resposta.nextPageToken || resposta.newStartPageToken || pageToken;
+        resumo = alteracoesPreparadas.length > 0
+          ? await repository.aplicarAlteracoes(conexao, alteracoesPreparadas, tokenFinal)
+          : (await repository.registrarVerificacao(tokenFinal), {
+            atualizados: 0,
+            indisponiveis: 0,
+            reconciliacaoNecessaria: false
+          });
+        deveReconciliar = resumo.reconciliacaoNecessaria;
+        await repository.marcarNotificacoesProcessadas();
       }
-      const tokenFinal = resposta.nextPageToken || resposta.newStartPageToken || pageToken;
-      resumo = alteracoesPreparadas.length > 0
-        ? await repository.aplicarAlteracoes(conexao, alteracoesPreparadas, tokenFinal)
-        : (await repository.registrarVerificacao(tokenFinal), {
-          atualizados: 0,
-          indisponiveis: 0,
-          reconciliacaoNecessaria: false
-        });
-      deveReconciliar = deveReconciliar || resumo.reconciliacaoNecessaria;
-      await repository.marcarNotificacoesProcessadas();
     } catch (erro) {
       if (erro.codigo === "GOOGLE_PAGE_TOKEN_EXPIRADO") {
         const refreshToken = await integracaoService.obterRefreshTokenParaUso();
@@ -167,7 +182,9 @@ function criarGoogleDriveChangesService(dependencias) {
     if (!configuracao.googleDrive.webhookUrl) {
       return { configurado: false };
     }
-    const estado = await obterEstadoPreparado();
+    // Somente o processador, sob a trava compartilhada, inicializa o cursor.
+    const estado = await repository.buscarEstado();
+    if (!estado) return { configurado: true, ativo: false };
     const refreshToken = await integracaoService.obterRefreshTokenParaUso();
     const anterior = await repository.buscarCanalAtivo();
     const agora = Date.now();

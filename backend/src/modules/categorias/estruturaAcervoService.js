@@ -85,6 +85,8 @@ function criarEstruturaAcervoService(repository) {
     const dados = validarCategoria(corpo, false);
     return repository.comTransacaoHierarquia(async function criar(conexao){
       await validarPai(dados.categoriaPaiId,null,conexao);
+      if(dados.categoriaPaiId && await repository.ehCategoriaVinculadaAoDrive(dados.categoriaPaiId,conexao))
+        throw new AppError("Pasta vinculada ao Drive deve ser alterada pelo Google Drive",409,"CATEGORIA_VINCULADA_DRIVE");
       return repository.criarCategoria(dados,conexao);
     });
   }
@@ -93,9 +95,13 @@ function criarEstruturaAcervoService(repository) {
     const alteracoes = validarCategoria(corpo, true);
     return repository.comTransacaoHierarquia(async function editar(conexao){
       const categoria=await exigirCategoria(categoriaId,conexao);
+      if(await repository.ehCategoriaVinculadaAoDrive(categoria.id,conexao))
+        throw new AppError("Pasta vinculada ao Drive deve ser alterada pelo Google Drive",409,"CATEGORIA_VINCULADA_DRIVE");
       if(!categoria.ativo)throw new AppError("Categoria inativa nao pode ser editada",409,"CATEGORIA_INATIVA");
       const dados=Object.assign({},categoria,alteracoes);
       await validarPai(dados.categoriaPaiId,categoria.id,conexao);
+      if(dados.categoriaPaiId && await repository.ehCategoriaVinculadaAoDrive(dados.categoriaPaiId,conexao))
+        throw new AppError("Pasta vinculada ao Drive deve ser alterada pelo Google Drive",409,"CATEGORIA_VINCULADA_DRIVE");
       return repository.atualizarCategoria(categoria.id,dados,conexao);
     });
   }
@@ -104,6 +110,8 @@ function criarEstruturaAcervoService(repository) {
     const ativo = validarAtivo(corpo);
     return repository.comTransacaoHierarquia(async function alterar(conexao){
       const categoria=await exigirCategoria(categoriaId,conexao);
+      if(await repository.ehCategoriaVinculadaAoDrive(categoria.id,conexao))
+        throw new AppError("Pasta vinculada ao Drive deve ser alterada pelo Google Drive",409,"CATEGORIA_VINCULADA_DRIVE");
       if(ativo===categoria.ativo)return categoria;
       if(ativo)await validarPai(categoria.categoriaPaiId,categoria.id,conexao);
       else if(await repository.contarFilhosAtivos(categoria.id,conexao)>0)throw new AppError("Desative as categorias filhas antes da categoria pai",409,"CATEGORIA_POSSUI_FILHAS_ATIVAS");

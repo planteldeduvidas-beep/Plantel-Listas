@@ -116,6 +116,43 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     conexao.release();
   }
 
+  async function salvarCredencialEReiniciarChanges(refreshTokenCriptografado, escopo, usuarioId) {
+    const conexao = await pool.getConnection();
+    let aberta = false;
+    let travaObtida = false;
+    try {
+      const [trava] = await conexao.execute(
+        "SELECT GET_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64),30) AS obtida"
+      );
+      if (Number(trava[0].obtida) !== 1) {
+        throw new AppError("Outra operacao do Drive esta em andamento", 503, "GOOGLE_DRIVE_OPERACAO_CONCORRENTE");
+      }
+      travaObtida = true;
+      await conexao.beginTransaction();
+      aberta = true;
+      await salvarCredencial(refreshTokenCriptografado, escopo, usuarioId, conexao);
+      // O cursor antigo pode pertencer a outra autorizacao/conta Google.
+      await conexao.execute("DELETE FROM estado_changes_google_drive WHERE id=1");
+      await conexao.execute("UPDATE canais_google_drive SET status='expirado' WHERE status='ativo'");
+      await conexao.commit();
+      aberta = false;
+    } catch (erro) {
+      if (aberta) await conexao.rollback().catch(function preservarErroOriginal() {});
+      throw erro;
+    } finally {
+      let conexaoValida = true;
+      if (travaObtida) {
+        try {
+          await conexao.execute("SELECT RELEASE_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64))");
+        } catch (erro) {
+          conexao.destroy();
+          conexaoValida = false;
+        }
+      }
+      if (conexaoValida) conexao.release();
+    }
+  }
+
   async function criarSincronizacaoAguardando(usuarioId) {
     const conexao = await pool.getConnection();
     let travaAdquirida = false;
@@ -399,6 +436,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     criarEstadoOAuth: criarEstadoOAuth,
     consumirEstadoOAuth: consumirEstadoOAuth,
     salvarCredencial: salvarCredencial,
+    salvarCredencialEReiniciarChanges: salvarCredencialEReiniciarChanges,
     marcarCredencialParaRenovacao: marcarCredencialParaRenovacao,
     buscarCredencial: buscarCredencial,
     buscarUltimaSincronizacao: buscarUltimaSincronizacao,

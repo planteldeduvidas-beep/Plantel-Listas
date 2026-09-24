@@ -177,7 +177,8 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     repository: acervoRepository,
     provider: googleDriveProvider,
     integracaoService: integracaoGoogleDriveService,
-    analyticsService: analyticsService
+    analyticsService: analyticsService,
+    logger: logger
   });
   const gestaoMateriaisService = criarGestaoMateriaisService({
     repository: criarGestaoMateriaisRepository(pool),
@@ -293,6 +294,19 @@ function criarAplicacao(configuracao, logger, dependenciasInformadas) {
 
   aplicacao.get("/api/saude", function verificarSaude(req, res) {
     res.status(200).json({ status: "ok" });
+  });
+
+  aplicacao.get("/api/prontidao", async function verificarProntidao(req, res) {
+    if (!dependencias.pool) {
+      res.status(503).json({ status: "indisponivel" });
+      return;
+    }
+    try {
+      await dependencias.pool.execute("SELECT 1");
+      res.status(200).json({ status: "ok" });
+    } catch (erro) {
+      res.status(503).json({ status: "indisponivel" });
+    }
   });
 
   if (dependencias.pool) {

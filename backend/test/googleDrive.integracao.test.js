@@ -9,6 +9,8 @@ const { criarEmailProviderFake } = require("../src/shared/providers/emailProvide
 const { criarHashDaSenha } = require("../src/modules/autenticacao/senha");
 const { ESCOPO_LEITURA, ESCOPO_GESTAO } = require("../src/shared/providers/googleDriveProvider");
 const AppError = require("../src/shared/errors/AppError");
+const criarChangesRepository = require("../src/modules/materiais/googleDriveChangesRepository");
+const criarChangesService = require("../src/modules/materiais/googleDriveChangesService");
 
 const configuracaoBase = obterConfiguracao();
 const nomeBancoTeste = process.env.DB_TEST_NAME || configuracaoBase.banco.nome + "_test";
@@ -135,6 +137,9 @@ async function limparCategorias() {
 }
 
 async function limparBanco() {
+  await pool.execute("DELETE FROM notificacoes_google_drive");
+  await pool.execute("DELETE FROM canais_google_drive");
+  await pool.execute("DELETE FROM estado_changes_google_drive");
   await pool.execute("DELETE FROM permissoes_professor_categoria");
   await pool.execute("DELETE FROM materiais");
   await limparCategorias();
@@ -292,6 +297,15 @@ test("OAuth usa estado com hash, guarda token criptografado e bloqueia replay", 
   assert.notEqual(estados[0].estado_hash, estado);
   assert.equal(estados[0].estado_hash.length, 64);
 
+  await pool.execute(
+    "INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em) VALUES (1,'cursor-antigo',NOW(3))"
+  );
+  await pool.execute(
+    "INSERT INTO canais_google_drive (channel_id,resource_id,token_hash,expira_em,status,criado_em) "
+    + "VALUES ('123e4567-e89b-12d3-a456-426614174001','recurso-antigo',?,DATE_ADD(NOW(3),INTERVAL 1 DAY),'ativo',NOW(3))",
+    ["a".repeat(64)]
+  );
+
   const callback = await admin.agente.get(
     "/api/integracoes/google-drive/oauth/callback?code=codigo-google-teste&state="
     + encodeURIComponent(estado)
@@ -309,6 +323,10 @@ test("OAuth usa estado com hash, guarda token criptografado e bloqueia replay", 
     false
   );
   assert.equal(credenciais[0].escopo, ESCOPO_GESTAO);
+  const [cursorAntigo] = await pool.execute("SELECT id FROM estado_changes_google_drive WHERE id=1");
+  const [canalAntigo] = await pool.execute("SELECT status FROM canais_google_drive WHERE channel_id='123e4567-e89b-12d3-a456-426614174001'");
+  assert.equal(cursorAntigo.length, 0);
+  assert.equal(canalAntigo[0].status, "expirado");
 
   const replay = await admin.agente.get(
     "/api/integracoes/google-drive/oauth/callback?code=outro-codigo-teste&state="
@@ -393,6 +411,52 @@ test("sincronizacao importa por Drive ID e permanece idempotente", async functio
   );
   assert.equal(Number(quantidades[0].categorias), 2);
   assert.equal(Number(quantidades[0].materiais), 3);
+});
+
+test("bootstrap importa arquivos existentes antes de usar o cursor e recupera falha", async function() {
+  const repository = criarChangesRepository(pool);
+  let consultasIncrementais = 0;
+  const providerChanges = Object.assign({}, providerFake, {
+    obterInicioDasAlteracoes: async function() { return "cursor-antes-da-varredura"; },
+    listarAlteracoes: async function(token, cursor) {
+      consultasIncrementais += 1;
+      assert.equal(cursor, "cursor-antes-da-varredura");
+      return { changes: [], newStartPageToken: "cursor-apos-varredura" };
+    }
+  });
+  const service = criarChangesService({
+    repository: repository,
+    provider: providerChanges,
+    integracaoService: aplicacao.locals.integracaoGoogleDriveService,
+    configuracao: configuracaoTeste,
+    agendarTarefa: function() {}
+  });
+  const nomeOriginal = arvoreAtual.pastas[1].name;
+  arvoreAtual.pastas[1].name = "X".repeat(121); // falha SQL depois da primeira pasta
+  await service.processarAlteracoes();
+  assert.equal(consultasIncrementais, 0);
+  assert.equal(tarefasAgendadas.length, 1);
+  await executarProximaTarefa();
+  const pendente = await repository.buscarEstado();
+  assert.equal(Number(pendente.reconciliacao_necessaria), 1);
+  assert.equal(pendente.page_token, "cursor-antes-da-varredura");
+  const [parcial] = await pool.execute("SELECT COUNT(*) AS total FROM categorias");
+  assert.equal(Number(parcial[0].total), 0);
+  await service.processarAlteracoes();
+  assert.equal(consultasIncrementais, 0);
+  arvoreAtual.pastas[1].name = nomeOriginal;
+  await executarProximaTarefa();
+  const concluido = await repository.buscarEstado();
+  assert.equal(Number(concluido.reconciliacao_necessaria), 0);
+  assert.equal(concluido.page_token, "cursor-antes-da-varredura");
+  const [materiais] = await pool.execute("SELECT COUNT(*) AS total FROM materiais");
+  assert.equal(Number(materiais[0].total), 3);
+  await service.processarAlteracoes();
+  assert.equal(consultasIncrementais, 1);
+  const final = await repository.buscarEstado();
+  assert.equal(final.page_token, "cursor-apos-varredura");
+  const [semDuplicacao] = await pool.execute("SELECT COUNT(*) AS total,COUNT(DISTINCT drive_file_id) AS unicos FROM materiais");
+  assert.equal(Number(semDuplicacao[0].total), Number(semDuplicacao[0].unicos));
 });
 
 test("nova sincronizacao atualiza nomes e marca arquivos ausentes sem apagar registros", async function testarReindexacao() {

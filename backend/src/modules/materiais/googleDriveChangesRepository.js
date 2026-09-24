@@ -276,7 +276,9 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
   async function buscarEstado(executorInformado) {
     const executor = executorInformado || pool;
     const [registros] = await executor.execute(
-      "SELECT page_token,reconciliacao_necessaria,ultima_verificacao_em,ultimo_erro_codigo "
+      "SELECT page_token,reconciliacao_necessaria,ultima_verificacao_em,ultimo_erro_codigo, "
+      + "NOT EXISTS (SELECT 1 FROM sincronizacoes_google_drive "
+      + "WHERE origem='manual' AND status='concluida' LIMIT 1) AS bootstrap_necessario "
       + "FROM estado_changes_google_drive WHERE id=1 LIMIT 1"
     );
     return registros[0] || null;
@@ -284,9 +286,10 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
 
   async function salvarEstadoInicial(pageToken) {
     await pool.execute(
-      "INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em) "
-      + "VALUES (1,?,CURRENT_TIMESTAMP(3)) "
-      + "ON DUPLICATE KEY UPDATE page_token=VALUES(page_token),atualizado_em=VALUES(atualizado_em),ultimo_erro_codigo=NULL",
+      "INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em,reconciliacao_necessaria) "
+      + "VALUES (1,?,CURRENT_TIMESTAMP(3),1) "
+      + "ON DUPLICATE KEY UPDATE page_token=VALUES(page_token),atualizado_em=VALUES(atualizado_em),"
+      + "reconciliacao_necessaria=1,ultimo_erro_codigo=NULL",
       [pageToken]
     );
   }
@@ -481,7 +484,7 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
 
   async function ehPastaConhecida(fileId) {
     const [registros] = await pool.execute(
-      "SELECT id FROM categorias WHERE drive_pasta_id=? LIMIT 1",
+      "SELECT id FROM categorias WHERE drive_pasta_id=? AND ativo=1 LIMIT 1",
       [fileId]
     );
     return Boolean(registros[0]);

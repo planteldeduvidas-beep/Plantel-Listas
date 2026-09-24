@@ -44,6 +44,12 @@ class OAuth2ClientComTokenRevogadoFake extends OAuth2ClientFake {
   }
 }
 
+class OAuth2ClientComFalhaTemporariaFake extends OAuth2ClientFake {
+  async getAccessToken() {
+    throw new Error("network timeout");
+  }
+}
+
 function criarConfiguracao() {
   return {
     clientId: "cliente-de-teste.apps.googleusercontent.com",
@@ -258,6 +264,42 @@ test("lista recursivamente apenas descendentes da raiz e respeita paginacao", as
     }
   });
 });
+
+test("falha temporaria ao obter access token nao revoga refresh token", async function() {
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientComFalhaTemporariaFake,
+    fetch: async function() { throw new Error("nao esperado"); }
+  });
+  await assert.rejects(provider.listarAlteracoes("refresh-token-teste"), function(erro) {
+    return erro.codigo === "GOOGLE_DRIVE_INDISPONIVEL";
+  });
+});
+
+for (const caso of [
+  { status: 401, motivo: "authError", codigo: "GOOGLE_AUTORIZACAO_INVALIDA" },
+  { status: 403, motivo: "insufficientFilePermissions", codigo: "GOOGLE_PERMISSAO_NEGADA" },
+  { status: 403, motivo: "userRateLimitExceeded", codigo: "GOOGLE_LIMITE_EXCEDIDO" },
+  { status: 403, motivo: "domainPolicy", codigo: "GOOGLE_POLITICA_BLOQUEIO" },
+  { status: 403, motivo: "motivoDesconhecido", codigo: "GOOGLE_ACESSO_NEGADO" },
+  { status: 429, motivo: "rateLimitExceeded", codigo: "GOOGLE_LIMITE_EXCEDIDO" }
+]) {
+  test("classifica falha Google " + caso.status + " / " + caso.motivo + " sem invalidar OAuth indevidamente", async function() {
+    const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+      OAuth2Client: OAuth2ClientFake,
+      fetch: async function() {
+        return new Response(JSON.stringify({ error: { errors: [{ reason: caso.motivo }] } }), { status: caso.status });
+      }
+    });
+    await assert.rejects(provider.listarAlteracoes("refresh-token-teste", "cursor", 25), function(erro) {
+      assert.equal(erro.codigo, caso.codigo);
+      return true;
+    });
+    await assert.rejects(provider.renomearArquivo("refresh-token-teste", "arquivo", "novo.pdf"), function(erro) {
+      assert.equal(erro.codigo, caso.codigo);
+      return true;
+    });
+  });
+}
 
 test("limita a concorrencia ao listar pastas sem perder arquivos", async function testarConcorrenciaDaArvore() {
   const configuracao = criarConfiguracao();

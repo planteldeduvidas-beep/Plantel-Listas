@@ -121,6 +121,15 @@ function criarEstruturaAcervoRepository(pool) {
     });
   }
 
+  async function ehCategoriaVinculadaAoDrive(categoriaId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [registros] = await executor.execute(
+      "SELECT drive_pasta_id IS NOT NULL AS vinculada FROM categorias WHERE id=? LIMIT 1",
+      [categoriaId]
+    );
+    return Boolean(registros[0] && Number(registros[0].vinculada) === 1);
+  }
+
   async function comTransacaoHierarquia(funcao) {
     const conexao=await pool.getConnection();let travaObtida=false;
     try{
@@ -199,6 +208,7 @@ function criarEstruturaAcervoRepository(pool) {
   return {
     listarCategorias: listarCategorias,
     buscarCategoriaPorId: buscarCategoriaPorId,
+    ehCategoriaVinculadaAoDrive: ehCategoriaVinculadaAoDrive,
     criarCategoria: criarCategoria,
     atualizarCategoria: atualizarCategoria,
     atualizarCategoriaAtivo: atualizarCategoriaAtivo,

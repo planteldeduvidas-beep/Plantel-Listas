@@ -49,19 +49,14 @@ function criarPermissaoService(dependencias) {
 
   async function revogar(permissaoIdInformado, administrador) {
     const permissaoId = validarId(permissaoIdInformado, "Permissao");
-    const permissao = await repository.buscarPorId(permissaoId);
-
-    if (!permissao) {
-      throw new AppError("Permissao nao encontrada", 404, "PERMISSAO_NAO_ENCONTRADA");
-    }
-
-    if (!permissao.ativa) {
-      throw new AppError("Permissao ja revogada", 409, "PERMISSAO_JA_REVOGADA");
-    }
-
-    const revogada = await repository.revogar(permissao.id, administrador.id);
-    await auditar(administrador, "acesso_professor_revogado", revogada);
-    return revogada;
+    return repository.comTravaAdministrativa(async function revogarComAuditoria(conexao) {
+      const permissao = await repository.buscarPorId(permissaoId, conexao);
+      if (!permissao) throw new AppError("Permissao nao encontrada", 404, "PERMISSAO_NAO_ENCONTRADA");
+      if (!permissao.ativa) throw new AppError("Permissao ja revogada", 409, "PERMISSAO_JA_REVOGADA");
+      const revogada = await repository.revogar(permissao.id, administrador.id, conexao);
+      await auditar(administrador, "acesso_professor_revogado", revogada, conexao);
+      return revogada;
+    });
   }
 
   async function salvarLote(professorIdInformado, corpo, administrador) {

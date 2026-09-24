@@ -10,7 +10,15 @@ function criarAnalyticsService(repository) {
       ? agora.toISOString().slice(0, 10)
       : agora.toISOString().slice(0, 16);
     const chave = [tipo, usuario.id, materialId, intervalo].join(":");
-    await repository.registrarUso(usuario, materialId, tipo, chave);
+    try {
+      await repository.registrarUso(usuario, materialId, tipo, chave);
+    } catch (erro) {
+      if (usuario.papel === "aluno" && repository.registrarHistoricoAposFalha) {
+        await repository.registrarHistoricoAposFalha(usuario, materialId, tipo)
+          .catch(function preservarFalhaOriginal() {});
+      }
+      throw erro;
+    }
   }
 
   async function registrarConsulta(usuarioId, filtros) {

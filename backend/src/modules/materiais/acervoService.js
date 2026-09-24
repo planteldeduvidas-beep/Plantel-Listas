@@ -14,6 +14,21 @@ function criarAcervoService(dependencias) {
     registrarUso: function registrarUso() { return Promise.resolve(); },
     registrarConsulta: function registrarConsulta() { return Promise.resolve(); }
   };
+  const logger = dependencias.logger;
+
+  async function registrarTelemetria(tarefa) {
+    try {
+      await tarefa();
+    } catch (erro) {
+      if (logger) {
+        const codigo = String(erro && (erro.codigo || erro.code) || "ANALYTICS_INDISPONIVEL");
+        logger.warn(
+          { codigo: /^[A-Z0-9_]{1,100}$/.test(codigo) ? codigo : "ANALYTICS_INDISPONIVEL" },
+          "Nao foi possivel registrar analytics do acervo"
+        );
+      }
+    }
+  }
 
   async function consultar(query, usuario) {
     const filtros = validarConsulta(query || {});
@@ -30,7 +45,7 @@ function criarAcervoService(dependencias) {
       repository.listarFiltros()
     ]);
     const totalPaginas = Math.max(1, Math.ceil(resultados[2].total / filtros.limite));
-    await analyticsService.registrarConsulta(usuario.id, filtros);
+    await registrarTelemetria(function registrar() { return analyticsService.registrarConsulta(usuario.id, filtros); });
     return {
       breadcrumb: resultados[0],
       pastas: resultados[1],
@@ -87,7 +102,9 @@ function criarAcervoService(dependencias) {
         erro.tamanhoTotal = material.tamanho_bytes;
         throw erro;
       }
-      await analyticsService.registrarUso(usuario, material.id, baixar ? "download" : "visualizacao");
+      await registrarTelemetria(function registrar() {
+        return analyticsService.registrarUso(usuario, material.id, baixar ? "download" : "visualizacao");
+      });
       return { material: material, resposta: resposta };
     } catch (erro) {
       if (erro.codigo === "GOOGLE_AUTORIZACAO_INVALIDA") {

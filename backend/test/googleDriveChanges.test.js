@@ -70,7 +70,7 @@ function criarCenario() {
     configuracao: { googleDrive: { webhookUrl: "https://acervo.example.com/api/integracoes/google-drive/webhook", intervaloChangesMs: 60000 } },
     agendarTarefa: function guardar() { chamadas.tarefasAgendadas += 1; }
   });
-  return { service: service, provider: provider, repository: repository, chamadas: chamadas };
+  return { service: service, provider: provider, repository: repository, chamadas: chamadas, estado: estado };
 }
 
 test("Changes API aplica criacao dentro da raiz e avanca token de forma idempotente", async function testarCriacao() {
@@ -112,7 +112,7 @@ test("reconciliacao persistida e retomada depois de liberar a named lock",async 
   assert.deepEqual(ordem,["liberar","agendar"]);
 });
 
-test("mudanca fora da raiz fica indisponivel e pasta e aplicada sem varrer subarvore", async function testarLimites() {
+test("mudanca fora da raiz fica indisponivel e pasta nova importa a subarvore", async function testarLimites() {
   const cenario = criarCenario();
   cenario.provider.verificarDescendenteDaRaiz = async function fora() { return false; };
   await cenario.service.processarAlteracoes();
@@ -123,10 +123,78 @@ test("mudanca fora da raiz fica indisponivel e pasta e aplicada sem varrer subar
     return { changes: [{ fileId: "pasta", file: { id: "pasta", name: "Pasta", mimeType: "application/vnd.google-apps.folder", parents: [cenario.provider.pastaRaizId] } }], newStartPageToken: "pagina-3" };
   };
   const resumo = await cenario.service.processarAlteracoes();
-  assert.equal(cenario.chamadas.aplicadas.alteracoes[0].pasta.parentId, cenario.provider.pastaRaizId);
-  assert.equal(Boolean(cenario.chamadas.aplicadas.alteracoes[0].subarvore), false);
+  assert.equal(cenario.chamadas.aplicadas.alteracoes[0].subarvore.pastas[0].parentId, cenario.provider.pastaRaizId);
   assert.equal(resumo.reconciliacaoNecessaria, false);
   assert.equal(cenario.chamadas.agendamentos, 0);
+});
+
+test("bootstrap captura cursor, aguarda varredura completa e retoma sem avancar em falha", async function() {
+  const cenario = criarCenario();
+  let estado = null;
+  let listagens = 0;
+  cenario.repository.buscarEstado = async function() { return estado; };
+  cenario.repository.salvarEstadoInicial = async function(token) {
+    estado = { page_token: token, reconciliacao_necessaria: 1, bootstrap_necessario: 1 };
+  };
+  cenario.provider.listarAlteracoes = async function(token, cursor) {
+    listagens += 1;
+    assert.equal(cursor, "inicio");
+    return { changes: [], newStartPageToken: "apos-varredura" };
+  };
+  await cenario.service.processarAlteracoes();
+  assert.equal(cenario.chamadas.agendamentos, 1);
+  assert.equal(listagens, 0);
+  await cenario.service.processarAlteracoes(); // varredura falhou: ainda pendente
+  assert.equal(cenario.chamadas.agendamentos, 2);
+  assert.equal(estado.page_token, "inicio");
+  estado.reconciliacao_necessaria = 0;
+  estado.bootstrap_necessario = 0; // commit da varredura completa
+  await cenario.service.processarAlteracoes();
+  assert.equal(listagens, 1);
+});
+
+test("pasta preenchida movida para a raiz prepara filhos e subpastas em uma subarvore", async function() {
+  const cenario = criarCenario();
+  cenario.provider.listarAlteracoes = async function() {
+    return { changes: [{ fileId: "pasta", file: { id: "pasta", mimeType: "application/vnd.google-apps.folder", parents: [cenario.provider.pastaRaizId] } }], newStartPageToken: "pagina-2" };
+  };
+  cenario.provider.listarSubarvore = async function(token, pasta) {
+    return { pastas: [
+      { id: pasta.id, parentId: cenario.provider.pastaRaizId },
+      { id: "filha", parentId: pasta.id }
+    ], arquivos: [{ id: "material", parentId: "filha", mimeType: "application/pdf" }] };
+  };
+  await cenario.service.processarAlteracoes();
+  const arvore = cenario.chamadas.aplicadas.alteracoes[0].subarvore;
+  assert.deepEqual(arvore.pastas.map(function(item) { return item.id; }), ["pasta", "filha"]);
+  assert.equal(arvore.arquivos[0].parentId, "filha");
+});
+
+test("mais de 25 mudancas continuam no proximo cursor sem perda", async function() {
+  const cenario = criarCenario();
+  const vistos = [];
+  cenario.provider.listarAlteracoes = async function(token, cursor, limite) {
+    assert.equal(limite, 25);
+    const inicio = cursor === "pagina-1" ? 0 : 25;
+    const total = inicio === 0 ? 25 : 5;
+    return {
+      changes: Array.from({ length: total }, function(_, indice) {
+        const id = "arquivo-" + (inicio + indice);
+        return { fileId: id, file: { id: id, mimeType: "application/pdf", parents: ["pasta-interna"] } };
+      }),
+      nextPageToken: inicio === 0 ? "pagina-2" : undefined,
+      newStartPageToken: inicio === 25 ? "pagina-final" : undefined
+    };
+  };
+  cenario.repository.aplicarAlteracoes = async function(conexao, alteracoes, cursor) {
+    vistos.push.apply(vistos, alteracoes.map(function(item) { return item.fileId; }));
+    cenario.estado.page_token = cursor;
+    return { atualizados: alteracoes.length, indisponiveis: 0, reconciliacaoNecessaria: false };
+  };
+  await cenario.service.processarAlteracoes();
+  await cenario.service.processarAlteracoes();
+  assert.equal(new Set(vistos).size, 30);
+  assert.equal(cenario.estado.page_token, "pagina-final");
 });
 
 test("page token perdido prepara full sync de fallback e falha Google e controlada", async function testarTokenPerdido() {

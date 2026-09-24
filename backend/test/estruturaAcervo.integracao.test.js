@@ -201,6 +201,23 @@ test("hierarquia recusa pai proprio, ciclos, pai inexistente e desativacao inval
   assert.equal(desativarComFilha.body.erro.codigo, "CATEGORIA_POSSUI_FILHAS_ATIVAS");
 });
 
+test("rota local impede divergencia de pasta vinculada ao Drive", async function() {
+  const admin = await autenticar("admin");
+  const pasta = (await criarCategoria(admin, { nome: "Pasta Drive" })).body.categoria;
+  await pool.execute("UPDATE categorias SET drive_pasta_id=? WHERE id=?", ["pastaDriveProtegida123", pasta.id]);
+  const editar = await admin.agente.patch("/api/categorias/" + pasta.id)
+    .set("X-CSRF-Token", admin.csrf).send({ nome: "Divergente" });
+  const desativar = await admin.agente.patch("/api/categorias/" + pasta.id + "/ativo")
+    .set("X-CSRF-Token", admin.csrf).send({ ativo: false });
+  const criarFilha = await criarCategoria(admin, { nome: "Filha local", categoriaPaiId: pasta.id });
+  assert.equal(editar.body.erro.codigo, "CATEGORIA_VINCULADA_DRIVE");
+  assert.equal(desativar.body.erro.codigo, "CATEGORIA_VINCULADA_DRIVE");
+  assert.equal(criarFilha.body.erro.codigo, "CATEGORIA_VINCULADA_DRIVE");
+  const [registros] = await pool.execute("SELECT nome,ativo FROM categorias WHERE id=?", [pasta.id]);
+  assert.equal(registros[0].nome, "Pasta Drive");
+  assert.equal(registros[0].ativo, 1);
+});
+
 test("registro inativo so pode ser reativado e nao aparece na estrutura publica", async function testarInativos() {
   const admin = await autenticar("admin");
   const aluno = await autenticar("aluno");

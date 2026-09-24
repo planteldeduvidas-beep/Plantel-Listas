@@ -1,4 +1,18 @@
 function criarAnalyticsRepository(pool) {
+  async function registrarHistorico(executor, usuario, materialId, tipo) {
+    if (usuario.papel !== "aluno") return;
+    await executor.execute(
+      "INSERT INTO historico_materiais_usuario "
+      + "(usuario_id,material_id,ultima_acao,ultima_visualizacao_em,ultimo_download_em,atualizado_em) "
+      + "VALUES (?,?,?,IF(?='visualizacao',CURRENT_TIMESTAMP(3),NULL),IF(?='download',CURRENT_TIMESTAMP(3),NULL),CURRENT_TIMESTAMP(3)) "
+      + "ON DUPLICATE KEY UPDATE ultima_acao=VALUES(ultima_acao),"
+      + "ultima_visualizacao_em=IF(VALUES(ultima_visualizacao_em) IS NULL,ultima_visualizacao_em,VALUES(ultima_visualizacao_em)),"
+      + "ultimo_download_em=IF(VALUES(ultimo_download_em) IS NULL,ultimo_download_em,VALUES(ultimo_download_em)),"
+      + "atualizado_em=VALUES(atualizado_em)",
+      [usuario.id, materialId, tipo, tipo, tipo]
+    );
+  }
+
   async function registrarUso(usuario, materialId, tipo, chave) {
     const conexao = await pool.getConnection();
     try {
@@ -7,18 +21,7 @@ function criarAnalyticsRepository(pool) {
         "INSERT IGNORE INTO eventos_uso_acervo (usuario_id,material_id,tipo,chave_deduplicacao) VALUES (?,?,?,?)",
         [usuario.id, materialId, tipo, chave]
       );
-      if (usuario.papel === "aluno") {
-        await conexao.execute(
-          "INSERT INTO historico_materiais_usuario "
-          + "(usuario_id,material_id,ultima_acao,ultima_visualizacao_em,ultimo_download_em,atualizado_em) "
-          + "VALUES (?,?,?,IF(?='visualizacao',CURRENT_TIMESTAMP(3),NULL),IF(?='download',CURRENT_TIMESTAMP(3),NULL),CURRENT_TIMESTAMP(3)) "
-          + "ON DUPLICATE KEY UPDATE ultima_acao=VALUES(ultima_acao),"
-          + "ultima_visualizacao_em=IF(VALUES(ultima_visualizacao_em) IS NULL,ultima_visualizacao_em,VALUES(ultima_visualizacao_em)),"
-          + "ultimo_download_em=IF(VALUES(ultimo_download_em) IS NULL,ultimo_download_em,VALUES(ultimo_download_em)),"
-          + "atualizado_em=VALUES(atualizado_em)",
-          [usuario.id, materialId, tipo, tipo, tipo]
-        );
-      }
+      await registrarHistorico(conexao, usuario, materialId, tipo);
       await conexao.commit();
     } catch (erro) {
       await conexao.rollback();
@@ -26,6 +29,10 @@ function criarAnalyticsRepository(pool) {
     } finally {
       conexao.release();
     }
+  }
+
+  async function registrarHistoricoAposFalha(usuario, materialId, tipo) {
+    return registrarHistorico(pool, usuario, materialId, tipo);
   }
 
   async function registrarConsulta(usuarioId, categoriaId, busca, chave, tipo) {
@@ -186,6 +193,7 @@ function criarAnalyticsRepository(pool) {
 
   return {
     registrarUso: registrarUso,
+    registrarHistoricoAposFalha: registrarHistoricoAposFalha,
     registrarConsulta: registrarConsulta,
     resumo: resumo,
     porDisciplina: function porDisciplina() { return distribuicao("disciplinas", "disciplina_id"); },

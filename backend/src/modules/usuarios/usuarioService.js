@@ -29,17 +29,24 @@ function criarUsuarioService(dependencias) {
 
   async function criarUsuario(usuarioAutenticado, corpo) {
     const dados = validarCriacao(corpo);
-    const usuario = await usuarioRepository.criar(dados.nome, dados.email, await criarHashDaSenha(dados.senha), dados.papel);
-    await registrar(usuarioAutenticado, "usuario_criado", usuario.id, { papel: usuario.papel });
+    const senhaHash = await criarHashDaSenha(dados.senha);
+    const usuario = await usuarioRepository.comTravaAdministrativa(async function criarComAuditoria(conexao) {
+      const criado = await usuarioRepository.criar(dados.nome, dados.email, senhaHash, dados.papel, conexao);
+      await registrar(usuarioAutenticado, "usuario_criado", criado.id, { papel: criado.papel }, conexao);
+      return criado;
+    });
     return criarUsuarioPublico(usuario);
   }
 
   async function editarUsuario(usuarioAutenticado, parametroId, corpo) {
     const id = validarUsuarioId(parametroId);
     const dados = validarEdicao(corpo);
-    if (!await usuarioRepository.atualizarDados(id, dados.nome, dados.email)) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
-    await registrar(usuarioAutenticado, "usuario_editado", id, { nomeAlterado: true, emailAlterado: true });
-    return criarUsuarioPublico(await usuarioRepository.buscarPorId(id));
+    const usuario = await usuarioRepository.comTravaAdministrativa(async function editarComAuditoria(conexao) {
+      if (!await usuarioRepository.atualizarDados(id, dados.nome, dados.email, conexao)) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
+      await registrar(usuarioAutenticado, "usuario_editado", id, { nomeAlterado: true, emailAlterado: true }, conexao);
+      return usuarioRepository.buscarPorId(id, conexao);
+    });
+    return criarUsuarioPublico(usuario);
   }
 
   async function alterarAtivo(usuarioAutenticado, parametroId, corpo) {

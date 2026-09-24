@@ -10,6 +10,7 @@ const { criarHashDaSenha } = require("../src/modules/autenticacao/senha");
 const { ESCOPO_LEITURA } = require("../src/shared/providers/googleDriveProvider");
 const { gerarHashDoToken } = require("../src/shared/utils/tokens");
 const criarChangesRepository = require("../src/modules/materiais/googleDriveChangesRepository");
+const criarChangesService = require("../src/modules/materiais/googleDriveChangesService");
 const criarAcervoRepository = require("../src/modules/materiais/acervoRepository");
 const { recomendacaoDaCategoria } = require("../src/modules/materiais/classificacaoAutomatica");
 
@@ -606,4 +607,47 @@ test("reconcilia renomeacao, movimentacao e remocao de subarvore sem full sync",
     + "('driveSubarvoreFase5','driveFilhaSubarvoreFase5') AND ativo=1"
   );
   assert.equal(Number(estadoPastas[0].ativas), 0);
+});
+
+test("pasta preenchida movida ao Drive monitorado importa descendentes sem duplicar", async function() {
+  await pool.execute("INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em) VALUES (1,'antes-movimento',NOW(3))");
+  const repository = criarChangesRepository(pool, { nomeTrava: "plantel_changes_teste_movimento" });
+  let varreduras = 0;
+  const service = criarChangesService({
+    repository: repository,
+    provider: {
+      pastaRaizId: configuracao.googleDrive.pastaRaizId,
+      verificarDescendenteDaRaiz: async function() { return true; },
+      listarAlteracoes: async function() {
+        return { changes: [{ fileId: "drivePastaMovida", file: {
+          id: "drivePastaMovida", name: "Movida", mimeType: "application/vnd.google-apps.folder",
+          parents: [configuracao.googleDrive.pastaRaizId]
+        } }], newStartPageToken: "apos-movimento" };
+      },
+      listarSubarvore: async function() {
+        varreduras += 1;
+        return { pastas: [
+          { id: "drivePastaMovida", name: "Movida", parentId: configuracao.googleDrive.pastaRaizId, nivel: 0 },
+          { id: "drivePastaNeta", name: "Neta", parentId: "drivePastaMovida", nivel: 1 }
+        ], arquivos: [{ id: "driveArquivoNeto", name: "neto.pdf", mimeType: "application/pdf", parentId: "drivePastaNeta" }] };
+      }
+    },
+    integracaoService: {
+      obterRefreshTokenParaUso: async function() { return "refresh-teste"; },
+      solicitarSincronizacaoAutomatica: async function() { throw new Error("full sync inesperada"); }
+    },
+    configuracao: configuracao,
+    agendarTarefa: function() {}
+  });
+  await service.processarAlteracoes();
+  const [pastas] = await pool.execute(
+    "SELECT drive_pasta_id FROM categorias WHERE drive_pasta_id IN ('drivePastaMovida','drivePastaNeta')"
+  );
+  const [materiais] = await pool.execute("SELECT id FROM materiais WHERE drive_file_id='driveArquivoNeto'");
+  assert.equal(pastas.length, 2);
+  assert.equal(materiais.length, 1);
+  await service.processarAlteracoes();
+  const [semDuplicacao] = await pool.execute("SELECT COUNT(*) AS total FROM materiais WHERE drive_file_id='driveArquivoNeto'");
+  assert.equal(Number(semDuplicacao[0].total), 1);
+  assert.equal(varreduras, 1);
 });

@@ -57,7 +57,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       refreshToken,
       encryptionKey
     );
-    await repository.salvarCredencial(
+    await repository.salvarCredencialEReiniciarChanges(
       tokenCriptografado,
       provider.escopo,
       usuarioId
@@ -81,7 +81,8 @@ function criarIntegracaoGoogleDriveService(dependencias) {
           credencial.refresh_token_criptografado,
           encryptionKey
         ),
-        origem: "banco"
+        origem: "banco",
+        versao: credencial.refresh_token_criptografado
       };
     }
     if (configuracao.googleDrive.refreshToken) {
@@ -184,6 +185,12 @@ function criarIntegracaoGoogleDriveService(dependencias) {
           503,
           "SINCRONIZACAO_CONCORRENTE"
         );
+      }
+      const credencialAtual = await repository.buscarCredencial(conexao);
+      if (credencialDeUso.origem === "banco"
+          ? !credencialAtual || credencialAtual.refresh_token_criptografado !== credencialDeUso.versao
+          : Boolean(credencialAtual)) {
+        throw new AppError("A conexao Google mudou durante a sincronizacao", 503, "GOOGLE_CREDENCIAL_ALTERADA");
       }
       etapa = "gravar_banco";
       const resumo = await repository.aplicarSincronizacao(

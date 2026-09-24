@@ -82,14 +82,16 @@ function criarPermissaoRepository(pool) {
     return buscarPorId(resultado.insertId,executor);
   }
 
-  async function revogar(permissaoId, administradorId) {
-    await pool.execute(
+  async function revogar(permissaoId, administradorId, executorInformado) {
+    const executor = executorInformado || pool;
+    const [resultado] = await executor.execute(
       "UPDATE permissoes_professor_categoria "
       + "SET revogada_em = CURRENT_TIMESTAMP(3), revogada_por_usuario_id = ? "
       + "WHERE id = ? AND revogada_em IS NULL",
       [administradorId, permissaoId]
     );
-    return buscarPorId(permissaoId);
+    if (resultado.affectedRows !== 1) throw new AppError("Permissao ja revogada",409,"PERMISSAO_JA_REVOGADA");
+    return buscarPorId(permissaoId, executor);
   }
 
   async function salvarLote(professorId, categoriaIds, administradorId) {

@@ -11,11 +11,15 @@ function criarCenario(opcoes) {
     concluida: false,
     liberada: false,
     falhaSemTrava: null,
-    tarefa: null
+    tarefa: null,
+    aplicacoes: 0
   };
   const conexao = {};
   const repository = {
-    buscarCredencial: async function buscarCredencial() { return null; },
+    buscarCredencial: async function buscarCredencial() {
+      return opcoes.credencialAlterada && estado.aquisicoes >= 2
+        ? { refresh_token_criptografado: "outra-autorizacao" } : null;
+    },
     criarSincronizacaoAguardando: async function criar() { return 1; },
     adquirirTravaDeSincronizacao: async function adquirir() {
       estado.aquisicoes += 1;
@@ -23,6 +27,7 @@ function criarCenario(opcoes) {
     },
     marcarSincronizando: async function marcar() { return true; },
     aplicarSincronizacao: async function aplicar() {
+      estado.aplicacoes += 1;
       if (opcoes.falhaAplicacao) throw opcoes.falhaAplicacao;
       return {
         pastasEncontradas: 1,
@@ -82,6 +87,14 @@ test("libera a trava durante a listagem e a readquire antes de gravar", async fu
   assert.equal(cenario.estado.concluida, true);
   assert.equal(cenario.estado.liberada, true);
   assert.equal(cenario.estado.falhaSemTrava, null);
+});
+
+test("nao aplica varredura da credencial antiga depois de nova autorizacao", async function() {
+  const cenario = criarCenario({ credencialAlterada: true });
+  await cenario.service.solicitarSincronizacao(1, {});
+  await cenario.estado.tarefa();
+  assert.equal(cenario.estado.aplicacoes, 0);
+  assert.equal(cenario.estado.concluida, false);
 });
 
 test("preserva erro SQL original quando registrar falha tambem falha", async function () {

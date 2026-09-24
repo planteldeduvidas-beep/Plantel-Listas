@@ -12,6 +12,35 @@ const URL_CHANNELS_DRIVE = "https://www.googleapis.com/drive/v3/channels/stop";
 const MIME_ATALHO = "application/vnd.google-apps.shortcut";
 const TEMPO_LIMITE_REQUISICAO_MS = 30000;
 
+async function classificarFalhaDrive(resposta, codigoPadrao) {
+  if (resposta.status === 401) return { codigo: "GOOGLE_AUTORIZACAO_INVALIDA", status: 503 };
+  if (resposta.status === 404) return { codigo: "GOOGLE_ARQUIVO_NAO_ENCONTRADO", status: 409 };
+  if (resposta.status === 410 && codigoPadrao === "GOOGLE_PAGE_TOKEN_EXPIRADO") {
+    return { codigo: "GOOGLE_PAGE_TOKEN_EXPIRADO", status: 503 };
+  }
+  if (resposta.status === 403 || resposta.status === 429) {
+    let motivo = "";
+    try {
+      const corpo = await resposta.json();
+      motivo = String(corpo && corpo.error && (
+        corpo.error.errors && corpo.error.errors[0] && corpo.error.errors[0].reason
+        || corpo.error.status
+      ) || "");
+    } catch (erro) { /* O status HTTP continua sendo suficiente para negar a operacao. */ }
+    if (resposta.status === 429 || /^(userRateLimitExceeded|rateLimitExceeded|dailyLimitExceeded|quotaExceeded|storageQuotaExceeded|downloadQuotaExceeded|RESOURCE_EXHAUSTED)$/i.test(motivo)) {
+      return { codigo: "GOOGLE_LIMITE_EXCEDIDO", status: 503 };
+    }
+    if (/^(domainPolicy|domainPolicyError|appNotAuthorizedToFile)$/i.test(motivo)) {
+      return { codigo: "GOOGLE_POLITICA_BLOQUEIO", status: 403 };
+    }
+    if (/^(insufficientFilePermissions|insufficientPermissions|forbidden)$/i.test(motivo)) {
+      return { codigo: "GOOGLE_PERMISSAO_NEGADA", status: 403 };
+    }
+    return { codigo: "GOOGLE_ACESSO_NEGADO", status: 403 };
+  }
+  return { codigo: codigoPadrao || "GOOGLE_DRIVE_INDISPONIVEL", status: 503 };
+}
+
 async function executarComTempoLimite(tarefa, tempoLimite) {
   let temporizador;
   const limite = new Promise(function aguardarLimite(resolve, reject) {
@@ -194,10 +223,13 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       }
       return token;
     } catch (erro) {
+      const motivo = erro && erro.response && erro.response.data && erro.response.data.error;
+      const credencialRevogada = motivo === "invalid_grant"
+        || (erro && /^invalid_grant(?:\b|$)/i.test(String(erro.message || "")));
       throw new AppError(
-        "Autorizacao Google Drive invalida ou expirada",
+        credencialRevogada ? "Autorizacao Google Drive invalida ou expirada" : "Google Drive temporariamente indisponivel",
         503,
-        "GOOGLE_AUTORIZACAO_INVALIDA"
+        credencialRevogada ? "GOOGLE_AUTORIZACAO_INVALIDA" : "GOOGLE_DRIVE_INDISPONIVEL"
       );
     }
   }
@@ -227,12 +259,8 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     }
 
     if (!resposta.ok) {
-      const codigo = resposta.status === 401 || resposta.status === 403
-        ? "GOOGLE_AUTORIZACAO_INVALIDA"
-        : resposta.status === 404
-          ? "GOOGLE_ARQUIVO_NAO_ENCONTRADO"
-          : "GOOGLE_DRIVE_INDISPONIVEL";
-      throw new AppError("Nao foi possivel consultar o Google Drive", resposta.status === 404 ? 409 : 503, codigo);
+      const falha = await classificarFalhaDrive(resposta);
+      throw new AppError("Nao foi possivel consultar o Google Drive", falha.status, falha.codigo);
     }
 
     return resposta.json();
@@ -275,16 +303,14 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     }
 
     if (![200, 206, 416].includes(resposta.status)) {
-      const codigo = resposta.status === 401
-        ? "GOOGLE_AUTORIZACAO_INVALIDA"
-        : resposta.status === 403
-          ? "MATERIAL_DOWNLOAD_NAO_PERMITIDO"
-          : "GOOGLE_DRIVE_INDISPONIVEL";
+      const falha = await classificarFalhaDrive(resposta);
+      const codigo = ["GOOGLE_ACESSO_NEGADO", "GOOGLE_PERMISSAO_NEGADA", "GOOGLE_POLITICA_BLOQUEIO"].includes(falha.codigo)
+        ? "MATERIAL_DOWNLOAD_NAO_PERMITIDO" : falha.codigo;
       throw new AppError(
         codigo === "MATERIAL_DOWNLOAD_NAO_PERMITIDO"
           ? "Este arquivo nao esta liberado para download"
           : "Nao foi possivel obter o arquivo",
-        codigo === "MATERIAL_DOWNLOAD_NAO_PERMITIDO" ? 403 : 503,
+        codigo === "MATERIAL_DOWNLOAD_NAO_PERMITIDO" ? 403 : falha.status,
         codigo
       );
     }
@@ -305,12 +331,11 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       throw new AppError("Google Drive temporariamente indisponivel", 503, "GOOGLE_DRIVE_INDISPONIVEL");
     }
     if (!resposta.ok) {
-      const codigo = resposta.status === 401 || resposta.status === 403
-        ? "GOOGLE_AUTORIZACAO_INVALIDA"
-        : resposta.status === 410
-          ? "GOOGLE_PAGE_TOKEN_EXPIRADO"
-          : "GOOGLE_DRIVE_INDISPONIVEL";
-      throw new AppError("Nao foi possivel consultar alteracoes do Google Drive", 503, codigo);
+      const falha = await classificarFalhaDrive(
+        resposta,
+        url.pathname.startsWith("/drive/v3/changes") ? "GOOGLE_PAGE_TOKEN_EXPIRADO" : undefined
+      );
+      throw new AppError("Nao foi possivel consultar alteracoes do Google Drive", falha.status, falha.codigo);
     }
     if (resposta.status === 204) {
       return {};
@@ -334,12 +359,8 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       throw new AppError("Google Drive temporariamente indisponivel", 503, "GOOGLE_DRIVE_INDISPONIVEL");
     }
     if (!resposta.ok) {
-      const codigo = resposta.status === 401 || resposta.status === 403
-        ? "GOOGLE_AUTORIZACAO_INVALIDA"
-        : resposta.status === 404
-          ? "GOOGLE_ARQUIVO_NAO_ENCONTRADO"
-          : "GOOGLE_DRIVE_INDISPONIVEL";
-      throw new AppError("Nao foi possivel alterar o Google Drive", resposta.status === 404 ? 409 : 503, codigo);
+      const falha = await classificarFalhaDrive(resposta);
+      throw new AppError("Nao foi possivel alterar o Google Drive", falha.status, falha.codigo);
     }
     return resposta.status === 204 ? {} : resposta.json();
   }
@@ -372,7 +393,8 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       throw new AppError("Google Drive temporariamente indisponivel", 503, "GOOGLE_DRIVE_INDISPONIVEL");
     }
     if (!inicio.ok || !inicio.headers.get("location")) {
-      throw new AppError("Nao foi possivel iniciar o envio ao Google Drive", 503, inicio.status === 401 || inicio.status === 403 ? "GOOGLE_AUTORIZACAO_INVALIDA" : "GOOGLE_DRIVE_INDISPONIVEL");
+      const falha = await classificarFalhaDrive(inicio);
+      throw new AppError("Nao foi possivel iniciar o envio ao Google Drive", falha.status, falha.codigo);
     }
     return requisitarEscrita(new URL(inicio.headers.get("location")), {
       method: "PUT",

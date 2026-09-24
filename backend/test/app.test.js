@@ -6,6 +6,7 @@ const path = require("node:path");
 const pino = require("pino");
 const request = require("supertest");
 const criarAplicacao = require("../src/app");
+const { obterConfiguracao } = require("../src/shared/config/ambiente");
 
 function criarConfiguracao(ambiente) {
   return {
@@ -39,6 +40,22 @@ test("bloqueia origem CORS nao autorizada", async function testarCors() {
     .set("Origin", "https://origem-invalida.example");
   assert.equal(resposta.status, 403);
   assert.equal(resposta.body.erro.codigo, "ORIGEM_NAO_PERMITIDA");
+});
+
+test("separa liveness de readiness do MySQL", async function() {
+  const semBanco = criarApp("test");
+  assert.equal((await request(semBanco).get("/api/saude")).status, 200);
+  assert.equal((await request(semBanco).get("/api/prontidao")).status, 503);
+  const pool = { execute: async function() { throw new Error("banco indisponivel"); } };
+  const comBanco = criarAplicacao(
+    Object.assign({}, obterConfiguracao(), { ambiente: "test" }),
+    pino({ level: "silent" }),
+    { pool: pool }
+  );
+  assert.equal((await request(comBanco).get("/api/saude")).status, 200);
+  assert.equal((await request(comBanco).get("/api/prontidao")).status, 503);
+  pool.execute = async function() { return [[{ pronto: 1 }]]; };
+  assert.equal((await request(comBanco).get("/api/prontidao")).status, 200);
 });
 
 test("producao entrega o fallback da SPA nas rotas institucionais sem mascarar a API", async function testarFallbackSpa(t) {
