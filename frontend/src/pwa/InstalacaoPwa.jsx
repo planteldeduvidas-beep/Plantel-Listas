@@ -18,11 +18,27 @@ function eSafari() {
   return /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(navigator.userAgent);
 }
 
+function eAndroid() {
+  return /Android/i.test(navigator.userAgent);
+}
+
+function eFirefox() {
+  return /Firefox|FxiOS/i.test(navigator.userAgent);
+}
+
 function instrucaoManual(ios) {
   if (ios) {
     return eSafari()
       ? "No Safari, toque em Compartilhar e depois em Adicionar à Tela de Início."
       : "No iPhone ou iPad, abra este site no Safari e use Compartilhar → Adicionar à Tela de Início.";
+  }
+  if (eFirefox()) {
+    if (eAndroid()) return "No Firefox para Android, toque no menu ⋮ e escolha Instalar ou Adicionar à tela inicial.";
+    if (/Windows/i.test(navigator.userAgent)) return "No Firefox para Windows, clique no ícone de aplicativos web na barra de endereços.";
+    return "O Firefox neste sistema não oferece instalação como aplicativo. Para instalar, abra este site no Chrome ou Edge.";
+  }
+  if (eAndroid()) {
+    return "No Chrome, toque no menu ⋮ e escolha Instalar app ou Adicionar à tela inicial.";
   }
   return "Se o navegador não abrir a confirmação, use o ícone de instalar na barra de endereço ou o menu do Chrome/Edge.";
 }
@@ -69,7 +85,10 @@ export default function InstalacaoPwa() {
   }, []);
 
   async function instalar() {
-    if (!convite) return;
+    if (!convite) {
+      definirResultadoDaInstalacao(instrucaoManual(ios));
+      return;
+    }
     definirInstalando(true);
     definirResultadoDaInstalacao("");
     try {
@@ -103,13 +122,11 @@ export default function InstalacaoPwa() {
     </aside>;
   }
 
-  if (instalado || dispensado || (!convite && !ios && !resultadoDaInstalacao)) return null;
+  if (instalado || dispensado) return null;
 
   return <aside className="aviso-pwa" aria-label="Instalação do Plantel Listas">
-    {convite ? <>
-      <span>{resultadoDaInstalacao || "Tenha o Plantel Listas na tela inicial. Ao tocar em instalar, confirme também no aviso do navegador."}</span>
-      <button type="button" onClick={instalar} disabled={instalando}>{instalando ? "Abrindo confirmação..." : "Instalar Plantel Listas"}</button>
-    </> : <span>{resultadoDaInstalacao || instrucaoManual(ios)}</span>}
+    <span>{resultadoDaInstalacao || "Tenha o Plantel Listas na tela inicial do seu dispositivo."}</span>
+    <button type="button" onClick={instalar} disabled={instalando}>{instalando ? "Abrindo confirmação..." : convite ? "Instalar Plantel Listas" : "Como instalar"}</button>
     <button type="button" className="aviso-pwa-fechar" onClick={() => definirDispensado(true)} aria-label="Dispensar orientação de instalação">×</button>
   </aside>;
 }
