@@ -177,6 +177,15 @@ test("exige integracoes e chave exclusiva em producao", function testarProducaoC
   }, /GOOGLE_DRIVE_ENCRYPTION_KEY/);
 
   variaveis.GOOGLE_DRIVE_ENCRYPTION_KEY = "chave-exclusiva-de-producao-com-32-caracteres";
+  assert.throws(()=>validarVariaveisDeAmbiente(variaveis),/SECURITY_EVIDENCE_KEY/);
+  variaveis.SECURITY_DEFENSE_ENABLED = "false";
+  assert.equal(validarVariaveisDeAmbiente(variaveis).defesa.habilitada,false);
+  variaveis.SECURITY_DEFENSE_ENABLED = "true";
+  variaveis.SECURITY_EVIDENCE_KEY = "a".repeat(64);
+  assert.throws(()=>validarVariaveisDeAmbiente(variaveis),/SECURITY_EVIDENCE_KEY/);
+  variaveis.SECURITY_EVIDENCE_KEY = require("node:crypto").randomBytes(32).toString("hex");
+  const mesmoSegredo = {...variaveis,CSRF_SECRET:variaveis.SECURITY_EVIDENCE_KEY};
+  assert.throws(()=>validarVariaveisDeAmbiente(mesmoSegredo),/SECURITY_EVIDENCE_KEY/);
   const configuracao = validarVariaveisDeAmbiente(variaveis);
   assert.equal(configuracao.googleDrive.encryptionKey, variaveis.GOOGLE_DRIVE_ENCRYPTION_KEY);
 });

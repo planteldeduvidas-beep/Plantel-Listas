@@ -1,7 +1,8 @@
 const { rateLimit } = require("express-rate-limit");
 
 function criarHandlerRateLimit(codigo) {
-  return function responderLimiteExcedido(req, res) {
+  return async function responderLimiteExcedido(req, res) {
+    await req.app.locals.defesaAtiva?.registrar(req, "RATE_LIMIT_TRIGGERED");
     res.status(429).json({
       erro: {
         codigo: codigo,

@@ -16,6 +16,7 @@
     "classify:archive": "node scripts/classificarAcervo.js",
     "analytics:retention": "node scripts/executarRetencaoAnalytics.js",
     "qa:load": "node scripts/medirCargaLocal.js",
+    "security:ops": "node scripts/operarSeguranca.js",
     "bootstrap:admin": "node scripts/bootstrapAdmin.js"
   },
   "engines": {

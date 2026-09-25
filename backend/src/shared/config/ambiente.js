@@ -161,7 +161,8 @@ function validarConfiguracaoDeProducao(configuracao) {
     [configuracao.googleDrive.pastaRaizId, "GOOGLE_DRIVE_PASTA_RAIZ_ID"],
     [configuracao.googleDrive.redirectUri, "GOOGLE_DRIVE_REDIRECT_URI"],
     [configuracao.googleDrive.webhookUrl, "GOOGLE_DRIVE_WEBHOOK_URL"],
-    [configuracao.googleDrive.encryptionKey, "GOOGLE_DRIVE_ENCRYPTION_KEY"]
+    [configuracao.googleDrive.encryptionKey, "GOOGLE_DRIVE_ENCRYPTION_KEY"],
+    [!configuracao.defesa.habilitada || configuracao.defesa.chaveEvidencia, "SECURITY_EVIDENCE_KEY"]
   ];
 
   for (const [valor, nome] of obrigatorias) {
@@ -180,6 +181,12 @@ function validarVariaveisDeAmbiente(variaveis) {
   }
 
   const csrfSecret = exigirSegredo(variaveis, "CSRF_SECRET");
+  const chaveEvidencia = lerTextoOpcional(variaveis, "SECURITY_EVIDENCE_KEY");
+  if (chaveEvidencia && (!/^[a-fA-F0-9]{64}$/.test(chaveEvidencia)
+      || chaveEvidencia === csrfSecret || chaveEvidencia === variaveis.GOOGLE_DRIVE_ENCRYPTION_KEY
+      || new Set(chaveEvidencia.toLowerCase()).size < 8)) {
+    throw new Error("SECURITY_EVIDENCE_KEY deve ser independente e conter 32 bytes aleatorios em hexadecimal");
+  }
   const encryptionKeyInformada = lerTextoOpcional(variaveis, "GOOGLE_DRIVE_ENCRYPTION_KEY");
   if (encryptionKeyInformada && encryptionKeyInformada.length < 32) {
     throw new Error("Variavel de ambiente deve ter pelo menos 32 caracteres: GOOGLE_DRIVE_ENCRYPTION_KEY");
@@ -197,6 +204,26 @@ function validarVariaveisDeAmbiente(variaveis) {
       true
     ).replace(/\/$/, ""),
     confiarProxy: lerInteiro(variaveis, "TRUST_PROXY", 0, 0, 10),
+    defesa: Object.freeze({
+      chaveEvidencia,
+      habilitada: lerBooleano(variaveis, "SECURITY_DEFENSE_ENABLED", true),
+      janelaMs: lerInteiro(variaveis, "SECURITY_WINDOW_MINUTES", 10, 1, 60) * 60000,
+      suspeito: lerInteiro(variaveis, "SECURITY_SUSPECT_SCORE", 10, 5, 1000),
+      limite: lerInteiro(variaveis, "SECURITY_LIMIT_SCORE", 30, 10, 2000),
+      bloqueio: lerInteiro(variaveis, "SECURITY_BLOCK_SCORE", 60, 20, 4000),
+      fatorAnonimo: lerInteiro(variaveis, "SECURITY_ANONYMOUS_FACTOR", 3, 2, 5),
+      enumeracao: lerInteiro(variaveis, "SECURITY_ENUMERATION_COUNT", 12, 10, 24),
+      pausaMs: lerInteiro(variaveis, "SECURITY_PAUSE_SECONDS", 30, 10, 120) * 1000,
+      bloqueioMs: lerInteiro(variaveis, "SECURITY_BLOCK_MINUTES", 15, 1, 60) * 60000,
+      refreshMs: lerInteiro(variaveis, "SECURITY_REFRESH_SECONDS", 5, 2, 30) * 1000,
+      alertaCooldownMs: lerInteiro(variaveis, "SECURITY_ALERT_COOLDOWN_MINUTES", 30, 10, 1440) * 60000,
+      alertaTetoHigh: lerInteiro(variaveis, "SECURITY_ALERT_HIGH_MAX", 10, 1, 50),
+      alertaTetoCritical: lerInteiro(variaveis, "SECURITY_ALERT_CRITICAL_MAX", 2, 1, 10),
+      retencaoDias: lerInteiro(variaveis, "SECURITY_RETENTION_DAYS", 30, 7, 180),
+      eventosPorMinuto: lerInteiro(variaveis, "SECURITY_EVENTS_PER_MINUTE", 120, 30, 600),
+      destinatario: validarEmailOpcional(lerTextoOpcional(variaveis, "SECURITY_ALERT_EMAIL_TO"), "SECURITY_ALERT_EMAIL_TO")
+        || validarEmailOpcional(lerTextoOpcional(variaveis, "SUPPORT_EMAIL_TO"), "SUPPORT_EMAIL_TO")
+    }),
     seguranca: Object.freeze({
       csrfSecret: csrfSecret,
       duracaoSessaoHoras: lerInteiro(
@@ -324,6 +351,9 @@ function validarVariaveisDeAmbiente(variaveis) {
   }
 
   validarConfiguracaoDeProducao(configuracao);
+  if (!(configuracao.defesa.suspeito < configuracao.defesa.limite && configuracao.defesa.limite < configuracao.defesa.bloqueio)) {
+    throw new Error("Thresholds SECURITY devem ser crescentes");
+  }
   return Object.freeze(configuracao);
 }
 

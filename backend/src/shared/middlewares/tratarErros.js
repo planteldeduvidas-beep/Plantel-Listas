@@ -1,6 +1,6 @@
 const AppError = require("../errors/AppError");
 
-function tratarErros(erro, req, res, next) {
+async function tratarErros(erro, req, res, next) {
   // Erros conhecidos do parser nao sao falhas internas nem devem registrar body.
   if (erro.type === "entity.parse.failed" && erro.status === 400) {
     erro = new AppError("JSON invalido", 400, "JSON_INVALIDO");
@@ -15,6 +15,8 @@ function tratarErros(erro, req, res, next) {
   const mensagem = erroOperacional
     ? erro.message
     : "Ocorreu um erro interno inesperado";
+
+  if (req.app.locals.defesaAtiva) await req.app.locals.defesaAtiva.registrarErro(req, codigo, statusCode);
 
   if (statusCode >= 500 && logger) {
     logger.error({ err: erro, codigo: codigo }, "Falha ao processar requisicao");

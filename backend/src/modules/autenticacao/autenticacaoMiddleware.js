@@ -28,6 +28,7 @@ function criarAutenticacaoMiddleware(autenticacaoRepository, configuracao) {
         tokenHash: sessao.tokenHash,
         expiraEm: sessao.expiraEm
       };
+      if (req.app.locals.defesaAtiva?.verificar(req, res)) return;
       next();
     } catch (erro) {
       next(erro);

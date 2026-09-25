@@ -17,6 +17,7 @@ const configuracaoTeste = Object.assign({}, configuracaoBase, {
   ambiente: "test",
   confiarProxy: false,
   nivelDeLog: "silent",
+  defesa: {...configuracaoBase.defesa, chaveEvidencia: require("node:crypto").randomBytes(32).toString("hex")},
   banco: Object.assign({}, configuracaoBase.banco, { nome: nomeBancoTeste }),
   seguranca: Object.assign({}, configuracaoBase.seguranca, {
     limiteAutenticacao: 20,

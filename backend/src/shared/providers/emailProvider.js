@@ -12,6 +12,7 @@ function criarEmailProviderNaoConfigurado(logger) {
   }
   return {
     enviarRecuperacaoSenha: informarPendencia,
+    enviarAlertaSeguranca: informarPendencia,
     enviarSuporte: informarPendencia
   };
 }
@@ -76,6 +77,10 @@ function criarEmailProviderSmtp(configuracao) {
         ].join("\n")
       });
     },
+    enviarAlertaSeguranca: async function enviarAlerta(dados) {
+      await transportador.sendMail({ from: configuracao.remetente, to: dados.destinatario,
+        subject: "PLANTEL SECURITY - bloqueio temporario", text: dados.texto });
+    },
     verificarConexao: function verificarConexao() {
       return transportador.verify();
     }
@@ -99,6 +104,9 @@ function criarEmailProviderFake() {
     },
     enviarSuporte: async function armazenarMensagemDeSuporte(dados) {
       mensagens.push(Object.assign({ tipo: "suporte" }, dados));
+    },
+    enviarAlertaSeguranca: async function armazenarAlerta(dados) {
+      mensagens.push(Object.assign({ tipo: "seguranca" }, dados));
     },
     obterMensagens: function obterMensagens() {
       return mensagens.slice();

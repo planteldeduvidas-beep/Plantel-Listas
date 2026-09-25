@@ -10,6 +10,7 @@ const AppError = require("./shared/errors/AppError");
 const tratarRotaNaoEncontrada = require("./shared/middlewares/tratarRotaNaoEncontrada");
 const tratarErros = require("./shared/middlewares/tratarErros");
 const criarRateLimiters = require("./shared/middlewares/criarRateLimiters");
+const criarDefesaService = require("./modules/seguranca/defesaService");
 const { criarEmailProviderNaoConfigurado } = require("./shared/providers/emailProvider");
 const criarUsuarioRepository = require("./modules/usuarios/usuarioRepository");
 const criarAutenticacaoRepository = require("./modules/autenticacao/autenticacaoRepository");
@@ -291,6 +292,13 @@ function criarAplicacao(configuracao, logger, dependenciasInformadas) {
     }
   }));
   aplicacao.use(helmet());
+  // A suite dedicada habilita o caminho completo; doubles legados nao possuem o schema.
+  if (dependencias.pool && configuracao.defesa?.habilitada
+      && (configuracao.ambiente !== "test" || dependencias.ativarDefesaEmTeste)) {
+    const defesa = criarDefesaService({ pool: dependencias.pool, configuracao, logger, emailProvider: dependencias.emailProvider, relogio: dependencias.relogioDefesa });
+    aplicacao.locals.defesaAtiva = defesa;
+    aplicacao.use(defesa.entrada);
+  }
   aplicacao.use(cors(criarConfiguracaoCors(configuracao)));
   aplicacao.use(express.json({ limit: "100kb" }));
   aplicacao.use(cookieParser());

@@ -9,6 +9,7 @@ async function iniciarServidor() {
   let configuracao;
   let logger;
   let pool;
+  let defesa;
 
   try {
     configuracao = obterConfiguracao();
@@ -21,6 +22,8 @@ async function iniciarServidor() {
       pool: pool,
       emailProvider: emailProvider
     });
+    defesa = aplicacao.locals.defesaAtiva;
+    await defesa?.iniciar();
     await aplicacao.locals.integracaoGoogleDriveService
       .recuperarSincronizacoesInterrompidas();
     await aplicacao.locals.gestaoMateriaisService
@@ -69,6 +72,7 @@ async function iniciarServidor() {
             });
           });
         } finally {
+          await defesa?.parar();
           await pool.end();
         }
       })().catch(function registrarFalha(erro) {
@@ -100,6 +104,7 @@ async function iniciarServidor() {
     }
 
     process.exitCode = 1;
+    await defesa?.parar();
     if (pool) {
       await pool.end().catch(function ignorarFalhaAoFecharPool() {});
     }
