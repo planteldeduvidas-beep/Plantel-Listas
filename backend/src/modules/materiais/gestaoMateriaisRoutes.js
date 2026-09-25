@@ -2,12 +2,19 @@ const express=require("express");
 const impedirCachePrivado=require("../../shared/middlewares/impedirCachePrivado");
 const {protegerContraCsrf}=require("../../shared/middlewares/protegerCsrf");
 const criarUpload=require("./uploadMaterialMiddleware");
+const AppError=require("../../shared/errors/AppError");
 
 function criarGestaoMateriaisRoutes(dependencias){
   const router=express.Router();
   const upload=criarUpload(dependencias.configuracao);
   router.use(impedirCachePrivado);
   router.use(dependencias.autenticar);
+  router.use(function autorizarGestaoAntesDoUpload(req,res,next){
+    if (!req.usuario || !["professor","admin"].includes(req.usuario.papel)) {
+      return next(new AppError("Usuario sem permissao",403,"SEM_PERMISSAO"));
+    }
+    next();
+  });
   router.get("/pastas",dependencias.controller.listarPastas);
   router.post("/pastas",protegerContraCsrf,dependencias.controller.criarPasta);
   router.patch("/pastas/:categoriaId/nome",protegerContraCsrf,dependencias.controller.renomearPasta);

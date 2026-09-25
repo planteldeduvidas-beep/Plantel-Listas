@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const pinoHttp = require("pino-http");
+const { serializarErroSeguro } = require("./shared/config/logger");
 const cookieParser = require("cookie-parser");
 const AppError = require("./shared/errors/AppError");
 const tratarRotaNaoEncontrada = require("./shared/middlewares/tratarRotaNaoEncontrada");
@@ -221,6 +222,7 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   aplicacao.use("/api/acervo", criarAcervoRoutes({
     controller: criarAcervoController(acervoService),
     autenticar: autenticar,
+    rateLimiterConsulta: rateLimiters.consultaAcervo,
     autorizarAdmin: autorizarAdmin
   }));
   aplicacao.use("/api/gestao-materiais", criarGestaoMateriaisRoutes({
@@ -281,7 +283,8 @@ function criarAplicacao(configuracao, logger, dependenciasInformadas) {
   aplicacao.use(pinoHttp({
     logger: logger,
     serializers: {
-      req: serializarRequisicaoParaLog
+      req: serializarRequisicaoParaLog,
+      err: serializarErroSeguro
     },
     genReqId: function gerarIdDaRequisicao() {
       return crypto.randomUUID();

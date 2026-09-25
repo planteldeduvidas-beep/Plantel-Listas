@@ -1,6 +1,12 @@
 const AppError = require("../errors/AppError");
 
 function tratarErros(erro, req, res, next) {
+  // Erros conhecidos do parser nao sao falhas internas nem devem registrar body.
+  if (erro.type === "entity.parse.failed" && erro.status === 400) {
+    erro = new AppError("JSON invalido", 400, "JSON_INVALIDO");
+  } else if (erro.type === "entity.too.large" && erro.status === 413) {
+    erro = new AppError("Corpo da requisicao muito grande", 413, "CORPO_MUITO_GRANDE");
+  }
   const configuracao = req.app.locals.configuracao;
   const logger = req.log || req.app.locals.logger;
   const erroOperacional = erro instanceof AppError && erro.operacional;

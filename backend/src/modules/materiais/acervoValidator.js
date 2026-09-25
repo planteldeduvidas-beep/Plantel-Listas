@@ -10,7 +10,7 @@ function lerInteiroPositivo(valor, nome, opcional) {
   if ((valor === undefined || valor === "") && opcional) {
     return null;
   }
-  if (!/^\d+$/.test(String(valor || "")) || Number(valor) < 1) {
+  if (!/^\d+$/.test(String(valor || "")) || !Number.isSafeInteger(Number(valor)) || Number(valor) < 1) {
     throw new AppError(nome + " invalido", 400, "PARAMETRO_INVALIDO");
   }
   return Number(valor);
@@ -39,7 +39,7 @@ function validarConsulta(query) {
   if (tipo && !["pdf", "video"].includes(tipo)) {
     throw new AppError("Tipo de arquivo invalido", 400, "PARAMETRO_INVALIDO");
   }
-  if (!ORDENACOES[ordenar]) {
+  if (typeof ordenar !== "string" || !Object.hasOwn(ORDENACOES, ordenar)) {
     throw new AppError("Ordenacao invalida", 400, "PARAMETRO_INVALIDO");
   }
 

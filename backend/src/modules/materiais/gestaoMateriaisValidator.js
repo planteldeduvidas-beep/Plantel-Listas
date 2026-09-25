@@ -3,7 +3,7 @@ const fs = require("node:fs/promises");
 const AppError = require("../../shared/errors/AppError");
 
 function inteiroPositivo(valor, nome) {
-  if (!/^\d+$/.test(String(valor || "")) || Number(valor) < 1) {
+  if (!/^\d+$/.test(String(valor || "")) || !Number.isSafeInteger(Number(valor)) || Number(valor) < 1) {
     throw new AppError(nome + " invalido", 400, "DADOS_INVALIDOS");
   }
   return Number(valor);
