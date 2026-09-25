@@ -8,6 +8,7 @@ import {
 } from "./api.js";
 import { Esqueleto, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, obterPastaDaUrl } from "./navegacao.js";
+import SeletorPasta from "./SeletorPasta.jsx";
 
 function tamanhoAmigavel(bytes) {
   if (bytes === null || bytes === undefined) return "Tamanho não informado";
@@ -41,6 +42,7 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   const [mostrarNovaPasta, definirMostrarNovaPasta] = useState(false);
   const [nomeNovaPasta, definirNomeNovaPasta] = useState("");
   const [paiNovaPasta, definirPaiNovaPasta] = useState("");
+  const [pastaEnvioId, definirPastaEnvioId] = useState("");
   const [ocupado, definirOcupado] = useState(false);
   const [materialParaExcluir, definirMaterialParaExcluir] = useState(null);
   const [textoExclusao, definirTextoExclusao] = useState("");
@@ -53,6 +55,12 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   useEffect(function carregarGestao() {
     carregarLixeira().catch(function falhou(falha) { aoErro(falha.message); });
   }, []);
+  useEffect(function sugerirPastaAtual() {
+    definirPastaEnvioId(function manterEscolhaAnterior(atual) {
+      if (pastas.some(function mesma(item) { return String(item.id) === String(atual); })) return atual;
+      return categoriaAtual && pastas.some(function mesma(item) { return item.id === categoriaAtual; }) ? String(categoriaAtual) : "";
+    });
+  }, [categoriaAtual, pastas]);
 
   async function executar(acao, mensagem) {
     definirOcupado(true);
@@ -104,8 +112,8 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
 
   return <section className="painel-gestao-materiais">
     <div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais da biblioteca."}</p></div><div className="acoes-gestao-pastas"><button type="button" className="botao-secundario" onClick={function alternar() { definirMostrarNovaPasta(!mostrarNovaPasta); }}><Icone nome={mostrarNovaPasta ? "fechar" : "mais"} />{mostrarNovaPasta ? "Cancelar" : "Nova pasta"}</button><button type="button" className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div></div>
-    {mostrarNovaPasta && <form className="formulario-material" onSubmit={criarPasta}><label>Nome da nova pasta<input required maxLength="120" value={nomeNovaPasta} onChange={function mudar(evento) { definirNomeNovaPasta(evento.target.value); }} /></label><label>Criar dentro de<select required value={paiNovaPasta} onChange={function mudar(evento) { definirPaiNovaPasta(evento.target.value); }}><option value="" disabled>Escolha uma pasta autorizada</option>{pastas.filter(function permitida(item) { return item.podeCriar; }).map(function opcao(item) { return <option key={item.id} value={item.id}>{item.caminho}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Criando..." : "Criar pasta"}</button></form>}
-    {mostrarEnvio && <form className="formulario-material" onSubmit={enviar}><label>Arquivo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><label>Adicionar na pasta<select required name="categoriaId" defaultValue={categoriaAtual && pastas.some(function mesma(item) { return item.id === categoriaAtual; }) ? categoriaAtual : ""}><option value="" disabled>Escolha uma pasta</option>{pastas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.caminho}</option>; })}</select></label><label>Nome do material <small>(opcional)</small><input name="nome" placeholder="Usar o nome do arquivo" /></label><label>Disciplina <small>(opcional)</small><select name="disciplinaId" defaultValue=""><option value="">Não informar</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><label>Concurso <small>(opcional)</small><select name="concursoId" defaultValue=""><option value="">Não informar</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Enviando..." : "Adicionar material"}</button></form>}
+    {mostrarNovaPasta && <form className="formulario-material" onSubmit={criarPasta}><label>Nome da nova pasta<input required maxLength="120" value={nomeNovaPasta} onChange={function mudar(evento) { definirNomeNovaPasta(evento.target.value); }} /></label><SeletorPasta rotulo="Criar dentro de" pastas={pastas.filter(function permitida(item) { return item.podeCriar; })} valor={paiNovaPasta} aoAlterar={definirPaiNovaPasta} obrigatorio opcaoVazia="Escolha uma pasta autorizada" /><button type="submit" disabled={ocupado}>{ocupado ? "Criando..." : "Criar pasta"}</button></form>}
+    {mostrarEnvio && <form className="formulario-material" onSubmit={enviar}><label>Arquivo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><SeletorPasta rotulo="Adicionar na pasta" pastas={pastas} valor={pastaEnvioId} aoAlterar={definirPastaEnvioId} nome="categoriaId" obrigatorio /><label>Nome do material <small>(opcional)</small><input name="nome" placeholder="Usar o nome do arquivo" /></label><label>Disciplina <small>(opcional)</small><select name="disciplinaId" defaultValue=""><option value="">Não informar</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><label>Concurso <small>(opcional)</small><select name="concursoId" defaultValue=""><option value="">Não informar</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Enviando..." : "Adicionar material"}</button></form>}
     {usuario.papel === "admin" && <details className="lixeira-materiais"><summary><span><Icone nome="historico" /> Lixeira</span><span className="contador">{lixeira.length}</span></summary>{!lixeira.length && <Vazio titulo="A lixeira está vazia" texto="Os materiais enviados para cá aparecerão nesta lista." />}{lixeira.map(function itemLixeira(item) { return <article key={item.id}><div><strong>{item.nome}</strong><small>{item.pasta ? "Pasta anterior: " + item.pasta : "Pasta anterior indisponível"}</small>{item.exclusaoPendente && <small>Exclusão aguardando conclusão</small>}</div><div><button type="button" className="secundario" disabled={ocupado || item.exclusaoPendente} onClick={function restaurarItem() { restaurar(item); }}>Restaurar</button><button type="button" className="perigo" disabled={ocupado} onClick={function excluirItem() { definirMaterialParaExcluir(item); definirTextoExclusao(""); }}>{item.exclusaoPendente ? "Finalizar exclusão" : "Excluir definitivamente"}</button></div></article>; })}</details>}
     {materialParaExcluir && <Modal titulo="Excluir este arquivo definitivamente?" aoFechar={function fechar() { definirMaterialParaExcluir(null); }}><form onSubmit={excluir}><p>Essa ação não poderá ser desfeita. Digite <strong>EXCLUIR</strong> para confirmar.</p><label>Confirmação<input value={textoExclusao} onChange={function mudar(evento) { definirTextoExclusao(evento.target.value); }} autoFocus autoComplete="off" /></label><div className="acoes-formulario"><button type="submit" className="perigo" disabled={ocupado || textoExclusao !== "EXCLUIR"}>{ocupado ? "Excluindo..." : "Excluir definitivamente"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirMaterialParaExcluir(null); }}>Cancelar</button></div></form></Modal>}
   </section>;
@@ -164,7 +172,7 @@ function AcoesDeGestao({ material, pastas, aoAtualizar, aoErro, aoMensagem }) {
         <button type="button" className="acao-texto" disabled={ocupado} onClick={function mostrar() { definirSubstituindo(!substituindo); definirMovendo(false); }}>Trocar arquivo</button>
         <button type="button" className="acao-texto perigo-texto" disabled={ocupado} onClick={function confirmarLixeira() { definirModal("lixeira"); }}>Enviar para lixeira</button>
       </div>
-      {movendo && <form className="acao-inline" onSubmit={mover}><label>Mover para<select required value={destino} onChange={function mudar(evento) { definirDestino(evento.target.value); }}><option value="" disabled>Escolha uma pasta</option>{pastas.filter(function diferente(item) { return item.id !== categoriaId; }).map(function opcao(item) { return <option key={item.id} value={item.id}>{item.caminho}</option>; })}</select></label><button type="submit" disabled={ocupado}>Mover material</button></form>}
+      {movendo && <form className="acao-inline" onSubmit={mover}><SeletorPasta rotulo="Mover para" pastas={pastas.filter(function diferente(item) { return item.id !== categoriaId; })} valor={destino} aoAlterar={definirDestino} obrigatorio /><button type="submit" disabled={ocupado}>Mover material</button></form>}
       {substituindo && <form className="acao-inline" onSubmit={substituir}><label>Novo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><button type="submit" disabled={ocupado}>Trocar arquivo</button></form>}
       {modal === "editar" && <Modal titulo="Editar nome" aoFechar={function fechar() { definirModal(null); }}><form onSubmit={editar}><label>Nome do material<input value={nomeEmEdicao} onChange={function mudar(evento) { definirNomeEmEdicao(evento.target.value); }} autoFocus required /></label><div className="acoes-formulario"><button type="submit" disabled={ocupado}>{ocupado ? "Salvando..." : "Salvar alteração"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirModal(null); }}>Cancelar</button></div></form></Modal>}
       {modal === "lixeira" && <Modal titulo="Enviar para a lixeira?" aoFechar={function fechar() { definirModal(null); }}><form onSubmit={lixeira}><p>O material deixará de aparecer na biblioteca, mas um administrador poderá restaurá-lo.</p><div className="acoes-formulario"><button type="submit" className="perigo" disabled={ocupado}>{ocupado ? "Enviando..." : "Enviar para a lixeira"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirModal(null); }}>Cancelar</button></div></form></Modal>}
@@ -182,7 +190,7 @@ function resumoPasta(pasta) {
   return resumoPastas + " · " + resumoMateriais;
 }
 
-function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar, podeRenomear, aoRenomear }) {
+function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar, podeRenomear, aoRenomear, resultadoDeBusca }) {
   const [editando, definirEditando] = useState(false);
   const [disciplina, definirDisciplina] = useState(valorInicial(pasta, "disciplina"));
   const [concurso, definirConcurso] = useState(valorInicial(pasta, "concurso"));
@@ -194,7 +202,7 @@ function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar, podeRenomear, 
     definirEditando(false);
   }
   return <article className="item-pasta">
-    <button type="button" className="abrir-pasta" onClick={function abrir() { aoAbrir(pasta.id); }}><span className="icone-item" aria-hidden="true"><Icone nome="pasta" tamanho={24} /></span><span><strong>{pasta.nome}</strong><small>{resumoPasta(pasta)}</small></span><Icone nome="chevron" /></button>
+    <button type="button" className="abrir-pasta" onClick={function abrir() { aoAbrir(pasta.id); }}><span className="icone-item" aria-hidden="true"><Icone nome="pasta" tamanho={24} /></span><span><strong>{pasta.nome}</strong><small>{resultadoDeBusca ? pasta.caminho : resumoPasta(pasta)}</small></span><Icone nome="chevron" /></button>
     {(pasta.disciplina || pasta.concurso) && <div className="etiquetas">{pasta.disciplina && <span>{pasta.disciplina.nome}</span>}{pasta.concurso && <span>{pasta.concurso.nome}</span>}</div>}
     {podeRenomear && <div className="gestao-pasta">{!renomeando ? <button type="button" className="acao-texto" onClick={function abrirRenomeacao() { definirNomeNovo(pasta.nome); definirRenomeando(true); }}>Renomear pasta</button> : <form onSubmit={async function salvarNome(evento) { evento.preventDefault(); const sucesso=await aoRenomear(pasta.id,nomeNovo); if(sucesso)definirRenomeando(false); }}><label>Novo nome<input required maxLength="120" value={nomeNovo} onChange={function mudar(evento) { definirNomeNovo(evento.target.value); }} /></label><button type="submit">Salvar</button><button type="button" className="secundario" onClick={function cancelar() { definirRenomeando(false); }}>Cancelar</button></form>}</div>}
     {usuario.papel === "admin" && <div className="classificacao-pasta">{!editando && <button type="button" className="acao-texto" onClick={function editar() { definirEditando(true); }}>Organizar pasta</button>}{editando && <form onSubmit={salvar}><label>Disciplina<select value={disciplina} onChange={function mudar(evento) { definirDisciplina(evento.target.value); }}><OpcoesClassificacao itens={filtros.disciplinas} /></select></label><label>Concurso<select value={concurso} onChange={function mudar(evento) { definirConcurso(evento.target.value); }}><OpcoesClassificacao itens={filtros.concursos} /></select></label><div><button type="submit">Salvar</button><button type="button" className="secundario" onClick={function cancelar() { definirEditando(false); }}>Cancelar</button></div></form>}</div>}
@@ -304,7 +312,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
           </span>
         )}
         {dados && <div className="resumo-biblioteca" aria-label="Resumo desta visualização">
-          <span className="dado-resumo"><i aria-hidden="true"><Icone nome="pasta" tamanho={23} /></i><small><strong>{dados.pastas.length.toLocaleString("pt-BR")}</strong>{dados.pastas.length === 1 ? "pasta visível" : "pastas visíveis"}</small></span>
+          <span className="dado-resumo"><i aria-hidden="true"><Icone nome="pasta" tamanho={23} /></i><small><strong>{(dados.paginacaoPastas?.totalItens ?? dados.pastas.length).toLocaleString("pt-BR")}</strong>{(dados.paginacaoPastas?.totalItens ?? dados.pastas.length) === 1 ? "pasta visível" : "pastas visíveis"}</small></span>
           <span className="dado-resumo"><i aria-hidden="true"><Icone nome="acervo" tamanho={23} /></i><small><strong>{dados.paginacao.totalItens.toLocaleString("pt-BR")}</strong>{dados.paginacao.totalItens === 1 ? "material encontrado" : "materiais encontrados"}</small></span>
         </div>}
       </div>
@@ -347,8 +355,8 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
         <>
           {dados.pastas.length > 0 && (
             <section className="grupo-resultados">
-              <div className="titulo-grupo"><div><span className="sobrelinha">Navegue</span><h3>Pastas</h3></div><span className="contador">{dados.pastas.length}</span></div>
-              <div className="grade-pastas">{dados.pastas.map(function pasta(item) { return <Pasta key={item.id} pasta={item} aoAbrir={abrirPasta} usuario={usuario} filtros={filtros} aoClassificar={salvarClassificacao} podeRenomear={usuario.papel === "admin" || pastasGerenciaveis.some(function autorizada(pasta) { return pasta.id === item.id; })} aoRenomear={salvarNomePasta} />; })}</div>
+              <div className="titulo-grupo"><div><span className="sobrelinha">Navegue</span><h3>Pastas</h3></div><span className="contador">{dados.paginacaoPastas?.totalItens ?? dados.pastas.length}</span></div>
+              <div className="grade-pastas">{dados.pastas.map(function pasta(item) { return <Pasta key={item.id} pasta={item} aoAbrir={abrirPasta} usuario={usuario} filtros={filtros} aoClassificar={salvarClassificacao} podeRenomear={usuario.papel === "admin" || pastasGerenciaveis.some(function autorizada(pasta) { return pasta.id === item.id; })} aoRenomear={salvarNomePasta} resultadoDeBusca={dados.paginacaoPastas?.pesquisadas} />; })}</div>
             </section>
           )}
 
@@ -372,7 +380,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
           </section>
 
           {!dados.pastas.length && !dados.materiais.length && <Vazio titulo={possuiFiltros ? "Nenhum resultado para estes filtros" : categoriaId ? "Esta pasta ainda está vazia" : "Nenhum material disponível"} texto={possuiFiltros ? "Remova um filtro ou tente um termo mais amplo." : categoriaId ? "Quando um material for adicionado, ele aparecerá aqui." : "Os materiais aparecerão aqui assim que estiverem disponíveis."} acao={possuiFiltros ? <button type="button" className="secundario" onClick={limparFiltros}>Limpar filtros</button> : null} />}
-          {dados.paginacao.totalPaginas > 1 && <nav className="paginacao" aria-label="Páginas dos materiais"><button type="button" className="secundario" disabled={dados.paginacao.pagina <= 1} onClick={function anterior() { definirPagina(pagina - 1); }}><Icone nome="voltar" />Anterior</button><span>Página <strong>{dados.paginacao.pagina}</strong> de {dados.paginacao.totalPaginas}</span><button type="button" className="secundario" disabled={dados.paginacao.pagina >= dados.paginacao.totalPaginas} onClick={function proxima() { definirPagina(pagina + 1); }}>Próxima<Icone nome="chevron" /></button></nav>}
+          {(dados.paginacaoResultados?.totalPaginas ?? dados.paginacao.totalPaginas) > 1 && <nav className="paginacao" aria-label="Páginas dos resultados"><button type="button" className="secundario" disabled={dados.paginacao.pagina <= 1} onClick={function anterior() { definirPagina(pagina - 1); }}><Icone nome="voltar" />Anterior</button><span>Página <strong>{dados.paginacao.pagina}</strong> de {dados.paginacaoResultados?.totalPaginas ?? dados.paginacao.totalPaginas}</span><button type="button" className="secundario" disabled={dados.paginacao.pagina >= (dados.paginacaoResultados?.totalPaginas ?? dados.paginacao.totalPaginas)} onClick={function proxima() { definirPagina(pagina + 1); }}>Próxima<Icone nome="chevron" /></button></nav>}
         </>
       )}
 

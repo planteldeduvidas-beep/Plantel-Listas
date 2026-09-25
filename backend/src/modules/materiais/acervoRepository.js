@@ -21,6 +21,7 @@ function mapearPasta(registro) {
   return {
     id: Number(registro.id),
     nome: registro.nome,
+    caminho: registro.caminho_texto || registro.nome,
     descricao: registro.descricao,
     quantidadePastas: Number(registro.quantidade_pastas || 0),
     quantidadeMateriais: Number(registro.quantidade_materiais || 0),
@@ -101,6 +102,40 @@ function criarAcervoRepository(pool) {
       [categoriaId]
     );
     return registros.map(mapearPasta);
+  }
+
+  async function pesquisarPastas(filtros) {
+    const condicoes = [];
+    const parametros = [];
+    if (filtros.categoriaId) {
+      condicoes.push("a.id<>?");
+      parametros.push(filtros.categoriaId);
+    }
+    if (filtros.busca) {
+      condicoes.push("(a.nome LIKE ? OR a.caminho_texto LIKE ? OR a.descricao LIKE ? OR d.nome LIKE ? OR c.nome LIKE ?)");
+      for (let indice = 0; indice < 5; indice += 1) parametros.push("%" + filtros.busca + "%");
+    }
+    if (filtros.disciplinaId) { condicoes.push("a.disciplina_efetiva_id=?"); parametros.push(filtros.disciplinaId); }
+    if (filtros.concursoId) { condicoes.push("a.concurso_efetivo_id=?"); parametros.push(filtros.concursoId); }
+    const ativas = ",pastas_ativas AS (SELECT id FROM categorias WHERE categoria_pai_id IS NULL AND ativo=1 "
+      + "UNION ALL SELECT f.id FROM categorias f INNER JOIN pastas_ativas p ON p.id=f.categoria_pai_id WHERE f.ativo=1) ";
+    const alcance = filtros.categoriaId
+      ? ",pastas_alcance AS (SELECT id FROM categorias WHERE id=? UNION ALL "
+        + "SELECT f.id FROM categorias f INNER JOIN pastas_alcance p ON p.id=f.categoria_pai_id) "
+      : "";
+    const origem = " FROM arvore a INNER JOIN pastas_ativas pa ON pa.id=a.id "
+      + (filtros.categoriaId ? "INNER JOIN pastas_alcance alcance ON alcance.id=a.id " : "")
+      + "LEFT JOIN disciplinas d ON d.id=a.disciplina_efetiva_id AND d.ativo=1 "
+      + "LEFT JOIN concursos c ON c.id=a.concurso_efetivo_id AND c.ativo=1 WHERE " + condicoes.join(" AND ");
+    const valores = (filtros.categoriaId ? [filtros.categoriaId] : []).concat(parametros);
+    const [totais] = await pool.execute(criarArvoreSql() + ativas + alcance + "SELECT COUNT(*) AS total" + origem, valores);
+    const ordem = filtros.ordenar === "nome_desc" ? "a.nome DESC,a.caminho_texto DESC,a.id DESC" : "a.nome ASC,a.caminho_texto ASC,a.id ASC";
+    const [registros] = await pool.execute(
+      criarArvoreSql() + ativas + alcance + "SELECT a.*,d.nome AS disciplina_nome,c.nome AS concurso_nome,0 AS quantidade_pastas,0 AS quantidade_materiais"
+        + origem + " ORDER BY " + ordem + " LIMIT ? OFFSET ?",
+      valores.concat([filtros.limite, (filtros.pagina - 1) * filtros.limite])
+    );
+    return { itens: registros.map(mapearPasta), total: Number(totais[0].total) };
   }
 
   function criarCondicoes(filtros) {
@@ -274,6 +309,7 @@ function criarAcervoRepository(pool) {
     buscarCategoria: buscarCategoria,
     listarBreadcrumb: listarBreadcrumb,
     listarPastas: listarPastas,
+    pesquisarPastas: pesquisarPastas,
     listarMateriais: listarMateriais,
     listarFiltros: listarFiltros,
     buscarMaterialDisponivel: buscarMaterialDisponivel,

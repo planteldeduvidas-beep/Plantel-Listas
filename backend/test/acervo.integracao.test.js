@@ -268,6 +268,51 @@ test("download usa anexo e nome seguro e material indisponivel nao e entregue", 
   assert.equal(ausente.status, 404);
 });
 
+test("busca pastas por nome, caminho e acento com resultados mistos e paginacao", async function testarBuscaDePastas() {
+  const [outraRaiz] = await pool.execute("INSERT INTO categorias (nome,drive_pasta_id) VALUES ('EFOMM','driveBuscaEfomm')");
+  const [matematicaEfomm] = await pool.execute("INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id) VALUES ('Matemática',?,'driveBuscaMatEfomm')", [outraRaiz.insertId]);
+  const [matematicaListas] = await pool.execute("INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id) VALUES ('Matemática',?,'driveBuscaMatListas')", [categoriaId]);
+  await pool.execute("INSERT INTO materiais (drive_file_id,categoria_id,nome,mime_type,tipo,extensao) VALUES ('driveBuscaVideo',?,'Aula de Matemática','video/mp4','video','mp4')", [matematicaEfomm.insertId]);
+  await pool.execute("UPDATE materiais SET nome='Lista de Matemática.pdf' WHERE id=?", [materialId]);
+  const { agente } = await autenticar("aluno");
+  const resposta = await agente.get("/api/acervo?busca=" + encodeURIComponent("matemática") + "&limite=1");
+  assert.equal(resposta.status, 200);
+  assert.equal(resposta.body.paginacaoPastas.totalItens, 3);
+  assert.equal(resposta.body.paginacaoResultados.totalPaginas, 3);
+  assert.equal(resposta.body.pastas.length, 1);
+  assert.ok(resposta.body.paginacao.totalItens >= 2);
+  const segunda = await agente.get("/api/acervo?busca=" + encodeURIComponent("MATEMATICA") + "&limite=1&pagina=2");
+  assert.equal(segunda.status, 200);
+  const terceira = await agente.get("/api/acervo?busca=Matem%C3%A1tica&limite=1&pagina=3");
+  assert.deepEqual(new Set([resposta.body.pastas[0].caminho, segunda.body.pastas[0].caminho, terceira.body.pastas[0].caminho]), new Set(["EFOMM / Matemática", "Listas", "Listas / Matemática"]));
+  const porCaminho = await agente.get("/api/acervo?busca=EFOMM");
+  assert.equal(porCaminho.status, 200);
+  assert.ok(porCaminho.body.pastas.some(function corresponde(pasta) { return pasta.id === Number(matematicaEfomm.insertId); }));
+  const parcial = await agente.get("/api/acervo?busca=EFOM");
+  assert.equal(parcial.status, 200);
+  assert.ok(parcial.body.pastas.some(function corresponde(pasta) { return pasta.caminho === "EFOMM / Matemática"; }));
+  const noRamo = await agente.get("/api/acervo?categoriaId=" + outraRaiz.insertId + "&busca=Mat");
+  assert.equal(noRamo.status, 200);
+  assert.deepEqual(noRamo.body.pastas.map(function identificar(pasta) { return pasta.id; }), [Number(matematicaEfomm.insertId)]);
+  const clique = await agente.get("/api/acervo?categoriaId=" + matematicaEfomm.insertId);
+  assert.deepEqual(clique.body.breadcrumb, [{ id: Number(outraRaiz.insertId), nome: "EFOMM" }, { id: Number(matematicaEfomm.insertId), nome: "Matemática" }]);
+  assert.equal(clique.body.materiais[0].tipo, "video");
+  assert.notEqual(Number(matematicaListas.insertId), Number(matematicaEfomm.insertId));
+});
+
+test("filtros incluem pastas classificadas, mas ocultam ramos desativados", async function testarFiltrosDePastas() {
+  const [classificada] = await pool.execute("INSERT INTO categorias (nome,drive_pasta_id,disciplina_id,disciplina_estado) VALUES ('Álgebra','driveBuscaAlgebra',?,'definida')", [disciplinaId]);
+  const [oculta] = await pool.execute("INSERT INTO categorias (nome,drive_pasta_id,ativo) VALUES ('Oculta','driveBuscaOculta',0)");
+  await pool.execute("INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id,ativo) VALUES ('Matemática',?,'driveBuscaFilhaOculta',1)", [oculta.insertId]);
+  const { agente } = await autenticar("aluno");
+  const filtrada = await agente.get("/api/acervo?disciplinaId=" + disciplinaId);
+  assert.equal(filtrada.status, 200);
+  assert.ok(filtrada.body.pastas.some(function mesma(pasta) { return pasta.id === Number(classificada.insertId); }));
+  const busca = await agente.get("/api/acervo?busca=Matemática");
+  assert.equal(busca.status, 200);
+  assert.ok(!busca.body.pastas.some(function oculta(pasta) { return pasta.caminho.includes("Oculta"); }));
+});
+
 test("meu historico registra uso do aluno, isola usuarios e oculta material indisponivel", async function testarMeuHistorico() {
   const aluno = await autenticar("aluno");
   const professor = await autenticar("professor");

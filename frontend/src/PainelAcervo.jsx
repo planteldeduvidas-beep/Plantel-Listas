@@ -15,6 +15,7 @@ import {
   obterStatusDasAtualizacoesGoogleDrive
 } from "./api.js";
 import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
+import SeletorPasta from "./SeletorPasta.jsx";
 import AdministracaoFase7 from "./AdministracaoFase7.jsx";
 import MeuHistorico from "./MeuHistorico.jsx";
 import Suporte from "./Suporte.jsx";
@@ -511,6 +512,14 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
   const categoriasAtivas = categorias.filter(function filtrarCategoria(item) {
     return item.ativo;
   });
+  const mapaCategorias = new Map(categorias.map(function indexar(item) { return [item.id, item]; }));
+  const pastasParaSelecao = categoriasAtivas.filter(function removerAtual(item) { return item.id !== categoriaEmEdicao; }).map(function comCaminho(item) {
+    const partes = [item.nome];
+    const vistos = new Set([item.id]);
+    let pai = mapaCategorias.get(item.categoriaPaiId);
+    while (pai && !vistos.has(pai.id)) { partes.unshift(pai.nome); vistos.add(pai.id); pai = mapaCategorias.get(pai.categoriaPaiId); }
+    return { id: item.id, nome: item.nome, caminho: partes.join(" / ") };
+  });
   const termoPastasAdmin = buscaPastasAdmin.trim().toLocaleLowerCase("pt-BR");
   const categoriasFiltradasAdmin = termoPastasAdmin
     ? categorias.filter(function localizarCategoria(item) {
@@ -641,7 +650,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
                 <h4>{categoriaEmEdicao ? "Editar pasta" : "Nova pasta"}</h4>
                 <label>Nome da pasta<input value={nomeCategoria} onChange={function atualizar(evento) { definirNomeCategoria(evento.target.value); }} required /></label>
                 <label>Descrição (opcional)<input value={descricaoCategoria} onChange={function atualizar(evento) { definirDescricaoCategoria(evento.target.value); }} maxLength="500" /></label>
-                <label>Criar dentro de<select value={categoriaPaiId} onChange={function atualizar(evento) { definirCategoriaPaiId(evento.target.value); }}><option value="">Nenhuma pasta (nível principal)</option>{categoriasAtivas.filter(function removerAtual(item) { return item.id !== categoriaEmEdicao; }).map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label>
+                <SeletorPasta rotulo="Criar dentro de" pastas={pastasParaSelecao} valor={categoriaPaiId} aoAlterar={definirCategoriaPaiId} opcaoVazia="Nenhuma pasta (nível principal)" />
                 <div className="acoes-formulario"><button type="submit">{categoriaEmEdicao ? "Salvar alterações" : "Criar pasta"}</button><button type="button" className="secundario" onClick={limparCategoria}>Cancelar</button></div>
               </form>
             )}

@@ -6940,3 +6940,11 @@ textarea {
 @media (max-width: 480px) {
   .area-estatisticas .administracao-fase7 > .bloco-admin { padding: 16px; }
 }
+
+.seletor-pasta { display: grid; gap: 10px; min-width: 0; }
+.seletor-pasta label { display: grid; gap: 6px; min-width: 0; }
+.seletor-pasta input, .seletor-pasta select { width: 100%; min-width: 0; }
+.seletor-pasta > small { color: var(--cor-texto-secundario, #66736e); font-size: 0.78rem; }
+.formulario-material .seletor-pasta, .formulario-edicao .seletor-pasta, .acao-inline .seletor-pasta { width: 100%; }
+.formulario-material { align-items: start; }
+.grade-pastas .abrir-pasta small { overflow-wrap: anywhere; }

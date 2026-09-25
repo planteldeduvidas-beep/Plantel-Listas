@@ -41,17 +41,20 @@ function criarAcervoService(dependencias) {
         throw new AppError("Pasta nao encontrada", 404, "PASTA_NAO_ENCONTRADA");
       }
     }
+    const pesquisarPastas = Boolean(filtros.busca || filtros.disciplinaId || filtros.concursoId);
     const resultados = await Promise.all([
       repository.listarBreadcrumb(filtros.categoriaId),
-      filtros.busca ? Promise.resolve([]) : repository.listarPastas(filtros.categoriaId),
+      pesquisarPastas ? repository.pesquisarPastas(filtros) : repository.listarPastas(filtros.categoriaId),
       repository.listarMateriais(filtros),
       repository.listarFiltros()
     ]);
     const totalPaginas = Math.max(1, Math.ceil(resultados[2].total / filtros.limite));
+    const totalPastas = pesquisarPastas ? resultados[1].total : resultados[1].length;
+    const paginasPastas = pesquisarPastas ? Math.max(1, Math.ceil(totalPastas / filtros.limite)) : 1;
     await registrarTelemetria(function registrar() { return analyticsService.registrarConsulta(usuario.id, filtros); });
     return {
       breadcrumb: resultados[0],
-      pastas: resultados[1],
+      pastas: pesquisarPastas ? resultados[1].itens : resultados[1],
       materiais: resultados[2].itens,
       paginacao: {
         pagina: filtros.pagina,
@@ -59,6 +62,8 @@ function criarAcervoService(dependencias) {
         totalItens: resultados[2].total,
         totalPaginas: totalPaginas
       },
+      paginacaoPastas: { pagina: filtros.pagina, limite: filtros.limite, totalItens: totalPastas, totalPaginas: paginasPastas, pesquisadas: pesquisarPastas },
+      paginacaoResultados: { pagina: filtros.pagina, totalPaginas: Math.max(totalPaginas, paginasPastas) },
       filtros: resultados[3]
     };
   }
