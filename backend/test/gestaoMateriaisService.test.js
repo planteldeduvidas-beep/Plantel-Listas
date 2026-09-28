@@ -11,6 +11,47 @@ function material() {
   return { id: 1, nome: "original.pdf", driveFileId: "driveOriginal", driveParentFileId: "drivePasta", categoriaId: 10, categoriaDriveId: "drivePasta", estado: "disponivel", versao: 1 };
 }
 
+test("exclusao de pasta compensa falha SQL e respeita commit incerto",async function () {
+  for (const incerto of [false,true]) {
+    const chamadas=[]; const fases=[];
+    const erro=new Error("falha SQL"); if(incerto) erro.estadoCommit="desconhecido";
+    const dependencias=criarDependencias({repository:{
+      pastaPossuiConteudo:async()=>false,
+      criarOperacaoDrive:async()=>{},atualizarOperacaoDrive:async()=>{},concluirOperacaoDrive:async()=>{},
+      registrarFalhaOperacaoDrive:async(chave,fase)=>fases.push(fase),
+      excluirPastaComConteudo:async()=>{throw erro;}
+    },provider:{pastaPossuiFilhos:async()=>false,alterarLixeira:async(token,id,estado)=>chamadas.push(estado)}});
+    await assert.rejects(dependencias.service.excluirPasta({id:2,papel:"admin"},10),/falha SQL/);
+    assert.deepEqual(chamadas,incerto?[true]:[true,false]);
+    assert.deepEqual(fases,incerto?["commit_incerto"]:[]);
+  }
+});
+
+test("exclusao de pasta protege papeis, raiz e escopo",async function () {
+  for (const cenario of ["professor","aluno","raiz","fora"]) {
+    let escritas=0;
+    const dependencias=criarDependencias({repository:{
+      buscarCategoria:async()=>({...categoria(10),drivePastaId:cenario==="raiz"?"driveRaiz":"drivePasta10"}),
+      pastaPossuiConteudo:async()=>cenario==="local"
+    },provider:{pastaPossuiFilhos:async()=>cenario==="remoto",verificarDescendenteDaRaiz:async()=>cenario!=="fora",alterarLixeira:async()=>{escritas++;}}});
+    await assert.rejects(dependencias.service.excluirPasta({id:2,papel:["professor","aluno"].includes(cenario)?cenario:"admin"},10));
+    assert.equal(escritas,0);
+  }
+});
+
+test("retoma pasta pendente conforme estado SQL confirmado",async function () {
+  for(const ativo of [true,false]) {
+    const chamadas=[];
+    const dependencias=criarDependencias({repository:{
+      buscarCategoria:async()=>({...categoria(10),ativo}),
+      listarOperacoesDrivePendentes:async()=>[{chave:"pasta-op",tipo:"pasta_lixeira",detalhes:{categoriaId:10,driveFileId:"drivePasta10"}}],
+      concluirOperacaoDrive:async()=>chamadas.push("concluida")
+    },provider:{alterarLixeira:async(token,id,estado)=>chamadas.push(estado)}});
+    assert.equal(await dependencias.service.recuperarOperacoesPendentes(),1);
+    assert.deepEqual(chamadas,[!ativo,"concluida"]);
+  }
+});
+
 function categoria(id) {
   return { id: id, nome: "Pasta", drivePastaId: "drivePasta" + id, ativo: true };
 }

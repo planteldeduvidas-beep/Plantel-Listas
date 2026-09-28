@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   consultarAcervo, obterUrlDoMaterial, classificarPasta,
   obterOrganizacaoAcervo, classificarPastas, listarPastasGerenciaveis,
-  criarPastaNoDrive, renomearPastaNoDrive,
+  criarPastaNoDrive, renomearPastaNoDrive, excluirPastaNoDrive,
   adicionarMaterial, editarMaterial, moverMaterial, substituirMaterial,
   enviarMaterialLixeira, listarLixeira, restaurarMaterial, excluirMaterial
 } from "./api.js";
@@ -190,7 +190,9 @@ function resumoPasta(pasta) {
   return resumoPastas + " · " + resumoMateriais;
 }
 
-function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar, podeRenomear, aoRenomear, resultadoDeBusca }) {
+function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar, podeRenomear, aoRenomear, aoExcluir, resultadoDeBusca }) {
+  const [confirmandoExclusao, definirConfirmandoExclusao] = useState(false);
+  const [excluindo, definirExcluindo] = useState(false);
   const [editando, definirEditando] = useState(false);
   const [disciplina, definirDisciplina] = useState(valorInicial(pasta, "disciplina"));
   const [concurso, definirConcurso] = useState(valorInicial(pasta, "concurso"));
@@ -202,6 +204,8 @@ function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar, podeRenomear, 
     definirEditando(false);
   }
   return <article className="item-pasta">
+    {usuario.papel === "admin" && <div className="gestao-pasta"><button type="button" className="acao-texto" onClick={function confirmar() { definirConfirmandoExclusao(true); }}>Excluir pasta</button></div>}
+    {confirmandoExclusao && <Modal titulo="Excluir pasta e todo o conteúdo?" aoFechar={function fechar() { if (!excluindo) definirConfirmandoExclusao(false); }}><p>A pasta <strong>{pasta.nome}</strong>, todos os arquivos e todas as subpastas serão enviados à lixeira do Google Drive e deixarão de aparecer na biblioteca.</p><p>Para recuperar, restaure a pasta no Google Drive e aguarde a sincronização.</p><div className="acoes-formulario"><button type="button" className="perigo" disabled={excluindo} onClick={async function excluir() { definirExcluindo(true); try { await aoExcluir(pasta.id); definirConfirmandoExclusao(false); } finally { definirExcluindo(false); } }}>{excluindo ? "Excluindo..." : "Excluir pasta e conteúdo"}</button><button type="button" className="botao-secundario" disabled={excluindo} onClick={function cancelar() { definirConfirmandoExclusao(false); }}>Cancelar</button></div></Modal>}
     <button type="button" className="abrir-pasta" onClick={function abrir() { aoAbrir(pasta.id); }}><span className="icone-item" aria-hidden="true"><Icone nome="pasta" tamanho={24} /></span><span><strong>{pasta.nome}</strong><small>{resultadoDeBusca ? pasta.caminho : resumoPasta(pasta)}</small></span><Icone nome="chevron" /></button>
     {(pasta.disciplina || pasta.concurso) && <div className="etiquetas">{pasta.disciplina && <span>{pasta.disciplina.nome}</span>}{pasta.concurso && <span>{pasta.concurso.nome}</span>}</div>}
     {podeRenomear && <div className="gestao-pasta">{!renomeando ? <button type="button" className="acao-texto" onClick={function abrirRenomeacao() { definirNomeNovo(pasta.nome); definirRenomeando(true); }}>Renomear pasta</button> : <form onSubmit={async function salvarNome(evento) { evento.preventDefault(); const sucesso=await aoRenomear(pasta.id,nomeNovo); if(sucesso)definirRenomeando(false); }}><label>Novo nome<input required maxLength="120" value={nomeNovo} onChange={function mudar(evento) { definirNomeNovo(evento.target.value); }} /></label><button type="submit">Salvar</button><button type="button" className="secundario" onClick={function cancelar() { definirRenomeando(false); }}>Cancelar</button></form>}</div>}
@@ -280,6 +284,11 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
     try { await renomearPastaNoDrive(id,nome); aoMensagem("Pasta renomeada no Google Drive."); await recarregarTudo(); return true; }
     catch (falha) { definirErro(mensagemHumana(falha)); return false; }
   }
+  async function excluirPasta(id) {
+    definirErro("");
+    try { await excluirPastaNoDrive(id); aoMensagem("Pasta enviada à lixeira do Google Drive."); await recarregarTudo(); return true; }
+    catch (falha) { definirErro(mensagemHumana(falha)); return false; }
+  }
   function alternar(id) { definirSelecionadas(function atualizar(atuais) { return atuais.includes(id) ? atuais.filter(function remover(item) { return item !== id; }) : atuais.concat(id); }); }
   async function salvarLote(evento) {
     evento.preventDefault();
@@ -356,7 +365,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
           {dados.pastas.length > 0 && (
             <section className="grupo-resultados">
               <div className="titulo-grupo"><div><span className="sobrelinha">Navegue</span><h3>Pastas</h3></div><span className="contador">{dados.paginacaoPastas?.totalItens ?? dados.pastas.length}</span></div>
-              <div className="grade-pastas">{dados.pastas.map(function pasta(item) { return <Pasta key={item.id} pasta={item} aoAbrir={abrirPasta} usuario={usuario} filtros={filtros} aoClassificar={salvarClassificacao} podeRenomear={usuario.papel === "admin" || pastasGerenciaveis.some(function autorizada(pasta) { return pasta.id === item.id; })} aoRenomear={salvarNomePasta} resultadoDeBusca={dados.paginacaoPastas?.pesquisadas} />; })}</div>
+              <div className="grade-pastas">{dados.pastas.map(function pasta(item) { return <Pasta key={item.id} pasta={item} aoAbrir={abrirPasta} usuario={usuario} filtros={filtros} aoClassificar={salvarClassificacao} podeRenomear={usuario.papel === "admin" || pastasGerenciaveis.some(function autorizada(pasta) { return pasta.id === item.id; })} aoRenomear={salvarNomePasta} aoExcluir={excluirPasta} resultadoDeBusca={dados.paginacaoPastas?.pesquisadas} />; })}</div>
             </section>
           )}
 

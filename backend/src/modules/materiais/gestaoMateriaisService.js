@@ -167,6 +167,27 @@ function criarGestaoMateriaisService(dependencias) {
     }
   }
 
+  async function excluirPasta(usuario, idInformado) {
+    if (!usuario || usuario.papel !== "admin") throw new AppError("Somente administradores podem excluir pastas",403,"SEM_PERMISSAO");
+    const categoria = await exigirCategoria(usuario,inteiroPositivo(idInformado,"Pasta"));
+    if (categoria.drivePastaId === provider.pastaRaizId) throw new AppError("A raiz do acervo e protegida",403,"RAIZ_PROTEGIDA");
+    const refreshToken = await token();
+    await exigirPastaDoAcervo(refreshToken,categoria.drivePastaId);
+    const detalhes = {categoriaId:categoria.id,driveFileId:categoria.drivePastaId};
+    const operacao = await iniciarOperacaoDrive("pasta_lixeira",usuario.id,null,detalhes);
+    try {
+      await executarGoogle(function enviar() { return provider.alterarLixeira(refreshToken,categoria.drivePastaId,true); });
+      await atualizarOperacaoDrive(operacao,"drive_confirmado",detalhes);
+    } catch (erro) {
+      await deixarOperacaoPendente(operacao,"reconciliacao_pendente",erro,detalhes);
+      throw erro;
+    }
+    try { return await repository.excluirPastaComConteudo(categoria,usuario.id,operacao); }
+    catch (erro) {
+      return tratarFalhaDepoisDoDrive(operacao,erro,detalhes,function restaurarPasta() { return provider.alterarLixeira(refreshToken,categoria.drivePastaId,false); });
+    }
+  }
+
   async function renomearPasta(usuario, idInformado, corpo) {
     exigirPapelDeGestao(usuario);
     const id = inteiroPositivo(idInformado,"Pasta");
@@ -422,6 +443,16 @@ function criarGestaoMateriaisService(dependencias) {
 
   async function reconciliarOperacao(refreshToken, operacao) {
     const detalhes=operacao.detalhes || {};
+    if (operacao.tipo === "pasta_lixeira") {
+      const categoria = await repository.buscarCategoria(detalhes.categoriaId);
+      if (!categoria || categoria.drivePastaId !== detalhes.driveFileId || categoria.drivePastaId === provider.pastaRaizId) {
+        throw new AppError("Pasta ausente durante reconciliacao",503,"PASTA_RECONCILIACAO_PENDENTE");
+      }
+      // O estado confirmado no banco decide a compensacao, inclusive em commit incerto.
+      await provider.alterarLixeira(refreshToken,categoria.drivePastaId,!categoria.ativo);
+      await concluirOperacaoDrive(operacao.chave);
+      return;
+    }
     if (operacao.tipo === "pasta_criacao") {
       const item = detalhes.driveFileId ? await obterItemOuNulo(refreshToken,detalhes.driveFileId)
         : typeof provider.buscarArquivoPorOperacao === "function" ? await provider.buscarArquivoPorOperacao(refreshToken,operacao.chave) : null;
@@ -538,6 +569,7 @@ function criarGestaoMateriaisService(dependencias) {
       return executarComTravaDeOperacao(function executar() { return excluirDefinitivamente(usuario, id, corpo); });
     },
     listarPastas: listarPastas,
+    excluirPasta: function excluirPastaComTrava(usuario,id) { return executarComTravaDeOperacao(function executar() { return excluirPasta(usuario,id); }); },
     criarPasta: function criarPastaComTrava(usuario,corpo) { return executarComTravaDeOperacao(function executar() { return criarPasta(usuario,corpo); }); },
     renomearPasta: function renomearPastaComTrava(usuario,id,corpo) { return executarComTravaDeOperacao(function executar() { return renomearPasta(usuario,id,corpo); }); },
     recuperarOperacoesPendentes: recuperarOperacoesPendentes,

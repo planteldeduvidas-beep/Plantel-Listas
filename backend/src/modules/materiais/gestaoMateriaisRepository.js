@@ -139,6 +139,30 @@ function criarGestaoMateriaisRepository(pool) {
     });
   }
 
+  async function excluirPastaComConteudo(categoria, usuarioId, operacaoChave) {
+    return executarTransacao(async function excluir(conexao) {
+      await conexao.execute("SELECT id FROM categorias WHERE id=? FOR UPDATE", [categoria.id]);
+      const [subarvore] = await conexao.execute(
+        "WITH RECURSIVE subarvore AS (SELECT id FROM categorias WHERE id=? UNION ALL SELECT c.id FROM categorias c INNER JOIN subarvore p ON c.categoria_pai_id=p.id) SELECT id FROM subarvore", [categoria.id]
+      );
+      const ids = subarvore.map(item => Number(item.id));
+      let pastas = 0;
+      let materiais = 0;
+      // Lotes limitados, todos na mesma transacao e sob a trava compartilhada do Drive.
+      for (let inicio=0; inicio<ids.length; inicio+=500) {
+        const lote=ids.slice(inicio,inicio+500);
+        const marcadores=lote.map(()=>"?").join(",");
+        const [arquivos]=await conexao.execute("UPDATE materiais SET disponivel=0,versao=versao+1 WHERE categoria_id IN ("+marcadores+") AND disponivel=1",lote);
+        const [pastasAlteradas]=await conexao.execute("UPDATE categorias SET ativo=0 WHERE id IN ("+marcadores+") AND ativo=1",lote);
+        materiais+=arquivos.affectedRows;
+        pastas+=pastasAlteradas.affectedRows;
+      }
+      await conexao.execute("INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado,contexto) VALUES (?,'pasta_enviada_lixeira','pasta',?,'concluida',?)", [usuarioId,categoria.id,JSON.stringify({nome:categoria.nome,pastas,materiais})]);
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,null);
+      return {id:categoria.id,excluida:true,pastas,materiais};
+    });
+  }
+
   async function renomearPasta(categoria, nome, usuarioId, operacaoChave) {
     return executarTransacao(async function renomear(conexao) {
       const [resultado] = await conexao.execute("UPDATE categorias SET nome=? WHERE id=? AND nome=? AND ativo=1", [nome,categoria.id,categoria.nome]);
@@ -348,7 +372,7 @@ function criarGestaoMateriaisRepository(pool) {
     return registros.map(mapearOperacaoDrive);
   }
 
-  return { adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
+  return { excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
 }
 
 module.exports = criarGestaoMateriaisRepository;

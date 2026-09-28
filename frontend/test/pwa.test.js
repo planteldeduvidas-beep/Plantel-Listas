@@ -46,9 +46,9 @@ test("service worker guarda apenas asset versionado e ignora API, páginas e arq
   };
   runInNewContext(readFileSync(new URL("public/sw.js", base), "utf8"), ambiente);
 
-  async function consultar(caminho, destino = "script") {
+  async function consultar(caminho, destino = "script", metodo = "GET") {
     let interceptado;
-    const request = { url: new URL(caminho, ambiente.self.location.origin).href, method: "GET", destination: destino };
+    const request = { url: new URL(caminho, ambiente.self.location.origin).href, method: metodo, destination: destino };
     ouvintes.get("fetch")({ request, respondWith(promessa) { interceptado = promessa; } });
     if (interceptado) await interceptado;
     return Boolean(interceptado);
@@ -56,6 +56,9 @@ test("service worker guarda apenas asset versionado e ignora API, páginas e arq
 
   assert.equal(await consultar("/api/sessao"), false);
   assert.equal(await consultar("/api/usuarios"), false);
+  assert.equal(await consultar("/api/gestao-materiais", "", "POST"), false);
+  assert.equal(await consultar("/api/gestao-materiais/1/substituir", "", "POST"), false);
+  assert.equal(await consultar("/api/gestao-materiais/pastas/1", "", "DELETE"), false);
   assert.equal(await consultar("/login", "document"), false);
   assert.equal(await consultar("/privacidade", "document"), false);
   assert.equal(await consultar("/materiais/arquivo.pdf", "image"), false);

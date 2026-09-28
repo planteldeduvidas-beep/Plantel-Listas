@@ -546,6 +546,16 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     return false;
   }
 
+  async function pastaPossuiFilhos(refreshToken, pastaId) {
+    const tokenDeAcesso = await obterTokenDeAcesso(refreshToken);
+    const resposta = await requisitarDrive("", {
+      q: "'" + pastaId + "' in parents and trashed = false",
+      spaces: "drive", pageSize: 1, supportsAllDrives: true,
+      includeItemsFromAllDrives: true, fields: "nextPageToken,files(id)"
+    }, tokenDeAcesso);
+    return Boolean((resposta.files || []).length || resposta.nextPageToken);
+  }
+
   async function listarFilhos(pastaId, tokenDeAcesso) {
     const itens = [];
     let pageToken = "";
@@ -685,6 +695,7 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     trocarCodigoPorRefreshToken: trocarCodigoPorRefreshToken,
     listarArvore: listarArvore,
     listarSubarvore: listarSubarvore,
+    pastaPossuiFilhos: pastaPossuiFilhos,
     obterConteudoArquivo: obterConteudoArquivo,
     obterTokenDeAcesso: obterTokenDeAcesso,
     obterInicioDasAlteracoes: obterInicioDasAlteracoes,

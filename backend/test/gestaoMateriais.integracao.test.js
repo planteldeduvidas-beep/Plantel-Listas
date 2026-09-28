@@ -18,6 +18,7 @@ let sequencia=0;
 const operacoes=[];
 const itensDrive=new Map();
 const provider={
+  pastaPossuiFilhos:async function(token,id){return [...itensDrive.values()].some(item=>!item.trashed&&(item.parents||[]).includes(id));},
   escopo:ESCOPO_GESTAO,pastaRaizId:configuracao.googleDrive.pastaRaizId,
   obterItem:async function obter(token,id){return itensDrive.get(id)||{id:id,name:"externo",mimeType:"application/vnd.google-apps.folder",parents:["foraDaRaiz"],trashed:false};},
   verificarDescendenteDaRaiz:async function verificar(token,item){if(!item||item.trashed)return false;let atual=item;for(let nivel=0;nivel<10;nivel+=1){if((atual.parents||[]).includes(configuracao.googleDrive.pastaRaizId))return true;atual=itensDrive.get((atual.parents||[])[0]);if(!atual)return false;}return false;},
@@ -39,6 +40,67 @@ async function autenticar(papel){const agente=request.agent(app);const csrf=(awa
 
 test.beforeEach(async function preparar(){await limpar();operacoes.length=0;itensDrive.clear();itensDrive.set(configuracao.googleDrive.pastaRaizId,{id:configuracao.googleDrive.pastaRaizId,mimeType:"application/vnd.google-apps.folder",parents:[],trashed:false});itensDrive.set("driveAreaA",{id:"driveAreaA",mimeType:"application/vnd.google-apps.folder",parents:[configuracao.googleDrive.pastaRaizId],trashed:false});itensDrive.set("driveAreaB",{id:"driveAreaB",mimeType:"application/vnd.google-apps.folder",parents:["driveAreaA"],trashed:false});itensDrive.set("driveProibida",{id:"driveProibida",mimeType:"application/vnd.google-apps.folder",parents:[configuracao.googleDrive.pastaRaizId],trashed:false});itensDrive.set("driveMaterial6",{id:"driveMaterial6",name:"original.pdf",mimeType:"application/pdf",parents:["driveAreaA"],trashed:false});usuarios={admin:await usuario("admin6@example.com","admin"),professor:await usuario("prof6@example.com","professor"),aluno:await usuario("aluno6@example.com","aluno")};const[a]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Area A','driveAreaA')");pastaA=Number(a.insertId);const[b]=await pool.execute("INSERT INTO categorias(nome,categoria_pai_id,drive_pasta_id)VALUES('Subarea B',?,'driveAreaB')",[pastaA]);pastaB=Number(b.insertId);const[p]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Proibida','driveProibida')");pastaProibida=Number(p.insertId);await pool.execute("INSERT INTO permissoes_professor_categoria(professor_id,categoria_id,concedida_por_usuario_id)VALUES(?,?,?)",[usuarios.professor.id,pastaA,usuarios.admin.id]);const[m]=await pool.execute("INSERT INTO materiais(drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,extensao,tamanho_bytes,disponivel,ultima_sincronizacao_drive_id)VALUES('driveMaterial6','driveAreaA',?,'original.pdf','application/pdf','pdf','pdf',20,1,NULL)",[pastaA]);materialId=Number(m.insertId);});
 test.afterEach(async function limparDisciplinasDoProfessor(){await pool.execute("DELETE FROM professor_disciplinas");});
+
+test("admin exclui pasta vazia aninhada com auditoria e journal; demais papeis protegidos",async function(){
+  const admin=await autenticar("admin");
+  const criada=await admin.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",admin.csrf).send({nome:"Pasta errada",categoriaPaiId:pastaB});
+  assert.equal(criada.status,201,JSON.stringify(criada.body));
+  const id=criada.body.id;
+  for(const papel of ["professor","aluno"]){
+    const pessoa=await autenticar(papel);
+    assert.equal((await pessoa.agente.delete("/api/gestao-materiais/pastas/"+id).set("X-CSRF-Token",pessoa.csrf)).status,403);
+  }
+  assert.equal((await admin.agente.delete("/api/gestao-materiais/pastas/"+id)).status,403);
+  const excluida=await admin.agente.delete("/api/gestao-materiais/pastas/"+id).set("X-CSRF-Token",admin.csrf);
+  assert.equal(excluida.status,200,JSON.stringify(excluida.body));
+  const [pastas]=await pool.execute("SELECT ativo,drive_pasta_id FROM categorias WHERE id=?",[id]);
+  assert.equal(Number(pastas[0].ativo),0);
+  assert.equal(itensDrive.get(pastas[0].drive_pasta_id).trashed,true);
+  const [auditoria]=await pool.execute("SELECT id FROM auditoria_geral WHERE entidade_id=? AND acao='pasta_enviada_lixeira'",[id]);
+  assert.equal(auditoria.length,1);
+  const [journal]=await pool.execute("SELECT fase FROM operacoes_google_drive_pendentes WHERE tipo='pasta_lixeira'");
+  assert.equal(journal[0].fase,"concluida");
+  const listagem=await admin.agente.get("/api/acervo?categoriaId="+pastaB);
+  assert.equal(listagem.body.pastas.some(pasta=>pasta.id===id),false);
+});
+
+test("exclusao de pasta preenchida retira descendentes e leitura direta sem afetar pai ou irma",async function(){
+  const admin=await autenticar("admin");
+  const sub=await admin.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",admin.csrf).send({nome:"Descendente",categoriaPaiId:pastaB});
+  assert.equal(sub.status,201);
+  const enviado=await admin.agente.post("/api/gestao-materiais").set("X-CSRF-Token",admin.csrf).field("categoriaId",String(sub.body.id)).attach("arquivo",Buffer.from("%PDF-1.7\nconteudo"),{filename:"filho.pdf",contentType:"application/pdf"});
+  assert.equal(enviado.status,201,JSON.stringify(enviado.body));
+  const removida=await admin.agente.delete("/api/gestao-materiais/pastas/"+pastaB).set("X-CSRF-Token",admin.csrf);
+  assert.equal(removida.status,200,JSON.stringify(removida.body));
+  assert.equal(removida.body.pastas,2);
+  assert.equal(removida.body.materiais,1);
+  const [categorias]=await pool.execute("SELECT id,ativo FROM categorias WHERE id IN (?,?,?,?)",[pastaA,pastaB,sub.body.id,pastaProibida]);
+  for(const categoria of categorias) assert.equal(Number(categoria.ativo),[pastaB,sub.body.id].includes(Number(categoria.id))?0:1);
+  const [material]=await pool.execute("SELECT disponivel FROM materiais WHERE id=?",[materialId]);
+  assert.equal(Number(material[0].disponivel),1);
+  const aluno=await autenticar("aluno");
+  assert.equal((await aluno.agente.get("/api/acervo/materiais/"+enviado.body.id+"/conteudo")).status,404);
+  assert.equal((await aluno.agente.get("/api/acervo/materiais/"+enviado.body.id+"/download")).status,404);
+  const [auditoria]=await pool.execute("SELECT contexto FROM auditoria_geral WHERE entidade_id=? AND acao='pasta_enviada_lixeira'",[pastaB]);
+  const contexto=typeof auditoria[0].contexto==="string"?JSON.parse(auditoria[0].contexto):auditoria[0].contexto;
+  assert.equal(contexto.pastas,2);
+  assert.equal(contexto.materiais,1);
+});
+
+test("upload multipart do PWA aceita PDF generico com nome sem extensao e rejeita falso PDF",async function(){
+  const admin=await autenticar("admin");
+  const enviar=(conteudo)=>admin.agente.post("/api/gestao-materiais").set("X-CSRF-Token",admin.csrf)
+    .set("User-Agent","Mozilla/5.0 (Linux; Android 14) Chrome/130.0.0.0 Mobile Safari/537.36")
+    .field("categoriaId",String(pastaB)).field("nome","Lista do celular").field("disciplinaId","").field("concursoId","")
+    .attach("arquivo",Buffer.from(conteudo),{filename:"lista.pdf",contentType:"application/octet-stream"});
+  const resposta=await enviar("%PDF-1.7\nconteudo");
+  assert.equal(resposta.status,201,JSON.stringify(resposta.body));
+  assert.equal(resposta.body.nome,"Lista do celular.pdf");
+  assert.equal(resposta.body.categoriaId,pastaB);
+  const [gravado]=await pool.execute("SELECT nome FROM materiais WHERE id=?",[resposta.body.id]);
+  assert.equal(gravado[0].nome,"Lista do celular.pdf");
+  assert.equal((await enviar("nao e pdf")).body.erro.codigo,"TIPO_ARQUIVO_INVALIDO");
+});
 test.after(async function encerrar(){await limpar();await pool.end();});
 
 test("upload valida PDF, video, CSRF, papeis, nomes, raiz e permissao por subarvore",async function(){const professor=await autenticar("professor");const pdf=Buffer.from("%PDF-1.7\nconteudo seguro","utf8");const ok=await professor.agente.post("/api/gestao-materiais").set("X-CSRF-Token",professor.csrf).field("categoriaId",String(pastaB)).attach("arquivo",pdf,{filename:"lista.pdf",contentType:"application/pdf"});assert.equal(ok.status,201);assert.equal(ok.body.nome,"lista.pdf");assert.equal(Object.prototype.hasOwnProperty.call(ok.body,"driveFileId"),false);assert.equal((await professor.agente.post("/api/gestao-materiais").field("categoriaId",String(pastaA)).attach("arquivo",pdf,{filename:"sem-csrf.pdf",contentType:"application/pdf"})).status,403);const proibido=await professor.agente.post("/api/gestao-materiais").set("X-CSRF-Token",professor.csrf).field("categoriaId",String(pastaProibida)).attach("arquivo",pdf,{filename:"lista.pdf",contentType:"application/pdf"});assert.equal(proibido.status,403);const falso=await professor.agente.post("/api/gestao-materiais").set("X-CSRF-Token",professor.csrf).field("categoriaId",String(pastaA)).attach("arquivo",Buffer.from("nao e pdf"),{filename:"falso.pdf",contentType:"application/pdf"});assert.equal(falso.status,400);const nomeInvalido=await professor.agente.post("/api/gestao-materiais").set("X-CSRF-Token",professor.csrf).field("categoriaId",String(pastaA)).field("nome","invalido/arquivo.pdf").attach("arquivo",pdf,{filename:"lista.pdf",contentType:"application/pdf"});assert.equal(nomeInvalido.status,400);const admin=await autenticar("admin");const video=Buffer.concat([Buffer.alloc(4),Buffer.from("ftyp"),Buffer.from("video seguro")]);const videoOk=await admin.agente.post("/api/gestao-materiais").set("X-CSRF-Token",admin.csrf).field("categoriaId",String(pastaProibida)).attach("arquivo",video,{filename:"aula.mp4",contentType:"video/mp4"});assert.equal(videoOk.status,201);assert.equal(videoOk.body.tipo,"video");const[fora]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Fora da raiz','driveForaRaiz')");const foraRaiz=await admin.agente.post("/api/gestao-materiais").set("X-CSRF-Token",admin.csrf).field("categoriaId",String(fora.insertId)).attach("arquivo",pdf,{filename:"fora.pdf",contentType:"application/pdf"});assert.equal(foraRaiz.status,403);assert.equal(foraRaiz.body.erro.codigo,"PASTA_FORA_DA_RAIZ");const aluno=await autenticar("aluno");assert.equal((await aluno.agente.post("/api/gestao-materiais").set("X-CSRF-Token",aluno.csrf).field("categoriaId",String(pastaA)).attach("arquivo",pdf,{filename:"aluno.pdf",contentType:"application/pdf"})).status,403);});

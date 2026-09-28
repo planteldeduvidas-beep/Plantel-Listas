@@ -49,7 +49,12 @@ async function identificarArquivo(arquivo, configuracao) {
     tipo = "video";
     mimeType = "video/webm";
   }
-  if (!tipo || (arquivo.mimetype && arquivo.mimetype !== mimeType)) {
+  // Assinatura e extensao continuam obrigatorias mesmo com MIME generico.
+  const mimeInformado = String(arquivo.mimetype || "").toLowerCase();
+  const mimesAceitos = ["", "application/octet-stream", mimeType];
+  if (extensao === "m4v") mimesAceitos.push("video/x-m4v");
+  if (tipo === "pdf") mimesAceitos.push("application/x-pdf");
+  if (!tipo || !mimesAceitos.includes(mimeInformado)) {
     throw new AppError("O arquivo nao corresponde a um PDF ou video permitido", 400, "TIPO_ARQUIVO_INVALIDO");
   }
   const limite = tipo === "pdf"
@@ -64,7 +69,8 @@ async function identificarArquivo(arquivo, configuracao) {
 async function validarUpload(corpo, arquivo, configuracao) {
   validarCampos(corpo, ["categoriaId", "nome", "disciplinaId", "concursoId"]);
   const detectado = await identificarArquivo(arquivo, configuracao);
-  const nome = nomeSeguro(corpo.nome, arquivo.originalname);
+  let nome = nomeSeguro(String(corpo.nome || "").trim(), arquivo.originalname);
+  if (!path.extname(nome)) nome += "." + detectado.extensao;
   if (path.extname(nome).toLowerCase().slice(1) !== detectado.extensao) {
     throw new AppError("O nome precisa manter a extensao do arquivo", 400, "EXTENSAO_INCOMPATIVEL");
   }

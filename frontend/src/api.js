@@ -274,6 +274,10 @@ function renomearPastaNoDrive(id, nome) {
   return requisitar("/gestao-materiais/pastas/" + id + "/nome", { method:"PATCH", body:JSON.stringify({nome:nome}) });
 }
 
+export function excluirPastaNoDrive(id) {
+  return requisitar("/gestao-materiais/pastas/" + id, { method:"DELETE" });
+}
+
 function adicionarMaterial(formulario) {
   return requisitar("/gestao-materiais", { method: "POST", body: formulario });
 }
