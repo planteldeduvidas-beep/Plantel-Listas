@@ -2842,15 +2842,6 @@ select option:checked {
     overscroll-behavior-y: contain;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: rgb(169 226 216 / 38%) transparent;
-  }
-
-  .barra-lateral::-webkit-scrollbar { width: 5px; }
-  .barra-lateral::-webkit-scrollbar-track { background: transparent; }
-  .barra-lateral::-webkit-scrollbar-thumb {
-    border-radius: 5px;
-    background: rgb(169 226 216 / 38%);
   }
 
   .conteudo-aplicacao {
@@ -6949,9 +6940,23 @@ textarea {
 .formulario-material { align-items: start; }
 .grade-pastas .abrir-pasta small { overflow-wrap: anywhere; }
 
-/* Oculta somente a calha nativa; toque, roda do mouse e teclado continuam rolando. */
-.barra-lateral { scrollbar-width: none; -ms-overflow-style: none; }
-.barra-lateral::-webkit-scrollbar { display: none; width: 0; height: 0; }
+/* Barra lateral visivel e discreta, sem a calha branca nativa no Chromium. */
+.barra-lateral::-webkit-scrollbar { width: 8px; }
+.barra-lateral::-webkit-scrollbar-track { background: var(--cor-lateral); }
+.barra-lateral::-webkit-scrollbar-thumb {
+  border: 2px solid var(--cor-lateral);
+  border-radius: 999px;
+  background: #78afa2;
+}
+.barra-lateral::-webkit-scrollbar-thumb:hover { background: #b5d9cf; }
+.barra-lateral::-webkit-scrollbar-button { display: none; height: 0; }
+
+@supports (-moz-appearance: none) {
+  .barra-lateral {
+    scrollbar-width: thin;
+    scrollbar-color: #78afa2 var(--cor-lateral);
+  }
+}
 
 .faixa-avisos-link { color: inherit; text-decoration: underline; text-decoration-color: #9bd5b5; text-underline-offset: 3px; }
 .faixa-avisos-link:hover { color: #fff; text-decoration-thickness: 2px; }
