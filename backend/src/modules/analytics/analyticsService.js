@@ -37,8 +37,20 @@ function criarAnalyticsService(repository) {
     const resultados = await Promise.all([
       repository.resumo(), repository.porDisciplina(), repository.porConcurso(),
       repository.evolucao(filtros.periodo), repository.maisUsados(filtros.periodo),
-      repository.recentes(), repository.atividade(filtros.periodo), repository.buscas(filtros.periodo), repository.pastasMaisAcessadas(filtros.periodo)
+      repository.recentes(), repository.atividade(filtros.periodo), repository.buscas(filtros.periodo), repository.pastasMaisAcessadas(filtros.periodo), repository.engajamento(filtros.periodo)
     ]);
+    const evolucao = resultados[3].map(function mapear(item) { return { dia: item.dia, acessos: numero(item.acessos), alunosAtivos: numero(item.alunos_ativos), visualizacoes: numero(item.visualizacoes), downloads: numero(item.downloads) }; });
+    const meses = new Map();
+    for (const dia of evolucao) {
+      const chave = new Date(dia.dia).toISOString().slice(0, 7);
+      const total = meses.get(chave) || { mes: chave, acessos: 0, visualizacoes: 0, downloads: 0 };
+      total.acessos += dia.acessos;
+      total.visualizacoes += dia.visualizacoes;
+      total.downloads += dia.downloads;
+      meses.set(chave, total);
+    }
+    const alunosComNavegacao = numero(resultados[9].alunos_com_navegacao);
+    const alunosComMaterial = numero(resultados[9].alunos_com_material);
     return {
       periodo: filtros.periodo,
       resumo: {
@@ -53,7 +65,9 @@ function criarAnalyticsService(repository) {
       },
       materiaisPorDisciplina: resultados[1].map(function mapear(item) { return { nome: item.nome, quantidade: numero(item.quantidade) }; }),
       materiaisPorConcurso: resultados[2].map(function mapear(item) { return { nome: item.nome, quantidade: numero(item.quantidade) }; }),
-      evolucao: resultados[3].map(function mapear(item) { return { dia: item.dia, acessos: numero(item.acessos), alunosAtivos: numero(item.alunos_ativos), visualizacoes: numero(item.visualizacoes), downloads: numero(item.downloads) }; }),
+      evolucao,
+      evolucaoMensal: Array.from(meses.values()),
+      engajamento: { alunosComNavegacao, alunosComMaterial, buscas: numero(resultados[9].buscas), taxaDeInteracao: alunosComNavegacao ? Math.round(numero(resultados[9].alunos_que_navegaram_e_interagiram) / alunosComNavegacao * 100) : 0 },
       materiaisMaisUsados: resultados[4].map(function mapear(item) { return { id: Number(item.id), nome: item.nome, visualizacoes: numero(item.visualizacoes), downloads: numero(item.downloads), acessos: numero(item.acessos) }; }),
       materiaisRecentes: resultados[5].map(function mapear(item) { return { id: Number(item.id), nome: item.nome, tipo: item.tipo, criadoEm: item.criado_em }; }),
       atividadeDoAcervo: resultados[6].map(function mapear(item) { return { acao: item.operacao, quantidade: numero(item.quantidade) }; }),

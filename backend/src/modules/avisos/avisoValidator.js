@@ -12,7 +12,7 @@ function validarId(valor) {
 
 function validarDados(corpo, parcial = false) {
   if (!corpo || typeof corpo !== "object" || Array.isArray(corpo)
-    || Object.keys(corpo).some(campo => !["texto", "ativo", "ordem"].includes(campo))
+    || Object.keys(corpo).some(campo => !["texto", "url", "ativo", "ordem"].includes(campo))
     || (parcial && !Object.keys(corpo).length)) throw erro("Dados do aviso invalidos");
   const dados = {};
   if (!parcial || Object.hasOwn(corpo, "texto")) {
@@ -20,6 +20,18 @@ function validarDados(corpo, parcial = false) {
     const texto = corpo.texto.trim().replace(/\s+/g, " ");
     if (!texto || texto.length > 160 || /[<>\u0000-\u001f\u007f]/.test(texto)) throw erro("Texto invalido");
     dados.texto = texto;
+  }
+  if (!parcial || Object.hasOwn(corpo, "url")) {
+    if (corpo.url !== undefined && corpo.url !== null && typeof corpo.url !== "string") throw erro("Link invalido");
+    const url = (corpo.url || "").trim();
+    if (url) {
+      if (url.length > 2048 || /[\s\u0000-\u001f\u007f]/.test(url)) throw erro("Link invalido");
+      try {
+        const destino = new URL(url);
+        if (destino.protocol !== "https:" || !destino.hostname || destino.username || destino.password) throw erro("Link invalido");
+      } catch (_) { throw erro("Link invalido"); }
+    }
+    dados.url = url || null;
   }
   if (!parcial || Object.hasOwn(corpo, "ativo")) {
     if (corpo.ativo !== undefined && typeof corpo.ativo !== "boolean") throw erro("Estado invalido");

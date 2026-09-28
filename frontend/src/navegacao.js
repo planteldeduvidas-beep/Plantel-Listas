@@ -1,7 +1,7 @@
 const AREAS_POR_PAPEL = {
-  aluno: ["acervo", "meuHistorico", "suporte"],
-  professor: ["acervo", "minhasPastas", "suporte"],
-  admin: ["estatisticas", "acervo", "usuarios", "acessos", "organizacao", "historico", "drive", "parceiros", "avisos"]
+  aluno: ["acervo", "meuHistorico", "suporte", "tutorial"],
+  professor: ["acervo", "minhasPastas", "suporte", "tutorial"],
+  admin: ["estatisticas", "acervo", "usuarios", "acessos", "organizacao", "historico", "drive", "parceiros", "avisos", "tutorial"]
 };
 
 const DOCUMENTOS_PUBLICOS = Object.freeze({

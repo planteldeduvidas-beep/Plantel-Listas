@@ -6948,3 +6948,49 @@ textarea {
 .formulario-material .seletor-pasta, .formulario-edicao .seletor-pasta, .acao-inline .seletor-pasta { width: 100%; }
 .formulario-material { align-items: start; }
 .grade-pastas .abrir-pasta small { overflow-wrap: anywhere; }
+
+/* Oculta somente a calha nativa; toque, roda do mouse e teclado continuam rolando. */
+.barra-lateral { scrollbar-width: none; -ms-overflow-style: none; }
+.barra-lateral::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+.faixa-avisos-link { color: inherit; text-decoration: underline; text-decoration-color: #9bd5b5; text-underline-offset: 3px; }
+.faixa-avisos-link:hover { color: #fff; text-decoration-thickness: 2px; }
+.faixa-avisos-link:focus-visible { outline-offset: 3px; }
+
+.grade-engajamento { margin: 22px 0; }
+.grade-engajamento > section { min-width: 0; padding: 24px; }
+.grade-engajamento p { color: var(--cor-texto-suave); line-height: 1.5; }
+.numeros-engajamento { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 10px; margin: 16px 0; }
+.numeros-engajamento .cartao-estatistica { min-width: 0; padding: 16px; border: 1px solid var(--cor-borda); border-radius: 9px; }
+.numeros-engajamento .cartao-estatistica strong { display: block; margin-top: 8px; font-size: 1.45rem; }
+.resumo-mensal { display: grid; gap: 14px; margin-top: 16px; }
+.resumo-mensal-item { display: grid; gap: 5px; }
+.resumo-mensal-item strong { font-size: .87rem; text-transform: capitalize; }
+.resumo-mensal-item small { color: var(--cor-texto-suave); }
+.resumo-mensal-barra { height: 9px; overflow: hidden; border-radius: 9px; background: var(--cor-borda); }
+.resumo-mensal-barra i { display: block; height: 100%; border-radius: inherit; background: #137c70; }
+
+.tutorial-painel { max-width: 1050px; }
+.tutorial-orientacao { margin: 20px 0 30px; padding: 22px 26px; border: 1px solid var(--cor-borda); border-radius: 12px; background: var(--cor-superficie, #fff); }
+.tutorial-orientacao h3, .tutorial-secao-titulo { margin: 0 0 14px; font-size: 1.08rem; }
+.tutorial-orientacao ol, .tutorial-area-corpo ol { display: grid; gap: 12px; margin: 0; padding-left: 22px; line-height: 1.6; }
+.tutorial-orientacao li, .tutorial-area-corpo li { padding-left: 5px; }
+.tutorial-orientacao li::marker, .tutorial-area-corpo li::marker { color: #087b6f; font-weight: 700; }
+.tutorial-lista { display: grid; gap: 12px; }
+.tutorial-area { min-width: 0; border: 1px solid var(--cor-borda); border-radius: 12px; background: var(--cor-superficie, #fff); overflow: hidden; }
+.tutorial-area[open] { border-color: #9dc9be; }
+.tutorial-area summary { display: flex; align-items: center; gap: 16px; padding: 18px 22px; cursor: pointer; list-style: none; }
+.tutorial-area summary::-webkit-details-marker { display: none; }
+.tutorial-area summary:focus-visible { outline: 3px solid #087b6f; outline-offset: -4px; }
+.tutorial-numero { flex: 0 0 auto; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: #075f55; background: #e1f2ed; font-size: .82rem; font-weight: 800; }
+.tutorial-area-nome { display: grid; gap: 3px; min-width: 0; }
+.tutorial-area-nome strong { font-size: 1rem; }
+.tutorial-area-nome small { color: var(--cor-texto-suave); line-height: 1.4; }
+.tutorial-expandir { margin-left: auto; color: var(--cor-texto-suave); font-size: 1.5rem; transition: transform 160ms ease; }
+.tutorial-area[open] .tutorial-expandir { transform: rotate(180deg); }
+.tutorial-area-corpo { padding: 0 22px 22px 72px; }
+.tutorial-area-corpo ol { padding-bottom: 18px; }
+.tutorial-dica { margin: 0 0 18px; padding: 12px 14px; border-left: 3px solid #087b6f; border-radius: 4px; background: rgb(12 116 103 / 7%); line-height: 1.5; }
+.tutorial-area-corpo > button { width: auto; max-width: 100%; }
+@media (max-width: 760px) { .grade-engajamento > section { padding: 18px; } .tutorial-orientacao { padding: 18px; } .tutorial-area summary { gap: 12px; padding: 16px; } .tutorial-area-corpo { padding: 0 16px 18px; } }
+@media (max-width: 420px) { .numeros-engajamento { grid-template-columns: 1fr; } }

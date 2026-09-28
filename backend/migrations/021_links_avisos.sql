@@ -1,0 +1,1 @@
+ALTER TABLE avisos_biblioteca ADD COLUMN url VARCHAR(2048) NULL AFTER texto;

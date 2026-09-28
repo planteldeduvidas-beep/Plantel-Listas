@@ -84,13 +84,25 @@ function criarAnalyticsRepository(pool) {
     return registros;
   }
 
+  async function engajamento(periodo) {
+    const [registros] = await pool.execute(
+      "SELECT SUM(teve_navegacao) AS alunos_com_navegacao,SUM(teve_material) AS alunos_com_material,"
+      + "SUM(teve_navegacao AND teve_material) AS alunos_que_navegaram_e_interagiram,SUM(buscas) AS buscas FROM ("
+      + "SELECT e.usuario_id,MAX(e.tipo='acesso' AND u.papel='aluno') AS teve_navegacao,"
+      + "MAX(e.tipo IN ('visualizacao','download') AND u.papel='aluno') AS teve_material,"
+      + "SUM(e.tipo='busca' AND u.papel='aluno') AS buscas FROM eventos_uso_acervo e INNER JOIN usuarios u ON u.id=e.usuario_id "
+      + "WHERE e.criado_em>=DATE_SUB(CURRENT_DATE,INTERVAL ? DAY) GROUP BY e.usuario_id) dados", [periodo - 1]
+    );
+    return registros[0];
+  }
+
   async function buscas(periodo) {
     const [registros] = await pool.execute(
       "SELECT termo,SUM(quantidade) AS quantidade FROM (SELECT termo_busca AS termo,quantidade FROM analytics_buscas_diario "
       + "WHERE dia>=DATE_SUB(CURRENT_DATE,INTERVAL ? DAY) UNION ALL SELECT termo_busca,COUNT(*) FROM eventos_uso_acervo "
-      + "WHERE tipo='busca' AND criado_em>=DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL ? DAY) GROUP BY termo_busca) dados "
+      + "WHERE tipo='busca' AND criado_em>=DATE_SUB(CURRENT_DATE,INTERVAL ? DAY) GROUP BY termo_busca) dados "
       + "GROUP BY termo ORDER BY quantidade DESC,termo LIMIT 20",
-      [periodo, periodo]
+      [periodo - 1, periodo - 1]
     );
     return registros;
   }
@@ -100,9 +112,9 @@ function criarAnalyticsRepository(pool) {
       "SELECT nome,SUM(quantidade) AS quantidade FROM (SELECT pasta_nome AS nome,quantidade FROM analytics_pastas_diario "
       + "WHERE dia>=DATE_SUB(CURRENT_DATE,INTERVAL ? DAY) UNION ALL SELECT COALESCE(c.nome,'Inicio da biblioteca'),COUNT(*) "
       + "FROM eventos_uso_acervo e LEFT JOIN categorias c ON c.id=e.categoria_id WHERE e.tipo='acesso' "
-      + "AND e.criado_em>=DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL ? DAY) GROUP BY c.id,c.nome) dados "
+      + "AND e.criado_em>=DATE_SUB(CURRENT_DATE,INTERVAL ? DAY) GROUP BY c.id,c.nome) dados "
       + "GROUP BY nome ORDER BY quantidade DESC,nome LIMIT 20",
-      [periodo, periodo]
+      [periodo - 1, periodo - 1]
     );
     return registros;
   }
@@ -114,9 +126,9 @@ function criarAnalyticsRepository(pool) {
       + "FROM analytics_materiais_diario WHERE dia>=DATE_SUB(CURRENT_DATE,INTERVAL ? DAY) UNION ALL "
       + "SELECT m.id,m.nome,SUM(e.tipo='visualizacao'),SUM(e.tipo='download') FROM eventos_uso_acervo e "
       + "INNER JOIN materiais m ON m.id=e.material_id WHERE e.tipo IN ('visualizacao','download') "
-      + "AND e.criado_em>=DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL ? DAY) GROUP BY m.id,m.nome) dados "
+      + "AND e.criado_em>=DATE_SUB(CURRENT_DATE,INTERVAL ? DAY) GROUP BY m.id,m.nome) dados "
       + "GROUP BY material_id ORDER BY acessos DESC,nome ASC LIMIT 15",
-      [periodo, periodo]
+      [periodo - 1, periodo - 1]
     );
     return registros;
   }
@@ -131,9 +143,9 @@ function criarAnalyticsRepository(pool) {
 
   async function atividade(periodo) {
     const [registros] = await pool.execute(
-      "SELECT operacao,COUNT(*) AS quantidade FROM auditoria_materiais WHERE criado_em>=DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL ? DAY) "
+      "SELECT operacao,COUNT(*) AS quantidade FROM auditoria_materiais WHERE criado_em>=DATE_SUB(CURRENT_DATE,INTERVAL ? DAY) "
       + "GROUP BY operacao ORDER BY quantidade DESC,operacao",
-      [periodo]
+      [periodo - 1]
     );
     return registros;
   }
@@ -203,6 +215,7 @@ function criarAnalyticsRepository(pool) {
     registrarConsulta: registrarConsulta,
     resumo: resumo,
     porDisciplina: function porDisciplina() { return distribuicao("disciplinas", "disciplina_id"); },
+    engajamento,
     porConcurso: function porConcurso() { return distribuicao("concursos", "concurso_id"); },
     evolucao: evolucao,
     maisUsados: maisUsados,

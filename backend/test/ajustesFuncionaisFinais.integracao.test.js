@@ -140,6 +140,8 @@ test("retencao consolida eventos antigos e preserva metricas e historico pessoal
   assert.equal(painel.evolucao[0].visualizacoes, 1);
   assert.equal(painel.evolucao[0].downloads, 1);
   assert.equal(painel.evolucao[0].alunosAtivos, 1);
+  assert.equal(painel.evolucaoMensal.reduce((total, mes) => total + mes.acessos, 0), 1);
+  assert.equal(painel.engajamento.alunosComNavegacao, 0);
   assert.equal(painel.materiaisMaisUsados[0].nome, "Material historico.pdf");
   assert.equal(painel.termosMaisPesquisados[0].termo, "cinematica");
   const [historico] = await pool.execute("SELECT COUNT(*) AS total FROM historico_materiais_usuario WHERE usuario_id=?", [alunoId]);

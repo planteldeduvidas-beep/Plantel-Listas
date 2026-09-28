@@ -14,6 +14,9 @@ test("navegacao do frontend limita areas e representa pastas na URL", async func
   assert.equal(navegacao.obterAreaPermitida("aluno", "?area=parceiros"), "acervo");
   assert.equal(navegacao.obterAreaPermitida("aluno", "?area=usuarios"), "acervo");
   assert.equal(navegacao.obterAreaPermitida("professor", "?area=minhasPastas"), "minhasPastas");
+  for (const papel of ["aluno", "professor", "admin"]) {
+    assert.equal(navegacao.obterAreaPermitida(papel, "?area=tutorial"), "tutorial");
+  }
   assert.equal(navegacao.obterPastaDaUrl("?area=acervo&pasta=47"), 47);
   assert.equal(navegacao.obterPastaDaUrl("?area=acervo&pasta=../../segredo"), null);
   assert.equal(navegacao.criarUrlDaNavegacao("/", "acervo", 47), "/?area=acervo&pasta=47");
@@ -87,4 +90,18 @@ test("faixa de avisos fica restrita a biblioteca do aluno e respeita movimento r
   assert.match(painel, /area="avisos"/);
   assert.match(faixa, /prefers-reduced-motion: reduce/);
   assert.match(faixa, /Pausar avisos/);
+  assert.match(faixa, /rel="noopener noreferrer"/);
+  assert.match(faixa, /itens\(true\)/);
+});
+
+test("guia renderiza somente o conteudo do papel autenticado", function testarGuiaPorPapel() {
+  const painel = fs.readFileSync(path.resolve(__dirname, "../../frontend/src/PainelAcervo.jsx"), "utf8");
+  const tutorial = fs.readFileSync(path.resolve(__dirname, "../../frontend/src/Tutorial.jsx"), "utf8");
+  assert.match(painel, /<Tutorial papel=\{usuario\.papel\} aoAbrir=\{navegar\}/);
+  assert.match(tutorial, /const guia = obterGuia\(papel\)/);
+  assert.match(tutorial, /if \(!guia\) return null/);
+  assert.match(tutorial, /aoAbrir\(item\.area\)/);
+  for (const area of ["meuHistorico", "minhasPastas", "estatisticas", "usuarios", "acessos", "organizacao", "historico", "drive", "parceiros", "avisos"]) {
+    assert.match(tutorial, new RegExp('area: "' + area + '"'));
+  }
 });

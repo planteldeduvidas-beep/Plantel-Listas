@@ -134,6 +134,11 @@ test("analytics agrega uso e permanece exclusivo de admin", async function testa
   assert.equal(painel.body.materiaisMaisUsados[0].downloads, 1);
   assert.equal(painel.body.evolucao[0].acessos, 1);
   assert.equal(painel.body.evolucao[0].alunosAtivos, 1);
+  assert.equal(painel.body.engajamento.alunosComNavegacao, 1);
+  assert.equal(painel.body.engajamento.alunosComMaterial, 1);
+  assert.equal(painel.body.engajamento.taxaDeInteracao, 100);
+  assert.equal(painel.body.engajamento.buscas, 1);
+  assert.equal(painel.body.evolucaoMensal.reduce((total, mes) => total + mes.acessos, 0), 1);
   assert.equal(painel.body.termosMaisPesquisados[0].termo, "material analytics");
   assert.equal(painel.body.pastasMaisAcessadas[0].nome, "ANALYTICS_F7");
   assert.equal((await aluno.agente.get("/api/analytics")).status, 403);

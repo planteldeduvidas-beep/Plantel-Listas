@@ -75,6 +75,16 @@ test("recusa destinatario de suporte e retencao invalidos", function testarAjust
   }, /ANALYTICS_RAW_RETENTION_DAYS/);
 });
 
+test("suporte usa a conta SMTP da recuperacao quando nao ha destinatario proprio", function testarDestinoPadraoSuporte() {
+  const variaveis = criarVariaveisValidas();
+  variaveis.SUPPORT_EMAIL_TO = "";
+  variaveis.SMTP_HOST = "smtp.example.com";
+  variaveis.SMTP_USER = "recuperacao@example.com";
+  variaveis.SMTP_PASSWORD = "senha-de-teste";
+  variaveis.SMTP_FROM = "recuperacao@example.com";
+  assert.equal(validarVariaveisDeAmbiente(variaveis).suporte.destinatario, "recuperacao@example.com");
+});
+
 test("falha de forma controlada quando uma env obrigatoria esta ausente", function testarEnvAusente() {
   const variaveis = criarVariaveisValidas();
   delete variaveis.DB_HOST;

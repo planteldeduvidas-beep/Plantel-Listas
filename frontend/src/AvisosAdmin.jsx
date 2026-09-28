@@ -3,7 +3,7 @@ import { criarAviso, editarAviso, listarAvisosAdmin } from "./api.js";
 import { Vazio } from "./ComponentesInterface.jsx";
 import FaixaAvisos from "./FaixaAvisos.jsx";
 
-const inicial = { texto: "", ativo: false, ordem: 0 };
+const inicial = { texto: "", url: "", ativo: false, ordem: 0 };
 
 export default function AvisosAdmin({ aoMensagem, aoErro }) {
   const [avisos, definirAvisos] = useState([]);
@@ -20,7 +20,7 @@ export default function AvisosAdmin({ aoMensagem, aoErro }) {
   useEffect(() => { carregar().catch(erro => aoErro(erro.message)); }, []);
 
   function fechar() { definirAberto(false); definirEditando(null); definirDados(inicial); }
-  function editar(item) { definirEditando(item); definirDados({ texto: item.texto, ativo: item.ativo, ordem: item.ordem }); definirAberto(true); }
+  function editar(item) { definirEditando(item); definirDados({ texto: item.texto, url: item.url || "", ativo: item.ativo, ordem: item.ordem }); definirAberto(true); }
 
   async function salvar(evento) {
     evento.preventDefault();
@@ -54,6 +54,9 @@ export default function AvisosAdmin({ aoMensagem, aoErro }) {
       <label>Texto do aviso<input required maxLength="160" value={dados.texto}
         onChange={evento => definirDados(atual => ({ ...atual, texto: evento.target.value }))}
         placeholder="Ex.: Novo material disponível na biblioteca" /></label>
+      <label>Link HTTPS (opcional)<input type="url" inputMode="url" maxLength="2048" pattern="https://.*" value={dados.url}
+        onChange={evento => definirDados(atual => ({ ...atual, url: evento.target.value }))}
+        placeholder="https://site-do-parceiro.com.br" /></label>
       <div className="formulario-aviso-opcoes">
         <label>Ordem<input type="number" min="0" max="100000" value={dados.ordem}
           onChange={evento => definirDados(atual => ({ ...atual, ordem: evento.target.value }))} /></label>
@@ -65,7 +68,7 @@ export default function AvisosAdmin({ aoMensagem, aoErro }) {
     </form>}
     {!!ativos.length && <div className="previa-avisos"><h3>Prévia da faixa</h3><FaixaAvisos avisos={ativos} /></div>}
     <ul className="lista-avisos-admin">{avisos.map(item => <li key={item.id}>
-      <span><strong>{item.texto}</strong><small>Ordem {item.ordem} · {item.ativo ? "Ativo" : "Arquivado"}</small></span>
+      <span><strong>{item.texto}</strong><small>Ordem {item.ordem} · {item.ativo ? "Ativo" : "Arquivado"}{item.url ? " · Com link" : ""}</small></span>
       <div className="lista-avisos-admin-acoes"><button type="button" className="secundario" onClick={() => editar(item)}>Editar</button>
         <button type="button" className="secundario" onClick={() => alternar(item)}>{item.ativo ? "Arquivar" : "Ativar"}</button></div>
     </li>)}</ul>

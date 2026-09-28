@@ -1,0 +1,179 @@
+import React from "react";
+
+const GUIAS = Object.freeze({
+  aluno: {
+    titulo: "Guia do aluno",
+    introducao: "Escolha uma área abaixo. Cada explicação mostra onde tocar e o que acontece depois.",
+    areas: [
+      {
+        area: "acervo", titulo: "Biblioteca", resumo: "Encontre pastas, PDFs e vídeos.",
+        passos: [
+          "No menu, toque em Biblioteca. No celular, abra o menu pelo botão de três linhas no canto superior esquerdo.",
+          "Para explorar, toque no nome de uma pasta. O caminho acima da lista mostra onde você está; toque em Início para voltar ao começo.",
+          "Para procurar algo, digite uma palavra no campo de busca e toque em Buscar. O botão Filtros permite escolher tipo, disciplina ou concurso. Os resultados podem incluir pastas e arquivos.",
+          "No arquivo desejado, toque em Abrir para ver o PDF ou assistir ao vídeo. Toque em Baixar quando quiser guardar uma cópia no dispositivo.",
+          "Acima da busca fica a faixa Avisos. Mensagens sublinhadas podem levar a uma página externa; confira o destino antes de abrir."
+        ], dica: "Se não encontrar o material, limpe os filtros ou tente parte do nome. Uma pasta encontrada na busca abre normalmente ao toque."
+      },
+      {
+        area: "meuHistorico", titulo: "Meu Histórico", resumo: "Volte a um material usado antes.",
+        passos: [
+          "No menu, toque em Meu Histórico.",
+          "A lista mostra os arquivos que você abriu ou baixou, com a ação e a data mais recentes.",
+          "Toque em Abrir novamente para retornar ao material. Use Anterior e Próxima quando houver mais páginas."
+        ], dica: "O histórico é só seu. Materiais que não estão mais disponíveis deixam de aparecer."
+      },
+      {
+        area: "suporte", titulo: "Suporte", resumo: "Envie uma dúvida à equipe.",
+        passos: [
+          "No menu, toque em Suporte.",
+          "Escreva um assunto curto e explique o problema no campo Mensagem. Diga em qual pasta ou arquivo ele ocorreu.",
+          "Toque em Enviar mensagem e aguarde a confirmação na tela. A resposta será enviada ao e-mail da sua conta."
+        ], dica: "Nunca envie senha ou código de acesso na mensagem."
+      }
+    ]
+  },
+  professor: {
+    titulo: "Guia do professor",
+    introducao: "Veja como encontrar suas pastas e trabalhar somente no acervo liberado para você.",
+    areas: [
+      {
+        area: "minhasPastas", titulo: "Pastas liberadas", resumo: "Confira onde você pode trabalhar.",
+        passos: [
+          "No menu, toque em Pastas liberadas.",
+          "Confira a lista de pastas sob sua responsabilidade. Ela é definida pelo administrador.",
+          "Se a pasta esperada não aparecer, peça ao administrador a liberação antes de tentar alterá-la."
+        ], dica: "Ver um material na Biblioteca não significa ter permissão para editá-lo."
+      },
+      {
+        area: "acervo", titulo: "Biblioteca", resumo: "Pesquise, envie e organize materiais autorizados.",
+        passos: [
+          "Abra Biblioteca no menu. Entre em uma pasta pelo nome ou use Buscar e Filtros para localizar o conteúdo.",
+          "Para criar uma subpasta, toque em Nova pasta, informe o nome, confira o destino e confirme. Faça isso apenas dentro de uma pasta que você gerencia.",
+          "Para enviar um arquivo, toque em Adicionar material, selecione um PDF ou vídeo, confira a pasta de destino e toque em Adicionar material no formulário. Aguarde a mensagem de conclusão antes de repetir o envio.",
+          "Nos materiais que você pode gerenciar, abra as opções para editar o nome, mover, substituir o arquivo ou enviar para a lixeira. Confira o destino antes de salvar."
+        ], dica: "Se a ação não estiver disponível ou for negada, confirme a pasta em Pastas liberadas."
+      },
+      {
+        area: "suporte", titulo: "Suporte", resumo: "Peça ajuda quando uma ação não funcionar.",
+        passos: [
+          "No menu, toque em Suporte.",
+          "Descreva no Assunto o que tentou fazer e, na Mensagem, informe o nome da pasta ou arquivo e a mensagem de erro exibida.",
+          "Toque em Enviar mensagem. A equipe responderá ao e-mail da sua conta."
+        ], dica: "Não inclua senhas, códigos ou links privados na mensagem."
+      }
+    ]
+  },
+  admin: {
+    titulo: "Guia do administrador",
+    introducao: "Passe por cada tela de gestão com passos práticos. Abra somente a área que precisa usar agora.",
+    areas: [
+      {
+        area: "estatisticas", titulo: "Visão geral", resumo: "Entenda o uso real da biblioteca.",
+        passos: [
+          "No menu, toque em Visão geral. Em Período, escolha 7, 30 ou 90 dias.",
+          "Leia Atividade por dia para comparar navegações, aberturas de arquivos e downloads; a seção por mês resume os dias incluídos no período.",
+          "Em Engajamento, veja quantos alunos distintos navegaram ou abriram materiais. Consulte também termos pesquisados, materiais e pastas mais usados.",
+          "Toque em Relatório CSV para baixar os dados quando precisar analisá-los fora do sistema."
+        ], dica: "Navegação é entrada na biblioteca ou em pasta; não é login nem número de visitantes únicos."
+      },
+      {
+        area: "acervo", titulo: "Biblioteca", resumo: "Cuide dos arquivos e das pastas do acervo.",
+        passos: [
+          "Abra Biblioteca. Use pastas, Busca e Filtros para chegar ao lugar desejado; confira o caminho antes de modificar algo.",
+          "Toque em Nova pasta para criar uma pasta no destino correto, ou em Adicionar material para escolher PDF/vídeo, pasta e classificação e iniciar o upload.",
+          "No material, abra as opções para renomear, mover, substituir ou enviar à lixeira. Confirme o nome e a pasta antes de salvar.",
+          "Abra Lixeira para restaurar um item. A exclusão definitiva não pode ser desfeita: confira o item antes de confirmar."
+        ], dica: "Mudanças em pastas e arquivos vinculados ao Google Drive também afetam a integração. Evite repetir uma ação enquanto ela estiver processando."
+      },
+      {
+        area: "usuarios", titulo: "Usuários", resumo: "Crie contas e ajuste o acesso de cada pessoa.",
+        passos: [
+          "No menu, toque em Usuários. Use Buscar, Tipo e Conta para localizar alguém pelo nome, e-mail, papel ou estado.",
+          "Para cadastrar, toque em Novo usuário, preencha nome, e-mail e senha temporária, escolha Aluno, Professor ou Administrador e toque em Criar usuário.",
+          "Na linha da pessoa, o seletor Tipo de usuário altera o papel. Em Opções, você encontra Editar dados, Redefinir senha e Bloquear/Liberar conta.",
+          "Depois de uma alteração, confira o papel e o estado exibidos na própria linha."
+        ], dica: "Confira o e-mail antes de criar a conta e conceda somente o papel necessário."
+      },
+      {
+        area: "acessos", titulo: "Acessos", resumo: "Defina as áreas de trabalho dos professores.",
+        passos: [
+          "No menu, toque em Acessos e escolha um professor no campo Professor.",
+          "Em Disciplinas autorizadas, marque as disciplinas sob sua responsabilidade; isso libera os ramos classificados nelas e suas subpastas.",
+          "Use Acessos específicos por pasta apenas quando precisar liberar uma pasta isolada. Revise as escolhas e toque em Salvar acessos.",
+          "Peça ao professor para conferir Pastas liberadas e testar a pasta após a confirmação."
+        ], dica: "A disciplina é a forma mais rápida de liberar várias pastas; pastas não classificadas podem exigir liberação específica."
+      },
+      {
+        area: "organizacao", titulo: "Organização", resumo: "Mantenha pastas, disciplinas e concursos organizados.",
+        passos: [
+          "Em Organização, use Localizar pasta para encontrar uma pasta pelo nome e conferir se ela é principal ou filha.",
+          "Toque em Nova pasta para informar nome e destino. Na lista, use Editar para dados permitidos ou Ocultar/Mostrar para controlar a visibilidade.",
+          "Mais abaixo, gerencie os catálogos Disciplinas e Concursos, que são opções usadas nos filtros e na classificação.",
+          "Para renomear ou mover uma pasta vinculada ao Google Drive, use o fluxo da Biblioteca; a edição somente local é bloqueada para evitar divergência."
+        ], dica: "Antes de ocultar uma pasta, verifique se ela contém materiais que alunos ou professores ainda precisam."
+      },
+      {
+        area: "historico", titulo: "Histórico", resumo: "Consulte ações administrativas registradas.",
+        passos: [
+          "No menu, toque em Histórico.",
+          "Use o campo Mostrar para escolher uma ação ou deixe Todas as atividades.",
+          "Leia a descrição, o responsável e a data de cada registro para entender o que mudou."
+        ], dica: "Este histórico de auditoria é diferente de Meu Histórico, que registra materiais usados por cada aluno."
+      },
+      {
+        area: "drive", titulo: "Google Drive", resumo: "Acompanhe a conexão e a sincronização.",
+        passos: [
+          "No menu, toque em Google Drive. Confira se a conta está conectada e veja a última atualização e o número de arquivos encontrados.",
+          "Quando a conexão exigir renovação, use Renovar conexão e conclua a autorização na conta correta.",
+          "Se precisar conferir mudanças feitas diretamente no Drive, use Atualizar materiais agora e aguarde o resultado. A atualização automática também busca manter o acervo sincronizado."
+        ], dica: "Não clique várias vezes durante uma sincronização em andamento. Se aparecer erro, anote a mensagem antes de tentar novamente."
+      },
+      {
+        area: "parceiros", titulo: "Parceiros", resumo: "Gerencie os cards de divulgação.",
+        passos: [
+          "No menu, toque em Parceiros e depois em Novo parceiro.",
+          "Preencha as informações do parceiro, confira link, imagem e benefício quando usados e salve.",
+          "Revise a lista e use Ativar para mostrar o card; Editar ajusta os dados e Arquivar retira o card da exibição."
+        ], dica: "Salvar o cadastro não publica o parceiro automaticamente."
+      },
+      {
+        area: "avisos", titulo: "Avisos", resumo: "Publique mensagens na faixa do aluno.",
+        passos: [
+          "No menu, toque em Avisos e depois em Novo aviso.",
+          "Escreva uma mensagem curta. Se ela levar a uma parceria ou página, preencha Link HTTPS (opcional). Ajuste a Ordem quando necessário.",
+          "Marque Exibir aos alunos e toque em Salvar aviso. Confira a Prévia da faixa; use Editar ou Arquivar para mudar a publicação."
+        ], dica: "Um aviso sem link é apenas informativo. Um aviso com link fica clicável para o aluno e abre outra aba."
+      }
+    ]
+  }
+});
+
+export function obterGuia(papel) { return GUIAS[papel] || null; }
+
+export default function Tutorial({ papel, aoAbrir }) {
+  const guia = obterGuia(papel);
+  if (!guia) return null;
+
+  return <section className="bloco-admin painel-conteudo tutorial-painel" aria-label={guia.titulo}>
+    <div className="cabecalho-bloco"><div><h2>{guia.titulo}</h2><p>{guia.introducao}</p></div></div>
+    <div className="tutorial-orientacao">
+      <h3>Primeiros passos em qualquer tela</h3>
+      <ol>
+        <li>Abra o menu lateral para escolher uma área. No celular, toque no botão de três linhas no alto da tela.</li>
+        <li>Se entrar no lugar errado, use Voltar ou escolha outra área no menu. Para trocar as cores, use o botão de tema no alto.</li>
+        <li>Site do Plantel abre a página institucional. Os cards Parceiros Plantel ficam mais abaixo no menu; toque em Conhecer para ver a oferta em outra aba.</li>
+        <li>Quando terminar, procure sua conta na parte de baixo do menu e toque em Sair. No celular, deslize o menu para baixo se necessário.</li>
+      </ol>
+    </div>
+    <h3 className="tutorial-secao-titulo">Escolha a parte que deseja aprender</h3>
+    <div className="tutorial-lista">{guia.areas.map((item, indice) => <details key={item.area} className="tutorial-area" open={indice === 0}>
+      <summary><span className="tutorial-numero" aria-hidden="true">{String(indice + 1).padStart(2, "0")}</span><span className="tutorial-area-nome"><strong>{item.titulo}</strong><small>{item.resumo}</small></span><span className="tutorial-expandir" aria-hidden="true">⌄</span></summary>
+      <div className="tutorial-area-corpo">
+        <ol>{item.passos.map((passo, numero) => <li key={numero}>{passo}</li>)}</ol>
+        <p className="tutorial-dica"><strong>Vale saber:</strong> {item.dica}</p>
+        <button type="button" className="botao-principal" onClick={() => aoAbrir(item.area)}>Abrir {item.titulo}</button>
+      </div>
+    </details>)}</div>
+  </section>;
+}

@@ -1,27 +1,27 @@
 function criarAvisoRepository(pool) {
   async function listar(apenasAtivos) {
     const [linhas] = await pool.execute(
-      "SELECT id,texto,ativo,ordem FROM avisos_biblioteca " + (apenasAtivos ? "WHERE ativo=1 " : "") + "ORDER BY ordem,id"
+      "SELECT id,texto,url,ativo,ordem FROM avisos_biblioteca " + (apenasAtivos ? "WHERE ativo=1 " : "") + "ORDER BY ordem,id"
     );
     return linhas;
   }
 
   async function buscar(id, conexao) {
-    const [linhas] = await conexao.execute("SELECT id,texto,ativo,ordem FROM avisos_biblioteca WHERE id=? FOR UPDATE", [id]);
+    const [linhas] = await conexao.execute("SELECT id,texto,url,ativo,ordem FROM avisos_biblioteca WHERE id=? FOR UPDATE", [id]);
     return linhas[0] || null;
   }
 
   async function criar(dados, conexao) {
     const [resultado] = await conexao.execute(
-      "INSERT INTO avisos_biblioteca (texto,ativo,ordem) VALUES (?,?,?)",
-      [dados.texto, dados.ativo ? 1 : 0, dados.ordem]
+      "INSERT INTO avisos_biblioteca (texto,url,ativo,ordem) VALUES (?,?,?,?)",
+      [dados.texto, dados.url, dados.ativo ? 1 : 0, dados.ordem]
     );
     return Number(resultado.insertId);
   }
 
   async function atualizar(id, dados, conexao) {
-    await conexao.execute("UPDATE avisos_biblioteca SET texto=?,ativo=?,ordem=? WHERE id=?",
-      [dados.texto, dados.ativo ? 1 : 0, dados.ordem, id]);
+    await conexao.execute("UPDATE avisos_biblioteca SET texto=?,url=?,ativo=?,ordem=? WHERE id=?",
+      [dados.texto, dados.url, dados.ativo ? 1 : 0, dados.ordem, id]);
   }
 
   async function comTransacao(operacao) {

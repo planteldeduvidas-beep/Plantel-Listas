@@ -44,19 +44,22 @@ export default function FaixaAvisos({ avisos: avisosFornecidos }) {
   const duracao = Math.max(22, Math.min(55, avisos.reduce((total, aviso) => total + aviso.texto.length, 0) * 0.22));
   const interrompida = pausada || paginaOculta;
 
-  function itens() {
+  function itens(copia = false) {
     return avisos.map(aviso => <li key={aviso.id} className="faixa-avisos-item">
-      <span className="faixa-avisos-separador" aria-hidden="true" />{aviso.texto}
+      <span className="faixa-avisos-separador" aria-hidden="true" />{aviso.url && !copia
+        ? <a className="faixa-avisos-link" href={aviso.url} target="_blank" rel="noopener noreferrer" aria-label={aviso.texto + " (abre em nova aba)"}>{aviso.texto}<span aria-hidden="true"> ↗</span></a>
+        : aviso.texto}
     </li>);
   }
 
   return <section className="faixa-avisos" aria-label="Avisos da biblioteca" data-pausada={interrompida ? "true" : "false"}
+    onPointerDown={evento => { if (evento.pointerType === "touch" && !movimentoReduzido) definirPausada(true); }}
     style={{ "--duracao-avisos": duracao + "s", "--largura-avisos": larguraJanela + "px" }}>
     <strong className="faixa-avisos-rotulo">Avisos</strong>
     <div className="faixa-avisos-janela" ref={janelaRef}>
       <div className="faixa-avisos-trilho">
         <ul className="faixa-avisos-grupo" aria-live="off">{itens()}</ul>
-        <ul className="faixa-avisos-grupo faixa-avisos-copia" aria-hidden="true">{itens()}</ul>
+        <ul className="faixa-avisos-grupo faixa-avisos-copia" aria-hidden="true">{itens(true)}</ul>
       </div>
     </div>
     {!movimentoReduzido && <button type="button" className="faixa-avisos-pausa"

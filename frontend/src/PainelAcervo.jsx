@@ -23,6 +23,7 @@ import ParceirosSidebar from "./ParceirosSidebar.jsx";
 import ParceirosAdmin from "./ParceirosAdmin.jsx";
 import FaixaAvisos from "./FaixaAvisos.jsx";
 import AvisosAdmin from "./AvisosAdmin.jsx";
+import Tutorial from "./Tutorial.jsx";
 import { Alerta, AlternadorTema, Carregando, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, obterAreaInicial, obterAreaPermitida, obterPastaDaUrl } from "./navegacao.js";
 
@@ -553,7 +554,8 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
     historico: { codigo: "PL / 06", contexto: "Auditoria", titulo: "Histórico de atividades", texto: "Consulte as ações importantes realizadas no sistema." },
     drive: { codigo: "PL / 07", contexto: "Integração", titulo: "Google Drive", texto: "Confira a conexão e mantenha os materiais atualizados." },
     parceiros: { codigo: "PL / 10", contexto: "Administração", titulo: "Parceiros Plantel", texto: "Gerencie os parceiros exibidos na sidebar." },
-    avisos: { codigo: "PL / 11", contexto: "Administração", titulo: "Avisos da biblioteca", texto: "Publique mensagens curtas para os alunos." }
+    avisos: { codigo: "PL / 11", contexto: "Administração", titulo: "Avisos da biblioteca", texto: "Publique mensagens curtas para os alunos." },
+    tutorial: { codigo: "PL / 12", contexto: "Ajuda", titulo: "Como usar o Plantel", texto: "Um guia passo a passo para o seu perfil." }
   };
   const informacaoDaArea = informacoesDasAreas[areaAtual] || informacoesDasAreas.acervo;
 
@@ -574,6 +576,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           {usuario.papel === "aluno" && <ItemMenu area="meuHistorico" atual={areaAtual} icone="historico" texto="Meu Histórico" aoAbrir={navegar} />}
           {usuario.papel === "professor" && <ItemMenu area="minhasPastas" atual={areaAtual} icone="pasta" texto="Pastas liberadas" aoAbrir={navegar} />}
           {["aluno", "professor"].includes(usuario.papel) && <ItemMenu area="suporte" atual={areaAtual} icone="suporte" texto="Suporte" aoAbrir={navegar} />}
+          <ItemMenu area="tutorial" atual={areaAtual} icone="inicio" texto="Como usar" aoAbrir={navegar} />
           <a className="item-menu-link" href="https://planteldeduvidas.com.br" target="_blank" rel="noreferrer"><Icone nome="inicio" /><span>Site do Plantel</span></a>
           {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /><ItemMenu area="parceiros" atual={areaAtual} icone="parceiros" texto="Parceiros" aoAbrir={navegar} /><ItemMenu area="avisos" atual={areaAtual} icone="historico" texto="Avisos" aoAbrir={navegar} /></>}
         </nav>
@@ -595,6 +598,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
         {areaAtual === "acervo" && <BibliotecaAcervo usuario={usuario} aoMensagem={definirMensagem} />}
         {usuario.papel === "aluno" && areaAtual === "meuHistorico" && <MeuHistorico aoErro={mostrarErro} />}
         {["aluno", "professor"].includes(usuario.papel) && areaAtual === "suporte" && <Suporte usuario={usuario} />}
+        {areaAtual === "tutorial" && <Tutorial papel={usuario.papel} aoAbrir={navegar} />}
 
         {usuario.papel === "professor" && areaAtual === "minhasPastas" && <section className="cartao-painel painel-conteudo"><div className="cabecalho-bloco"><div><h2>Pastas liberadas para você</h2><p>Você pode adicionar, editar e mover materiais somente nestas pastas.</p></div></div><ul className="lista-pastas-professor">{minhasPermissoes.map(function renderizar(item) { return <li key={item.id}><span className="icone-lista"><Icone nome="pasta" /></span><span><strong>{item.categoria.nome}</strong><small>Você pode gerenciar os materiais desta pasta.</small></span></li>; })}</ul>{!minhasPermissoes.length && <Vazio titulo="Nenhuma pasta liberada" texto="Quando um administrador liberar uma pasta, ela aparecerá aqui." />}</section>}
 

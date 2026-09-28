@@ -3,7 +3,7 @@ const { validarId, validarDados } = require("./avisoValidator");
 
 function criarAvisoService(repository, auditoriaRepository) {
   const publico = registro => ({
-    id: Number(registro.id), texto: registro.texto, ativo: Boolean(registro.ativo), ordem: Number(registro.ordem)
+    id: Number(registro.id), texto: registro.texto, url: registro.url || null, ativo: Boolean(registro.ativo), ordem: Number(registro.ordem)
   });
 
   async function listar(apenasAtivos) {

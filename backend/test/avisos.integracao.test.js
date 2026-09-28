@@ -36,10 +36,13 @@ test("avisos: admin gerencia, usuarios veem apenas ativos e CSRF protege mutacoe
     assert.equal((await admin.agente.post("/api/avisos").send({ texto: "Sem CSRF" })).status, 403);
     assert.equal((await admin.agente.post("/api/avisos").set("X-CSRF-Token", admin.csrf).send({ texto: "<script>" })).status, 400);
     assert.equal((await admin.agente.post("/api/avisos").set("X-CSRF-Token", admin.csrf).send({ texto: "Texto", papel: "admin" })).status, 400);
+    assert.equal((await admin.agente.post("/api/avisos").set("X-CSRF-Token", admin.csrf).send({ texto: "Link inseguro", url: "javascript:alert(1)" })).status, 400);
+    assert.equal((await admin.agente.post("/api/avisos").set("X-CSRF-Token", admin.csrf).send({ texto: "Link sem TLS", url: "http://example.com" })).status, 400);
 
     const primeiro = await admin.agente.post("/api/avisos").set("X-CSRF-Token", admin.csrf)
-      .send({ texto: "Biblioteca atualizada hoje", ativo: true, ordem: 20 });
+      .send({ texto: "Biblioteca atualizada hoje", url: "https://parceiro.example.com/oferta", ativo: true, ordem: 20 });
     assert.equal(primeiro.status, 201);
+    assert.equal(primeiro.body.aviso.url, "https://parceiro.example.com/oferta");
     const segundo = await admin.agente.post("/api/avisos").set("X-CSRF-Token", admin.csrf)
       .send({ texto: "Novo simulado disponivel", ativo: true, ordem: 1 });
     const oculto = await admin.agente.post("/api/avisos").set("X-CSRF-Token", admin.csrf)
@@ -47,11 +50,13 @@ test("avisos: admin gerencia, usuarios veem apenas ativos e CSRF protege mutacoe
     assert.equal(segundo.status, 201);
     assert.equal(oculto.status, 201);
     assert.deepEqual((await aluno.agente.get("/api/avisos")).body.avisos.map(item => item.texto), ["Novo simulado disponivel", "Biblioteca atualizada hoje"]);
+    assert.equal((await aluno.agente.get("/api/avisos")).body.avisos[1].url, "https://parceiro.example.com/oferta");
     assert.deepEqual((await professor.agente.get("/api/avisos")).body.avisos.map(item => item.texto), ["Novo simulado disponivel", "Biblioteca atualizada hoje"]);
     assert.equal((await admin.agente.get("/api/avisos/admin")).body.avisos.length, 3);
     assert.equal((await admin.agente.patch("/api/avisos/" + primeiro.body.aviso.id).set("X-CSRF-Token", admin.csrf).send({ ativo: false })).status, 200);
+    assert.equal((await admin.agente.patch("/api/avisos/" + primeiro.body.aviso.id).set("X-CSRF-Token", admin.csrf).send({ url: "" })).body.aviso.url, null);
     const [auditorias] = await pool.execute("SELECT acao FROM auditoria_geral WHERE entidade='aviso_biblioteca' ORDER BY id");
-    assert.deepEqual(auditorias.map(item => item.acao), ["aviso_criado", "aviso_criado", "aviso_criado", "aviso_editado"]);
+    assert.deepEqual(auditorias.map(item => item.acao), ["aviso_criado", "aviso_criado", "aviso_criado", "aviso_editado", "aviso_editado"]);
   } finally {
     const [ids] = await pool.execute("SELECT id FROM avisos_biblioteca WHERE texto IN (?,?,?)", ["Biblioteca atualizada hoje", "Novo simulado disponivel", "Ainda em revisao"]);
     for (const item of ids) {

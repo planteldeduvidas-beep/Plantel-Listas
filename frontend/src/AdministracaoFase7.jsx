@@ -38,20 +38,20 @@ function GraficoUso({ dados }) {
   return (
     <div className="grafico-uso-completo">
       <div className="legenda-grafico">
-        <span><i className="legenda-acessos" /><span>Acessos<strong>{totais.acessos.toLocaleString("pt-BR")}</strong></span></span>
-        <span><i className="legenda-visualizacoes" /><span>Visualizações<strong>{totais.visualizacoes.toLocaleString("pt-BR")}</strong></span></span>
+        <span><i className="legenda-acessos" /><span>Navegações<strong>{totais.acessos.toLocaleString("pt-BR")}</strong></span></span>
+        <span><i className="legenda-visualizacoes" /><span>Aberturas<strong>{totais.visualizacoes.toLocaleString("pt-BR")}</strong></span></span>
         <span><i className="legenda-downloads" /><span>Downloads<strong>{totais.downloads.toLocaleString("pt-BR")}</strong></span></span>
       </div>
       <div className="area-grafico-uso">
         <div className="escala-grafico" aria-hidden="true">{marcas.map(function marca(valor, indice) { return <span key={indice}>{valor.toLocaleString("pt-BR")}</span>; })}</div>
-        <div className="grafico-uso" role="img" aria-label="Acessos, visualizações e downloads dos materiais por dia">
+        <div className="grafico-uso" role="img" aria-label="Navegações na biblioteca, aberturas de material e downloads por dia">
           {dados.map(function coluna(item) {
             const data = new Date(item.dia).toLocaleDateString("pt-BR");
             return (
               <div className="coluna-grafico" key={item.dia}>
                 <div className="grupo-barras-grafico">
-                  <span className="barra-grafico acessos" style={{ height: altura(item.acessos) }} title={item.acessos + " acessos em " + data}><b>{item.acessos}</b></span>
-                  <span className="barra-grafico visualizacoes" style={{ height: altura(item.visualizacoes) }} title={item.visualizacoes + " visualizações em " + data}><b>{item.visualizacoes}</b></span>
+                  <span className="barra-grafico acessos" style={{ height: altura(item.acessos) }} title={item.acessos + " navegações em " + data}><b>{item.acessos}</b></span>
+                  <span className="barra-grafico visualizacoes" style={{ height: altura(item.visualizacoes) }} title={item.visualizacoes + " aberturas em " + data}><b>{item.visualizacoes}</b></span>
                   <span className="barra-grafico downloads" style={{ height: altura(item.downloads) }} title={item.downloads + " downloads em " + data}><b>{item.downloads}</b></span>
                 </div>
                 <small>{new Date(item.dia).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</small>
@@ -62,6 +62,19 @@ function GraficoUso({ dados }) {
       </div>
     </div>
   );
+}
+
+function ResumoMensal({ dados }) {
+  if (!dados.length) return <Vazio titulo="Sem atividade mensal no período" />;
+  const maximo = Math.max(1, ...dados.map(item => item.acessos + item.visualizacoes + item.downloads));
+  return <div className="resumo-mensal">{dados.map(item => {
+    const rotulo = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(item.mes + "-01T12:00:00Z"));
+    const total = item.acessos + item.visualizacoes + item.downloads;
+    return <div className="resumo-mensal-item" key={item.mes}>
+      <strong>{rotulo}</strong><div className="resumo-mensal-barra" role="img" aria-label={total + " eventos em " + rotulo}><i style={{ width: Math.round(total / maximo * 100) + "%" }} /></div>
+      <small>{item.acessos} navegações · {item.visualizacoes} aberturas · {item.downloads} downloads</small>
+    </div>;
+  })}</div>;
 }
 
 function nomeAtividade(acao) {
@@ -205,7 +218,13 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
         {paginacao && <p className="texto-apoio">{paginacao.total} usuário(s) encontrado(s).</p>}
       </section>}
 
-      {area === "estatisticas" && analytics && <section className="bloco-admin painel-conteudo"><div className="cabecalho-bloco"><div><h2>Visão geral</h2><p>Dados reais dos materiais e de sua utilização.</p></div><div className="acoes-cabecalho"><label className="periodo-estatisticas">Período<select value={periodo} onChange={function mudar(evento) { definirPeriodo(Number(evento.target.value)); }}><option value="7">7 dias</option><option value="30">30 dias</option><option value="90">90 dias</option></select></label><a className="botao-secundario" href={obterUrlRelatorio(periodo)}><Icone nome="download" />Relatório CSV</a></div></div><div className="grade-estatisticas"><CartaoNumero titulo="Materiais" valor={analytics.resumo.materiais} /><CartaoNumero titulo="PDFs" valor={analytics.resumo.pdfs} /><CartaoNumero titulo="Vídeos" valor={analytics.resumo.videos} /><CartaoNumero titulo="Contas ativas" valor={analytics.resumo.usuariosAtivos} /><CartaoNumero titulo="Alunos" valor={analytics.resumo.alunos} /><CartaoNumero titulo="Professores" valor={analytics.resumo.professores} /></div><section className="painel-grafico"><div><h3>Uso dos materiais</h3><p>Acessos, visualizações e downloads por dia.</p></div><GraficoUso dados={analytics.evolucao} /></section><div className="grade-admin grade-dados"><div><h3>Materiais mais usados</h3><ol className="lista-simples">{analytics.materiaisMaisUsados.map(function item(material) { return <li key={material.id}><strong>{material.nome}</strong><small>{material.visualizacoes} visualizações · {material.downloads} downloads</small></li>; })}</ol>{!analytics.materiaisMaisUsados.length && <Vazio titulo="Ainda não há uso registrado" texto="Os dados aparecerão conforme os materiais forem utilizados." />}</div><div><h3>Termos mais pesquisados</h3><ol className="lista-simples">{analytics.termosMaisPesquisados.map(function item(busca) { return <li key={busca.termo}><strong>{busca.termo}</strong><small>{busca.quantidade} busca(s)</small></li>; })}</ol>{!analytics.termosMaisPesquisados.length && <Vazio titulo="Nenhuma pesquisa no período" />}</div><div><h3>Pastas mais acessadas</h3><ol className="lista-simples">{analytics.pastasMaisAcessadas.map(function item(pasta, indice) { return <li key={pasta.nome + "-" + indice}><strong>{pasta.nome}</strong><small>{pasta.quantidade} acesso(s)</small></li>; })}</ol></div><div><h3>Atividade da biblioteca</h3><ul className="lista-simples">{analytics.atividadeDoAcervo.map(function item(atividade) { return <li key={atividade.acao}><strong>{nomeAtividade(atividade.acao)}</strong><small>{atividade.quantidade} ocorrência(s)</small></li>; })}</ul></div></div></section>}
+      {area === "estatisticas" && analytics && <section className="bloco-admin painel-conteudo">
+        <div className="cabecalho-bloco"><div><h2>Visão geral</h2><p>Acervo e atividade da biblioteca, sem confundir navegações com pessoas.</p></div><div className="acoes-cabecalho"><label className="periodo-estatisticas">Período<select value={periodo} onChange={evento => definirPeriodo(Number(evento.target.value))}><option value="7">7 dias</option><option value="30">30 dias</option><option value="90">90 dias</option></select></label><a className="botao-secundario" href={obterUrlRelatorio(periodo)}><Icone nome="download" />Relatório CSV</a></div></div>
+        <div className="grade-estatisticas"><CartaoNumero titulo="Materiais" valor={analytics.resumo.materiais} /><CartaoNumero titulo="PDFs" valor={analytics.resumo.pdfs} /><CartaoNumero titulo="Vídeos" valor={analytics.resumo.videos} /><CartaoNumero titulo="Contas ativas" valor={analytics.resumo.usuariosAtivos} /><CartaoNumero titulo="Alunos" valor={analytics.resumo.alunos} /><CartaoNumero titulo="Professores" valor={analytics.resumo.professores} /></div>
+        <section className="painel-grafico"><div><h3>Atividade por dia</h3><p>Navegação = entrada em uma pasta ou na biblioteca (limitada por pessoa, pasta e hora). Abertura = PDF/vídeo; download = arquivo baixado. Não são logins nem visitantes únicos.</p></div><GraficoUso dados={analytics.evolucao} /></section>
+        <div className="grade-admin grade-dados grade-engajamento"><section><h3>Engajamento de alunos</h3><p>Pessoas distintas nos {periodo} dias selecionados; não são somas das barras diárias.</p><div className="numeros-engajamento"><CartaoNumero titulo="Navegaram" valor={analytics.engajamento.alunosComNavegacao} /><CartaoNumero titulo="Abriram ou baixaram" valor={analytics.engajamento.alunosComMaterial} /><CartaoNumero titulo="Pesquisas de alunos" valor={analytics.engajamento.buscas} /></div><p>{analytics.engajamento.taxaDeInteracao}% dos alunos que navegaram abriram ou baixaram material.</p></section><section><h3>Atividade por mês</h3><p>Totais dos dias incluídos no período selecionado; meses nas pontas podem ser parciais.</p><ResumoMensal dados={analytics.evolucaoMensal} /></section></div>
+        <div className="grade-admin grade-dados"><div><h3>Materiais mais usados</h3><ol className="lista-simples">{analytics.materiaisMaisUsados.map(material => <li key={material.id}><strong>{material.nome}</strong><small>{material.visualizacoes} aberturas · {material.downloads} downloads</small></li>)}</ol>{!analytics.materiaisMaisUsados.length && <Vazio titulo="Ainda não há uso registrado" />}</div><div><h3>Termos mais pesquisados</h3><p>Uma ocorrência por pessoa e termo a cada dia.</p><ol className="lista-simples">{analytics.termosMaisPesquisados.map(busca => <li key={busca.termo}><strong>{busca.termo}</strong><small>{busca.quantidade} ocorrência(s)</small></li>)}</ol>{!analytics.termosMaisPesquisados.length && <Vazio titulo="Nenhuma pesquisa no período" />}</div><div><h3>Pastas mais acessadas</h3><ol className="lista-simples">{analytics.pastasMaisAcessadas.map((pasta, indice) => <li key={pasta.nome + "-" + indice}><strong>{pasta.nome}</strong><small>{pasta.quantidade} navegação(ões)</small></li>)}</ol></div><div><h3>Atividade da biblioteca</h3><ul className="lista-simples">{analytics.atividadeDoAcervo.map(atividade => <li key={atividade.acao}><strong>{nomeAtividade(atividade.acao)}</strong><small>{atividade.quantidade} ocorrência(s)</small></li>)}</ul></div></div>
+      </section>}
 
       {area === "historico" && auditoria && <section className="bloco-admin painel-conteudo"><div className="cabecalho-bloco"><div><h2>Histórico de atividades</h2><p>Acompanhe ações importantes realizadas no sistema.</p></div></div><label className="filtro-historico">Mostrar<select value={acao} onChange={function mudar(evento) { definirAcao(evento.target.value); }}><option value="">Todas as atividades</option>{auditoria.acoes.map(function opcao(item) { return <option key={item} value={item}>{nomeAtividade(item)}</option>; })}</select></label><ul className="lista-historico">{auditoria.eventos.map(function evento(item) { return <li key={item.chave}><span className="icone-historico"><Icone nome="historico" /></span><span><strong>{nomeAtividade(item.acao)}</strong><small>{item.descricao} · por {item.ator}</small></span><time>{new Date(item.criadoEm).toLocaleString("pt-BR")}</time></li>; })}</ul>{!auditoria.eventos.length && <Vazio titulo="Nenhuma atividade encontrada" texto="Altere o filtro para consultar outros registros." />}</section>}
 

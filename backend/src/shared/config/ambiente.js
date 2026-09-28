@@ -292,7 +292,7 @@ function validarVariaveisDeAmbiente(variaveis) {
     }),
     suporte: Object.freeze({
       destinatario: validarEmailOpcional(
-        lerTextoOpcional(variaveis, "SUPPORT_EMAIL_TO"),
+        lerTextoOpcional(variaveis, "SUPPORT_EMAIL_TO") || lerTextoOpcional(variaveis, "SMTP_USER"),
         "SUPPORT_EMAIL_TO"
       )
     }),
