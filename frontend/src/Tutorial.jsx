@@ -50,7 +50,7 @@ const GUIAS = Object.freeze({
         passos: [
           "Abra Biblioteca no menu. Entre em uma pasta pelo nome ou use Buscar e Filtros para localizar o conteúdo.",
           "Para criar uma subpasta, toque em Nova pasta, informe o nome, confira o destino e confirme. Faça isso apenas dentro de uma pasta que você gerencia.",
-          "Para enviar um arquivo, toque em Adicionar material, selecione um PDF ou vídeo, confira a pasta de destino e toque em Adicionar material no formulário. Aguarde a mensagem de conclusão antes de repetir o envio.",
+          "Para enviar um arquivo, toque em Adicionar material, selecione um PDF ou vídeo e confira a pasta de destino. O Nome do material é opcional: escreva só o título, mesmo com números e pontos, pois a extensão correta é adicionada automaticamente. Toque em Adicionar material no formulário e aguarde a conclusão antes de repetir.",
           "Nos materiais que você pode gerenciar, abra as opções para editar o nome, mover, substituir o arquivo ou enviar para a lixeira. Confira o destino antes de salvar."
         ], dica: "Se a ação não estiver disponível ou for negada, confirme a pasta em Pastas liberadas."
       },
@@ -81,7 +81,7 @@ const GUIAS = Object.freeze({
         area: "acervo", titulo: "Biblioteca", resumo: "Cuide dos arquivos e das pastas do acervo.",
         passos: [
           "Abra Biblioteca. Use pastas, Busca e Filtros para chegar ao lugar desejado; confira o caminho antes de modificar algo.",
-          "Toque em Nova pasta para criar uma pasta no destino correto, ou em Adicionar material para escolher PDF/vídeo, pasta e classificação e iniciar o upload.",
+          "Toque em Nova pasta para criar uma pasta no destino correto. Para enviar um material, toque em Adicionar material, escolha PDF/vídeo, pasta e classificação. Nome do material é opcional: escreva só o título, mesmo com pontos como Prova 2020.21; a extensão correta é adicionada automaticamente. Confirme o envio e aguarde a conclusão.",
           "No material, abra as opções para renomear, mover, substituir ou enviar à lixeira. Confirme o nome e a pasta antes de salvar.",
           "Abra Lixeira para restaurar um item. A exclusão definitiva não pode ser desfeita: confira o item antes de confirmar."
         ], dica: "Mudanças em pastas e arquivos vinculados ao Google Drive também afetam a integração. Evite repetir uma ação enquanto ela estiver processando."

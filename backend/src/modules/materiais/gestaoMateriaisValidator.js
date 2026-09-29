@@ -69,11 +69,14 @@ async function identificarArquivo(arquivo, configuracao) {
 async function validarUpload(corpo, arquivo, configuracao) {
   validarCampos(corpo, ["categoriaId", "nome", "disciplinaId", "concursoId"]);
   const detectado = await identificarArquivo(arquivo, configuracao);
-  let nome = nomeSeguro(String(corpo.nome || "").trim(), arquivo.originalname);
-  if (!path.extname(nome)) nome += "." + detectado.extensao;
-  if (path.extname(nome).toLowerCase().slice(1) !== detectado.extensao) {
-    throw new AppError("O nome precisa manter a extensao do arquivo", 400, "EXTENSAO_INCOMPATIVEL");
+  let titulo = nomeSeguro(String(corpo.nome || "").trim(), arquivo.originalname);
+  const extensaoDoTitulo = path.extname(titulo).toLowerCase().slice(1);
+  if (["pdf", "mp4", "m4v", "webm"].includes(extensaoDoTitulo)) {
+    titulo = titulo.slice(0, -(extensaoDoTitulo.length + 1));
+  } else if (extensaoDoTitulo && !/^\d+$/.test(extensaoDoTitulo)) {
+    throw new AppError("Digite apenas o titulo; a extensao do arquivo e adicionada automaticamente", 400, "EXTENSAO_INCOMPATIVEL");
   }
+  const nome = nomeSeguro(titulo + "." + detectado.extensao);
   return {
     categoriaId: inteiroPositivo(corpo.categoriaId, "Pasta"),
     nome: nome,

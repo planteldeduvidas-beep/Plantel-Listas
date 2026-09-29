@@ -15,6 +15,9 @@ test("upload mobile aceita MIME generico e M4V sem aceitar assinatura ou MIME co
     const upload = await validarUpload({categoriaId:"10",nome:"Minha lista"},arquivo,config);
     assert.equal(upload.nome,"Minha lista.pdf");
     assert.equal(upload.mimeType,"application/pdf");
+    assert.equal((await validarUpload({categoriaId:"10",nome:"Prova 2020.21"},arquivo,config)).nome,"Prova 2020.21.pdf");
+    assert.equal((await validarUpload({categoriaId:"10",nome:"Minha lista.pdf"},arquivo,config)).nome,"Minha lista.pdf");
+    assert.equal((await validarUpload({categoriaId:"10",nome:"Minha lista.mp4"},arquivo,config)).nome,"Minha lista.pdf");
     await assert.rejects(validarUpload({categoriaId:"10",nome:"lista.exe"},arquivo,config),{codigo:"EXTENSAO_INCOMPATIVEL"});
     await assert.rejects(identificarArquivo({...arquivo,mimetype:"image/png"},config),{codigo:"TIPO_ARQUIVO_INVALIDO"});
     await fs.writeFile(caminho,"arquivo falso");

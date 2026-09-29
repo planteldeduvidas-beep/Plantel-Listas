@@ -71,6 +71,14 @@ function mensagemHumana(falhaOuMensagem) {
     return "Sua sessão terminou. Entre novamente.";
   }
 
+  if (codigo === "TIPO_ARQUIVO_INVALIDO") {
+    return "O arquivo selecionado não é um PDF ou vídeo válido. Confira o arquivo original.";
+  }
+
+  if (codigo === "EXTENSAO_INCOMPATIVEL") {
+    return "Digite só o título do material; a extensão do arquivo é adicionada automaticamente.";
+  }
+
   const traducoes = [
     [/Usuario sem permissao|sem permissao|forbidden/i, "Você não tem acesso a essa área."],
     [/Categoria nao encontrada/i, "Pasta não encontrada."],
@@ -81,7 +89,7 @@ function mensagemHumana(falhaOuMensagem) {
     [/SQL|database|banco indisponivel|ECONNREFUSED/i, "O sistema está temporariamente indisponível. Tente novamente em instantes."],
     [/Material nao encontrado/i, "Esse material não está mais disponível."],
     [/arquivo.*grande|limite.*arquivo/i, "Esse arquivo é maior que o limite permitido."],
-    [/tipo.*permitido|MIME|extensao/i, "Use um arquivo PDF ou vídeo compatível."],
+    [/tipo.*permitido|MIME/i, "O arquivo selecionado não é um PDF ou vídeo válido. Confira o arquivo original."],
     [/Autenticacao necessaria|não autenticado|nao autenticado/i, "Sua sessão terminou. Entre novamente."],
     [/Movimentacao criaria ciclo/i, "Essa pasta não pode ficar dentro de uma de suas próprias subpastas."],
     [/Categoria nao pode ser pai de si mesma/i, "Uma pasta não pode ficar dentro dela mesma."]
