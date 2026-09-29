@@ -84,6 +84,7 @@ export default function ParceirosSidebar({ versao }) {
         </a>
         <strong>{parceiro.nome}</strong>
         <p>{parceiro.descricao}</p>
+        <div className="parceiros-sidebar-acoes">
         {(parceiro.cupom || parceiro.desconto) && <div className="parceiros-sidebar-beneficio">
           {parceiro.cupom && <button type="button" onClick={copiarCupom} title="Copiar cupom">Cupom: {parceiro.cupom}</button>}
           {parceiro.desconto && <small>{parceiro.desconto}</small>}
@@ -91,6 +92,7 @@ export default function ParceirosSidebar({ versao }) {
         <a className="parceiros-sidebar-link" href={parceiro.link} target="_blank" rel="noopener noreferrer">
           {parceiro.textoBotao || "Conhecer parceiro"}<span aria-hidden="true">↗</span>
         </a>
+        </div>
       </div>
       </div>
       <span className="parceiros-sidebar-feedback" role="status">{feedback}</span>
