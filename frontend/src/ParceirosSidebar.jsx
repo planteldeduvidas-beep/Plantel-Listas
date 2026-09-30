@@ -90,7 +90,7 @@ export default function ParceirosSidebar({ versao }) {
           {parceiro.desconto && <small>{parceiro.desconto}</small>}
         </div>}
         <a className="parceiros-sidebar-link" href={parceiro.link} target="_blank" rel="noopener noreferrer">
-          {parceiro.textoBotao || "Conhecer parceiro"}<span aria-hidden="true">↗</span>
+          Conhecer parceiro<span aria-hidden="true">↗</span>
         </a>
         </div>
       </div>
