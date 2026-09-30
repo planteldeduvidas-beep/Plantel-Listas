@@ -6799,8 +6799,10 @@ textarea {
 .faixa-avisos-pausa:hover { background: #31423f; }
 .faixa-avisos :focus-visible { outline: 2px solid #f5d887; outline-offset: -3px; }
 .faixa-avisos[data-pausada="true"] .faixa-avisos-trilho,
-.faixa-avisos:hover .faixa-avisos-trilho,
-.faixa-avisos:focus-within .faixa-avisos-trilho { animation-play-state: paused; }
+.faixa-avisos-janela:focus-within .faixa-avisos-trilho { animation-play-state: paused; }
+@media (hover: hover) {
+  .faixa-avisos-janela:hover .faixa-avisos-trilho { animation-play-state: paused; }
+}
 @keyframes correr-avisos { to { transform: translateX(-50%); } }
 
 :root[data-tema="escuro"] .faixa-avisos { border: 1px solid #38514b; background: #1c2927; }
@@ -6832,11 +6834,16 @@ textarea {
   .formulario-aviso { padding: 16px; }
 }
 
+.faixa-avisos[data-estatica="true"] { align-items: stretch; }
+.faixa-avisos[data-estatica="true"] .faixa-avisos-trilho { width: 100%; animation: none; }
+.faixa-avisos[data-estatica="true"] .faixa-avisos-grupo { flex-wrap: wrap; justify-content: flex-start; min-width: 0; white-space: normal; gap: 8px 18px; padding: 10px 14px; }
+.faixa-avisos[data-estatica="true"] .faixa-avisos-copia { display: none; }
+/* O movimento só é retomado por escolha explícita quando a preferência é reduzir. */
 @media (prefers-reduced-motion: reduce) {
-  .faixa-avisos { align-items: stretch; }
-  .faixa-avisos-trilho { width: 100%; animation: none; }
-  .faixa-avisos-grupo { flex-wrap: wrap; justify-content: flex-start; min-width: 0; white-space: normal; gap: 8px 18px; padding: 10px 14px; }
-  .faixa-avisos-copia { display: none; }
+  .faixa-avisos[data-estatica="false"] .faixa-avisos-trilho {
+    animation-duration: var(--duracao-avisos, 30s) !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 /* Instalação/atualização PWA: aviso curto, dispensável e fora da navegação. */
