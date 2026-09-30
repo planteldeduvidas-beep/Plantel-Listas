@@ -1,11 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
-import { listarAvisos } from "./api.js";
+import { listarAvisos, listarParceiros } from "./api.js";
+import { combinarAvisosParceiros } from "./avisosParceiros.js";
 
 export default function FaixaAvisos({ avisos: avisosFornecidos }) {
   const [avisosCarregados, definirAvisosCarregados] = useState([]);
+  const [parceiros, definirParceiros] = useState([]);
   const [paginaOculta, definirPaginaOculta] = useState(document.hidden);
   const [larguraJanela, definirLarguraJanela] = useState(0);
   const janelaRef = useRef(null);
+  const grupoRef = useRef(null);
+  const [larguraBase, definirLarguraBase] = useState(0);
+  const repeticoes = larguraBase > 0 ? Math.max(1, Math.ceil(larguraJanela / larguraBase)) : 1;
+
+  useEffect(() => {
+    let ativo = true;
+    listarParceiros().then(resposta => { if (ativo) definirParceiros(resposta.parceiros || []); })
+      .catch(() => { if (ativo) definirParceiros([]); });
+    return () => { ativo = false; };
+  }, []);
 
   useEffect(() => {
     if (avisosFornecidos !== undefined) return undefined;
@@ -26,19 +38,21 @@ export default function FaixaAvisos({ avisos: avisosFornecidos }) {
     if (!janelaRef.current) return undefined;
     const observador = new ResizeObserver(entradas => definirLarguraJanela(entradas[0].contentRect.width));
     observador.observe(janelaRef.current);
-    return () => observador.disconnect();
-  }, [avisosFornecidos, avisosCarregados]);
+    const medirGrupo = new ResizeObserver(() => definirLarguraBase(grupoRef.current.getBoundingClientRect().width / repeticoes));
+    medirGrupo.observe(grupoRef.current);
+    return () => { observador.disconnect(); medirGrupo.disconnect(); };
+  }, [avisosFornecidos, avisosCarregados, parceiros, repeticoes]);
 
-  const avisos = avisosFornecidos === undefined ? avisosCarregados : avisosFornecidos;
+  const avisos = combinarAvisosParceiros(avisosFornecidos === undefined ? avisosCarregados : avisosFornecidos, parceiros);
   if (!avisos.length) return null;
-  const duracao = Math.max(22, Math.min(55, avisos.reduce((total, aviso) => total + aviso.texto.length, 0) * 0.22));
+  const duracao = Math.max(22, larguraBase * repeticoes / 40);
 
   function itens(copia = false) {
-    return avisos.map(aviso => <li key={aviso.id} className="faixa-avisos-item">
-      <span className="faixa-avisos-separador" aria-hidden="true" />{aviso.url && !copia
-        ? <a className="faixa-avisos-link" href={aviso.url} target="_blank" rel="noopener noreferrer" aria-label={aviso.texto + " (abre em nova aba)"}>{aviso.texto}<span aria-hidden="true"> ↗</span></a>
+    return Array.from({ length: repeticoes }, (_, repeticao) => avisos.map(aviso => <li key={`${repeticao}-${aviso.id}`} className="faixa-avisos-item" aria-hidden={copia || repeticao > 0 ? true : undefined}>
+      <span className="faixa-avisos-separador" aria-hidden="true" />{aviso.url
+        ? <a className="faixa-avisos-link" href={aviso.url} tabIndex={copia || repeticao > 0 ? -1 : undefined} target="_blank" rel="noopener noreferrer" aria-label={aviso.texto + " (abre em nova aba)"}>{aviso.texto}<span aria-hidden="true"> ↗</span></a>
         : aviso.texto}
-    </li>);
+    </li>));
   }
 
   return <section className="faixa-avisos" aria-label="Avisos da biblioteca" data-pausada={paginaOculta ? "true" : "false"}
@@ -46,7 +60,7 @@ export default function FaixaAvisos({ avisos: avisosFornecidos }) {
     <strong className="faixa-avisos-rotulo">Avisos</strong>
     <div className="faixa-avisos-janela" ref={janelaRef}>
       <div className="faixa-avisos-trilho">
-        <ul className="faixa-avisos-grupo" aria-live="off">{itens()}</ul>
+        <ul className="faixa-avisos-grupo" ref={grupoRef} aria-live="off">{itens()}</ul>
         <ul className="faixa-avisos-grupo faixa-avisos-copia" aria-hidden="true">{itens(true)}</ul>
       </div>
     </div>

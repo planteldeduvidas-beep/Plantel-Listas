@@ -46,7 +46,7 @@ export default function AvisosAdmin({ aoMensagem, aoErro }) {
 
   const ativos = avisos.filter(item => item.ativo);
   return <section className="bloco-admin painel-conteudo painel-avisos-admin">
-    <div className="cabecalho-bloco"><div><h2>Avisos da biblioteca</h2><p>Mensagens curtas para a faixa exibida aos alunos. Nada é publicado automaticamente.</p></div>
+    <div className="cabecalho-bloco"><div><h2>Avisos da biblioteca</h2><p>Mensagens para a faixa dos alunos. Os parceiros ativos também aparecem automaticamente, com os links, benefícios e cupons cadastrados em Parceiros.</p></div>
       {!aberto && <button type="button" onClick={() => { definirEditando(null); definirDados(inicial); definirAberto(true); }}>+ Novo aviso</button>}
     </div>
     {aberto && <form className="formulario-aviso" onSubmit={salvar}>
@@ -66,7 +66,7 @@ export default function AvisosAdmin({ aoMensagem, aoErro }) {
       <div className="acoes-formulario"><button type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar aviso"}</button>
         <button type="button" className="secundario" disabled={salvando} onClick={fechar}>Cancelar</button></div>
     </form>}
-    {!!ativos.length && <div className="previa-avisos"><h3>Prévia da faixa</h3><FaixaAvisos avisos={ativos} /></div>}
+    <div className="previa-avisos"><h3>Prévia da faixa</h3><FaixaAvisos avisos={ativos} /></div>
     <ul className="lista-avisos-admin">{avisos.map(item => <li key={item.id}>
       <span><strong>{item.texto}</strong><small>Ordem {item.ordem} · {item.ativo ? "Ativo" : "Arquivado"}{item.url ? " · Com link" : ""}</small></span>
       <div className="lista-avisos-admin-acoes"><button type="button" className="secundario" onClick={() => editar(item)}>Editar</button>

@@ -6772,13 +6772,12 @@ textarea {
 .faixa-avisos-grupo {
   display: flex;
   align-items: center;
-  justify-content: space-around;
+  justify-content: flex-start;
   flex: 0 0 auto;
-  min-width: var(--largura-avisos, 100%);
   min-height: 46px;
   gap: 40px;
   margin: 0;
-  padding: 0 28px 0 0;
+  padding: 0 40px 0 0;
   list-style: none;
   white-space: nowrap;
 }
@@ -6813,7 +6812,7 @@ textarea {
 @media (max-width: 720px) {
   .faixa-avisos { min-height: 42px; margin-bottom: 16px; }
   .faixa-avisos-rotulo { padding: 0 10px; font-size: .61rem; }
-  .faixa-avisos-grupo { min-height: 42px; gap: 24px; }
+  .faixa-avisos-grupo { min-height: 42px; gap: 24px; padding-right: 24px; }
   .faixa-avisos-item { font-size: .74rem; }
   .formulario-aviso { padding: 16px; }
 }
@@ -6821,7 +6820,7 @@ textarea {
 /* A faixa permanece automática, com velocidade menor nesta preferência. */
 @media (prefers-reduced-motion: reduce) {
   .faixa-avisos .faixa-avisos-trilho {
-    animation-duration: 55s !important;
+    animation-duration: max(55s, var(--duracao-avisos, 30s)) !important;
     animation-iteration-count: infinite !important;
   }
 }
