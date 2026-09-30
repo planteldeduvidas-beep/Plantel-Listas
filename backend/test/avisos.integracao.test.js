@@ -54,6 +54,7 @@ test("avisos: admin gerencia, usuarios veem apenas ativos e CSRF protege mutacoe
     assert.deepEqual((await professor.agente.get("/api/avisos")).body.avisos.map(item => item.texto), ["Novo simulado disponivel", "Biblioteca atualizada hoje"]);
     assert.equal((await admin.agente.get("/api/avisos/admin")).body.avisos.length, 3);
     assert.equal((await admin.agente.patch("/api/avisos/" + primeiro.body.aviso.id).set("X-CSRF-Token", admin.csrf).send({ ativo: false })).status, 200);
+    assert.deepEqual((await aluno.agente.get("/api/avisos")).body.avisos.map(item => item.texto), ["Novo simulado disponivel"]);
     assert.equal((await admin.agente.patch("/api/avisos/" + primeiro.body.aviso.id).set("X-CSRF-Token", admin.csrf).send({ url: "" })).body.aviso.url, null);
     const [auditorias] = await pool.execute("SELECT acao FROM auditoria_geral WHERE entidade='aviso_biblioteca' ORDER BY id");
     assert.deepEqual(auditorias.map(item => item.acao), ["aviso_criado", "aviso_criado", "aviso_criado", "aviso_editado", "aviso_editado"]);
@@ -65,6 +66,36 @@ test("avisos: admin gerencia, usuarios veem apenas ativos e CSRF protege mutacoe
     }
     await pool.execute("DELETE FROM sessoes WHERE usuario_id IN (SELECT id FROM usuarios WHERE email LIKE ?)", [prefixo + "%"]);
     await pool.execute("DELETE FROM usuarios WHERE email LIKE ?", [prefixo + "%"]);
+  }
+});
+
+test("migration cadastra parceiros sem truncar, duplicar ou sobrescrever avisos arquivados", async () => {
+  const fs = require("node:fs/promises");
+  const path = require("node:path");
+  const urls = ["https://migration-avisos.example.com/ativo?ref=Plantel", "https://migration-avisos.example.com/inativo", "https://migration-avisos.example.com/existente"];
+  const descricao = "Preparação ".repeat(20).trim();
+  try {
+    for (const [nome, url, ativo, ordem] of [["Parceiro teste", urls[0], 1, 3], ["Duplicado", urls[0], 1, 4], ["Inativo", urls[1], 0, 5], ["Existente", urls[2], 1, 6]]) {
+      await pool.execute("INSERT INTO parceiros_plantel (nome,descricao,url_externa,ativo,ordem,cupom,desconto) VALUES (?,?,?,?,?,?,?)",
+        [nome, descricao, url, ativo, ordem, "PLANTEL10", "10%"]);
+    }
+    await pool.execute("INSERT INTO avisos_biblioteca (texto,url,ativo,ordem) VALUES (?,?,0,99)", ["Texto editado pelo admin", urls[2]]);
+    const sql = await fs.readFile(path.resolve(__dirname, "../migrations/022_cadastrar_avisos_parceiros.sql"), "utf8");
+    for (let rodada = 0; rodada < 2; rodada++) {
+      for (const comando of sql.split(";").filter(item => item.trim())) await pool.query(comando);
+      const [avisos] = await pool.execute("SELECT texto,url,ativo,ordem FROM avisos_biblioteca WHERE url IN (?,?,?) ORDER BY ordem", urls);
+      assert.equal(avisos.length, 3);
+      assert.equal(avisos[0].texto, `Parceiro teste · ${descricao} · 10% · Cupom: PLANTEL10`);
+      assert.equal(avisos[0].url, urls[0]);
+      assert.equal(avisos[0].ativo, 1);
+      assert.equal(avisos[1].ativo, 0);
+      assert.equal(avisos[2].texto, "Texto editado pelo admin");
+      assert.equal(avisos[2].ativo, 0);
+      assert.equal(avisos[2].ordem, 99);
+    }
+  } finally {
+    await pool.execute("DELETE FROM avisos_biblioteca WHERE url IN (?,?,?)", urls);
+    await pool.execute("DELETE FROM parceiros_plantel WHERE url_externa IN (?,?,?)", urls);
   }
 });
 

@@ -18,7 +18,7 @@ function validarDados(corpo, parcial = false) {
   if (!parcial || Object.hasOwn(corpo, "texto")) {
     if (typeof corpo.texto !== "string") throw erro("Texto invalido");
     const texto = corpo.texto.trim().replace(/\s+/g, " ");
-    if (!texto || texto.length > 160 || /[<>\u0000-\u001f\u007f]/.test(texto)) throw erro("Texto invalido");
+    if (!texto || texto.length > 600 || /[<>\u0000-\u001f\u007f]/.test(texto)) throw erro("Texto invalido");
     dados.texto = texto;
   }
   if (!parcial || Object.hasOwn(corpo, "url")) {

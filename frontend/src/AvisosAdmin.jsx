@@ -46,12 +46,12 @@ export default function AvisosAdmin({ aoMensagem, aoErro }) {
 
   const ativos = avisos.filter(item => item.ativo);
   return <section className="bloco-admin painel-conteudo painel-avisos-admin">
-    <div className="cabecalho-bloco"><div><h2>Avisos da biblioteca</h2><p>Mensagens para a faixa dos alunos. Os parceiros ativos também aparecem automaticamente, com os links, benefícios e cupons cadastrados em Parceiros.</p></div>
+    <div className="cabecalho-bloco"><div><h2>Avisos da biblioteca</h2><p>Gerencie aqui todas as mensagens e divulgações de parceiros da faixa dos alunos. Edite o texto, link e ordem ou arquive um aviso para retirá-lo da faixa. O cadastro em Parceiros é independente.</p></div>
       {!aberto && <button type="button" onClick={() => { definirEditando(null); definirDados(inicial); definirAberto(true); }}>+ Novo aviso</button>}
     </div>
     {aberto && <form className="formulario-aviso" onSubmit={salvar}>
       <h3>{editando ? "Editar aviso" : "Criar aviso"}</h3>
-      <label>Texto do aviso<input required maxLength="160" value={dados.texto}
+      <label>Texto do aviso<input required maxLength="600" value={dados.texto}
         onChange={evento => definirDados(atual => ({ ...atual, texto: evento.target.value }))}
         placeholder="Ex.: Novo material disponível na biblioteca" /></label>
       <label>Link HTTPS (opcional)<input type="url" inputMode="url" maxLength="2048" pattern="https://.*" value={dados.url}

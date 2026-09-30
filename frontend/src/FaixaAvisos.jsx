@@ -1,23 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { listarAvisos, listarParceiros } from "./api.js";
-import { combinarAvisosParceiros } from "./avisosParceiros.js";
+import { listarAvisos } from "./api.js";
 
 export default function FaixaAvisos({ avisos: avisosFornecidos }) {
   const [avisosCarregados, definirAvisosCarregados] = useState([]);
-  const [parceiros, definirParceiros] = useState([]);
   const [paginaOculta, definirPaginaOculta] = useState(document.hidden);
   const [larguraJanela, definirLarguraJanela] = useState(0);
   const janelaRef = useRef(null);
   const grupoRef = useRef(null);
   const [larguraBase, definirLarguraBase] = useState(0);
   const repeticoes = larguraBase > 0 ? Math.max(1, Math.ceil(larguraJanela / larguraBase)) : 1;
-
-  useEffect(() => {
-    let ativo = true;
-    listarParceiros().then(resposta => { if (ativo) definirParceiros(resposta.parceiros || []); })
-      .catch(() => { if (ativo) definirParceiros([]); });
-    return () => { ativo = false; };
-  }, []);
 
   useEffect(() => {
     if (avisosFornecidos !== undefined) return undefined;
@@ -41,9 +32,9 @@ export default function FaixaAvisos({ avisos: avisosFornecidos }) {
     const medirGrupo = new ResizeObserver(() => definirLarguraBase(grupoRef.current.getBoundingClientRect().width / repeticoes));
     medirGrupo.observe(grupoRef.current);
     return () => { observador.disconnect(); medirGrupo.disconnect(); };
-  }, [avisosFornecidos, avisosCarregados, parceiros, repeticoes]);
+  }, [avisosFornecidos, avisosCarregados, repeticoes]);
 
-  const avisos = combinarAvisosParceiros(avisosFornecidos === undefined ? avisosCarregados : avisosFornecidos, parceiros);
+  const avisos = avisosFornecidos === undefined ? avisosCarregados : avisosFornecidos;
   if (!avisos.length) return null;
   const duracao = Math.max(22, larguraBase * repeticoes / 40);
 

@@ -88,8 +88,10 @@ test("faixa de avisos fica restrita a biblioteca do aluno e respeita movimento r
 
   assert.match(painel, /usuario\.papel === "aluno" && areaAtual === "acervo" && <FaixaAvisos/);
   assert.match(painel, /area="avisos"/);
-  assert.match(faixa, /prefers-reduced-motion: reduce/);
-  assert.match(faixa, /Pausar avisos/);
+  const css = fs.readFileSync(path.resolve(__dirname, "../../frontend/src/styles.css"), "utf8");
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\.faixa-avisos-trilho/);
+  assert.doesNotMatch(faixa, /Pausar avisos|listarParceiros|combinarAvisosParceiros/);
+  assert.match(faixa, /const avisos = avisosFornecidos === undefined \? avisosCarregados : avisosFornecidos/);
   assert.match(faixa, /rel="noopener noreferrer"/);
   assert.match(faixa, /itens\(true\)/);
 });
