@@ -3,10 +3,7 @@ import { listarAvisos } from "./api.js";
 
 export default function FaixaAvisos({ avisos: avisosFornecidos }) {
   const [avisosCarregados, definirAvisosCarregados] = useState([]);
-  const [pausada, definirPausada] = useState(false);
   const [paginaOculta, definirPaginaOculta] = useState(document.hidden);
-  const [movimentoReduzido, definirMovimentoReduzido] = useState(false);
-  const [movimentoAutorizado, definirMovimentoAutorizado] = useState(false);
   const [larguraJanela, definirLarguraJanela] = useState(0);
   const janelaRef = useRef(null);
 
@@ -18,17 +15,6 @@ export default function FaixaAvisos({ avisos: avisosFornecidos }) {
     }).catch(() => { if (ativo) definirAvisosCarregados([]); });
     return () => { ativo = false; };
   }, [avisosFornecidos]);
-
-  useEffect(() => {
-    const consulta = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const atualizar = () => {
-      definirMovimentoReduzido(consulta.matches);
-      definirMovimentoAutorizado(false);
-    };
-    atualizar();
-    consulta.addEventListener("change", atualizar);
-    return () => consulta.removeEventListener("change", atualizar);
-  }, []);
 
   useEffect(() => {
     const atualizar = () => definirPaginaOculta(document.hidden);
@@ -46,9 +32,6 @@ export default function FaixaAvisos({ avisos: avisosFornecidos }) {
   const avisos = avisosFornecidos === undefined ? avisosCarregados : avisosFornecidos;
   if (!avisos.length) return null;
   const duracao = Math.max(22, Math.min(55, avisos.reduce((total, aviso) => total + aviso.texto.length, 0) * 0.22));
-  const interrompida = pausada || paginaOculta;
-  const estatica = movimentoReduzido && !movimentoAutorizado;
-  const podeRetomar = pausada || estatica;
 
   function itens(copia = false) {
     return avisos.map(aviso => <li key={aviso.id} className="faixa-avisos-item">
@@ -58,9 +41,7 @@ export default function FaixaAvisos({ avisos: avisosFornecidos }) {
     </li>);
   }
 
-  return <section className="faixa-avisos" aria-label="Avisos da biblioteca" data-pausada={interrompida ? "true" : "false"}
-    data-estatica={estatica ? "true" : "false"}
-    onPointerDown={evento => { if (evento.pointerType === "touch" && !estatica && !evento.target.closest(".faixa-avisos-pausa")) definirPausada(true); }}
+  return <section className="faixa-avisos" aria-label="Avisos da biblioteca" data-pausada={paginaOculta ? "true" : "false"}
     style={{ "--duracao-avisos": duracao + "s", "--largura-avisos": larguraJanela + "px" }}>
     <strong className="faixa-avisos-rotulo">Avisos</strong>
     <div className="faixa-avisos-janela" ref={janelaRef}>
@@ -69,13 +50,5 @@ export default function FaixaAvisos({ avisos: avisosFornecidos }) {
         <ul className="faixa-avisos-grupo faixa-avisos-copia" aria-hidden="true">{itens(true)}</ul>
       </div>
     </div>
-    <button type="button" className="faixa-avisos-pausa"
-      aria-label={podeRetomar ? "Reproduzir avisos" : "Pausar avisos"} aria-pressed={podeRetomar}
-      onClick={() => {
-        if (podeRetomar) {
-          definirMovimentoAutorizado(true);
-          definirPausada(false);
-        } else definirPausada(true);
-      }}>{podeRetomar ? "Reproduzir" : "Pausar"}</button>
   </section>;
 }

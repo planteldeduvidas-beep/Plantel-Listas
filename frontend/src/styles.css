@@ -6784,19 +6784,6 @@ textarea {
 }
 .faixa-avisos-item { display: flex; align-items: center; flex: 0 0 auto; gap: 12px; font-size: .81rem; font-weight: 620; }
 .faixa-avisos-separador { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: #9bd5b5; }
-.faixa-avisos-pausa {
-  flex: 0 0 auto;
-  min-width: 78px;
-  padding: 0 12px;
-  border: 0;
-  border-left: 1px solid rgb(255 255 255 / 16%);
-  border-radius: 0;
-  color: #e3efec;
-  background: #23312f;
-  font-size: .73rem;
-  font-weight: 700;
-}
-.faixa-avisos-pausa:hover { background: #31423f; }
 .faixa-avisos :focus-visible { outline: 2px solid #f5d887; outline-offset: -3px; }
 .faixa-avisos[data-pausada="true"] .faixa-avisos-trilho,
 .faixa-avisos-janela:focus-within .faixa-avisos-trilho { animation-play-state: paused; }
@@ -6806,8 +6793,6 @@ textarea {
 @keyframes correr-avisos { to { transform: translateX(-50%); } }
 
 :root[data-tema="escuro"] .faixa-avisos { border: 1px solid #38514b; background: #1c2927; }
-:root[data-tema="escuro"] .faixa-avisos-pausa { background: #1c2927; }
-:root[data-tema="escuro"] .faixa-avisos-pausa:hover { background: #2b3d39; }
 
 .formulario-aviso { display: grid; gap: 14px; margin: 18px 0; padding: 20px; border: 1px solid var(--cor-borda); border-radius: 10px; }
 .formulario-aviso h3, .previa-avisos h3 { margin: 0; }
@@ -6830,18 +6815,13 @@ textarea {
   .faixa-avisos-rotulo { padding: 0 10px; font-size: .61rem; }
   .faixa-avisos-grupo { min-height: 42px; gap: 24px; }
   .faixa-avisos-item { font-size: .74rem; }
-  .faixa-avisos-pausa { min-width: 59px; padding: 0 7px; font-size: .65rem; }
   .formulario-aviso { padding: 16px; }
 }
 
-.faixa-avisos[data-estatica="true"] { align-items: stretch; }
-.faixa-avisos[data-estatica="true"] .faixa-avisos-trilho { width: 100%; animation: none; }
-.faixa-avisos[data-estatica="true"] .faixa-avisos-grupo { flex-wrap: wrap; justify-content: flex-start; min-width: 0; white-space: normal; gap: 8px 18px; padding: 10px 14px; }
-.faixa-avisos[data-estatica="true"] .faixa-avisos-copia { display: none; }
-/* O movimento só é retomado por escolha explícita quando a preferência é reduzir. */
+/* A faixa permanece automática, com velocidade menor nesta preferência. */
 @media (prefers-reduced-motion: reduce) {
-  .faixa-avisos[data-estatica="false"] .faixa-avisos-trilho {
-    animation-duration: var(--duracao-avisos, 30s) !important;
+  .faixa-avisos .faixa-avisos-trilho {
+    animation-duration: 55s !important;
     animation-iteration-count: infinite !important;
   }
 }
