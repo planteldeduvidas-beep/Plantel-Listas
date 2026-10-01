@@ -10,6 +10,7 @@ function mapearCategoria(registro) {
     nome: registro.nome,
     descricao: registro.descricao,
     categoriaPaiId: registro.categoria_pai_id,
+    vinculadaDrive: Boolean(registro.drive_pasta_id),
     ordem: registro.ordem,
     ativo: registro.ativo === 1,
     criadoEm: registro.criado_em,
@@ -44,7 +45,7 @@ function criarEstruturaAcervoRepository(pool) {
   async function listarCategorias(apenasAtivas) {
     const condicao = apenasAtivas ? "WHERE ativo = 1 " : "";
     const [registros] = await pool.execute(
-      "SELECT id, nome, descricao, categoria_pai_id, ordem, ativo, criado_em, atualizado_em "
+      "SELECT id, nome, descricao, categoria_pai_id, ordem, ativo, criado_em, atualizado_em, drive_pasta_id "
       + "FROM categorias " + condicao
       + "ORDER BY categoria_pai_chave ASC, ordem ASC, nome ASC, id ASC"
     );
@@ -54,7 +55,7 @@ function criarEstruturaAcervoRepository(pool) {
   async function buscarCategoriaPorId(categoriaId, executorInformado, bloquear) {
     const executor = executorInformado || pool;
     const [registros] = await executor.execute(
-      "SELECT id, nome, descricao, categoria_pai_id, ordem, ativo, criado_em, atualizado_em "
+      "SELECT id, nome, descricao, categoria_pai_id, ordem, ativo, criado_em, atualizado_em, drive_pasta_id "
       + "FROM categorias WHERE id = ? LIMIT 1" + (bloquear ? " FOR UPDATE" : ""),
       [categoriaId]
     );

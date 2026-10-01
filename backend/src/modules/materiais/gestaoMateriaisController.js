@@ -1,6 +1,7 @@
 function criarGestaoMateriaisController(service) {
   async function responder(req,res,next,acao,status){try{res.status(status||200).json(await acao());}catch(erro){next(erro);}}
   return {
+    vincularPasta:function vincularPasta(req,res,next){return responder(req,res,next,()=>service.vincularPasta(req.usuario,req.params.categoriaId));},
     excluirPasta:function excluirPasta(req,res,next){return responder(req,res,next,function executar(){return service.excluirPasta(req.usuario,req.params.categoriaId);});},
     listarPastas:function listarPastas(req,res,next){return responder(req,res,next,function executar(){return service.listarPastas(req.usuario);});},
     criarPasta:function criarPasta(req,res,next){return responder(req,res,next,function executar(){return service.criarPasta(req.usuario,req.body);},201);},

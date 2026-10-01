@@ -108,7 +108,8 @@ const GUIAS = Object.freeze({
         area: "organizacao", titulo: "Organização", resumo: "Mantenha pastas, disciplinas e concursos organizados.",
         passos: [
           "Em Organização, use Localizar pasta para encontrar uma pasta pelo nome e conferir se ela é principal ou filha.",
-          "Toque em Nova pasta para informar nome e destino. Na lista, use Editar para dados permitidos ou Ocultar/Mostrar para controlar a visibilidade.",
+          "Toque em Nova pasta para informar nome e destino. Uma pasta principal é criada dentro da raiz do acervo no Google Drive; uma subpasta é criada dentro da pasta escolhida. Aguarde a confirmação antes de enviar materiais.",
+          "Se uma pasta antiga mostrar Vincular ao Drive, use esse botão para corrigir o cadastro mantendo seus acessos. Vincule primeiro a pasta principal e depois suas subpastas. Se houver nomes duplicados ou conflito, o sistema interrompe a operação para revisão.",
           "Mais abaixo, gerencie os catálogos Disciplinas e Concursos, que são opções usadas nos filtros e na classificação.",
           "Para renomear ou mover uma pasta vinculada ao Google Drive, use o fluxo da Biblioteca; a edição somente local é bloqueada para evitar divergência."
         ], dica: "Antes de ocultar uma pasta, verifique se ela contém materiais que alunos ou professores ainda precisam."

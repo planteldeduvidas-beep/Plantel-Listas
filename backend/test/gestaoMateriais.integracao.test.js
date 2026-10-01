@@ -18,6 +18,7 @@ let sequencia=0;
 const operacoes=[];
 const itensDrive=new Map();
 const provider={
+  buscarPastasPorNome:async function(token,pai,nome){return [...itensDrive.values()].filter(item=>item.name===nome && !item.trashed && item.mimeType==='application/vnd.google-apps.folder' && (item.parents||[]).includes(pai));},
   pastaPossuiFilhos:async function(token,id){return [...itensDrive.values()].some(item=>!item.trashed&&(item.parents||[]).includes(id));},
   escopo:ESCOPO_GESTAO,pastaRaizId:configuracao.googleDrive.pastaRaizId,
   obterItem:async function obter(token,id){return itensDrive.get(id)||{id:id,name:"externo",mimeType:"application/vnd.google-apps.folder",parents:["foraDaRaiz"],trashed:false};},
@@ -40,6 +41,44 @@ async function autenticar(papel){const agente=request.agent(app);const csrf=(awa
 
 test.beforeEach(async function preparar(){await limpar();operacoes.length=0;itensDrive.clear();itensDrive.set(configuracao.googleDrive.pastaRaizId,{id:configuracao.googleDrive.pastaRaizId,mimeType:"application/vnd.google-apps.folder",parents:[],trashed:false});itensDrive.set("driveAreaA",{id:"driveAreaA",mimeType:"application/vnd.google-apps.folder",parents:[configuracao.googleDrive.pastaRaizId],trashed:false});itensDrive.set("driveAreaB",{id:"driveAreaB",mimeType:"application/vnd.google-apps.folder",parents:["driveAreaA"],trashed:false});itensDrive.set("driveProibida",{id:"driveProibida",mimeType:"application/vnd.google-apps.folder",parents:[configuracao.googleDrive.pastaRaizId],trashed:false});itensDrive.set("driveMaterial6",{id:"driveMaterial6",name:"original.pdf",mimeType:"application/pdf",parents:["driveAreaA"],trashed:false});usuarios={admin:await usuario("admin6@example.com","admin"),professor:await usuario("prof6@example.com","professor"),aluno:await usuario("aluno6@example.com","aluno")};const[a]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Area A','driveAreaA')");pastaA=Number(a.insertId);const[b]=await pool.execute("INSERT INTO categorias(nome,categoria_pai_id,drive_pasta_id)VALUES('Subarea B',?,'driveAreaB')",[pastaA]);pastaB=Number(b.insertId);const[p]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Proibida','driveProibida')");pastaProibida=Number(p.insertId);await pool.execute("INSERT INTO permissoes_professor_categoria(professor_id,categoria_id,concedida_por_usuario_id)VALUES(?,?,?)",[usuarios.professor.id,pastaA,usuarios.admin.id]);const[m]=await pool.execute("INSERT INTO materiais(drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,extensao,tamanho_bytes,disponivel,ultima_sincronizacao_drive_id)VALUES('driveMaterial6','driveAreaA',?,'original.pdf','application/pdf','pdf','pdf',20,1,NULL)",[pastaA]);materialId=Number(m.insertId);});
 test.afterEach(async function limparDisciplinasDoProfessor(){await pool.execute("DELETE FROM professor_disciplinas");});
+
+test("Organizacao cria principal e subpasta no Drive com metadados; professor nao cria principal", async function() {
+  const admin=await autenticar("admin");
+  const raiz=await admin.agente.post("/api/categorias").set("X-CSRF-Token",admin.csrf).send({nome:"Resolucao principal",descricao:"Material resolvido",ordem:4});
+  assert.equal(raiz.status,201,JSON.stringify(raiz.body));
+  assert.equal(raiz.body.categoria.vinculadaDrive,true);
+  assert.equal(raiz.body.categoria.descricao,"Material resolvido");
+  assert.equal(raiz.body.categoria.ordem,4);
+  const filha=await admin.agente.post("/api/categorias").set("X-CSRF-Token",admin.csrf).send({nome:"Subpasta",categoriaPaiId:raiz.body.categoria.id});
+  assert.equal(filha.status,201,JSON.stringify(filha.body));
+  const [registros]=await pool.execute("SELECT drive_pasta_id FROM categorias WHERE id=?",[raiz.body.categoria.id]);
+  assert.deepEqual(itensDrive.get(registros[0].drive_pasta_id).parents,[provider.pastaRaizId]);
+  const destinos=await admin.agente.get("/api/gestao-materiais/pastas");
+  assert.ok(destinos.body.some(p=>p.id===filha.body.categoria.id));
+  const professor=await autenticar("professor");
+  assert.equal((await professor.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",professor.csrf).send({nome:"Proibida",categoriaPaiId:null})).status,403);
+  assert.equal((await admin.agente.post("/api/categorias").set("X-CSRF-Token",admin.csrf).send({nome:"Teste",drivePastaId:"injetado"})).status,400);
+});
+
+test("vincula legado preservando ID e permissao; repete sem duplicar e recusa ambiguidade", async function() {
+  const admin=await autenticar("admin");
+  const [criada]=await pool.execute("INSERT INTO categorias(nome) VALUES ('Resolucao legada')");
+  const id=Number(criada.insertId);
+  await pool.execute("INSERT INTO permissoes_professor_categoria(professor_id,categoria_id,concedida_por_usuario_id)VALUES(?,?,?)",[usuarios.professor.id,id,usuarios.admin.id]);
+  const vincular=()=>admin.agente.post(`/api/gestao-materiais/pastas/${id}/vincular-drive`).set("X-CSRF-Token",admin.csrf);
+  assert.equal((await admin.agente.post(`/api/gestao-materiais/pastas/${id}/vincular-drive`)).status,403);
+  assert.equal((await vincular()).status,200);
+  assert.equal((await vincular()).status,200);
+  assert.equal(operacoes.filter(op=>op[0]==="criar-pasta").length,1);
+  assert.ok((await admin.agente.get("/api/gestao-materiais/pastas")).body.some(p=>p.id===id));
+  const [permissoes]=await pool.execute("SELECT id FROM permissoes_professor_categoria WHERE categoria_id=? AND revogada_em IS NULL",[id]);
+  assert.equal(permissoes.length,1);
+  const [outra]=await pool.execute("INSERT INTO categorias(nome) VALUES ('Ambigua')");
+  for(const driveId of ['ambigua1','ambigua2']) itensDrive.set(driveId,{id:driveId,name:'Ambigua',mimeType:'application/vnd.google-apps.folder',parents:[provider.pastaRaizId]});
+  const conflito=await admin.agente.post(`/api/gestao-materiais/pastas/${outra.insertId}/vincular-drive`).set("X-CSRF-Token",admin.csrf);
+  assert.equal(conflito.status,409);
+  assert.equal(conflito.body.erro.codigo,"PASTA_DRIVE_AMBIGUA");
+});
 
 test("pasta recém-criada e vazia aparece nos destinos e aceita o primeiro upload", async function() {
   const admin = await autenticar("admin");

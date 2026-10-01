@@ -1,3 +1,5 @@
+const AppError = require("../../shared/errors/AppError");
+
 function mapearMaterial(item) {
   if (!item) return null;
   return {
@@ -128,9 +130,18 @@ function criarGestaoMateriaisRepository(pool) {
 
   async function criarPasta(dados, usuarioId, operacaoChave) {
     return executarTransacao(async function criar(conexao) {
+      if (dados.categoriaExistenteId) {
+        const [resultado] = await conexao.execute(
+          "UPDATE categorias SET drive_pasta_id=? WHERE id=? AND drive_pasta_id IS NULL AND ativo=1 AND nome=? AND categoria_pai_id <=> ?",
+          [dados.drivePastaId,dados.categoriaExistenteId,dados.nome,dados.categoriaPaiId]);
+        if (resultado.affectedRows !== 1) throw new AppError("Pasta mudou durante vinculacao",409,"PASTA_CONCORRENTE");
+        await conexao.execute("INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado) VALUES (?,'pasta_vinculada_drive','pasta',?,'concluida')", [usuarioId,dados.categoriaExistenteId]);
+        await concluirOperacaoNaTransacao(conexao,operacaoChave,null);
+        return {id:dados.categoriaExistenteId,nome:dados.nome,categoriaPaiId:dados.categoriaPaiId};
+      }
       const [resultado] = await conexao.execute(
-        "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id,ativo,disciplina_estado) VALUES (?,?,?,1,'herdar')",
-        [dados.nome,dados.categoriaPaiId,dados.drivePastaId]
+        "INSERT INTO categorias (nome,categoria_pai_id,drive_pasta_id,ativo,disciplina_estado,descricao,ordem) VALUES (?,?,?,1,'herdar',?,?)",
+        [dados.nome,dados.categoriaPaiId,dados.drivePastaId,dados.descricao || null,dados.ordem || 0]
       );
       const id = Number(resultado.insertId);
       await conexao.execute("INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado,contexto) VALUES (?,'pasta_criada','pasta',?,'concluida',?)", [usuarioId,id,JSON.stringify({categoriaPaiId:dados.categoriaPaiId})]);
@@ -372,7 +383,11 @@ function criarGestaoMateriaisRepository(pool) {
     return registros.map(mapearOperacaoDrive);
   }
 
-  return { excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
+  async function possuiVinculacaoPendente(id) {
+    const [linhas] = await pool.execute("SELECT id FROM operacoes_google_drive_pendentes WHERE tipo='pasta_criacao' AND fase<>'concluida' AND JSON_UNQUOTE(JSON_EXTRACT(detalhes,'$.categoriaExistenteId'))=? LIMIT 1", [String(id)]);
+    return linhas.length > 0;
+  }
+  return { possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
 }
 
 module.exports = criarGestaoMateriaisRepository;

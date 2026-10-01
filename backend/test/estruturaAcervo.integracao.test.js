@@ -92,6 +92,14 @@ async function autenticar(chave) {
 }
 
 async function criarCategoria(sessao, dados) {
+  // Fixtures legadas sem vinculo: mantem cobertura de edicao/reativacao e
+  // permissoes preexistentes. A criacao HTTP integrada e testada em gestaoMateriais.
+  if (sessao.usuario.papel === "admin") {
+    const repository = require("../src/modules/categorias/estruturaAcervoRepository")(pool);
+    const service = require("../src/modules/categorias/estruturaAcervoService")(repository);
+    try { return {status:201,body:{categoria:await service.criarCategoria(dados)}}; }
+    catch (erro) { return {status:erro.statusCode,body:{erro:{codigo:erro.codigo}}}; }
+  }
   return sessao.agente
     .post("/api/categorias")
     .set("X-CSRF-Token", sessao.csrf)
@@ -137,7 +145,7 @@ test("migration cria tabelas InnoDB, indices e constraints da fase 3", async fun
   }), true);
 });
 
-test("admin cria hierarquia e catalogos visiveis para aluno", async function testarEstruturaPublica() {
+test("hierarquia legada e catalogos continuam visiveis para aluno", async function testarEstruturaPublica() {
   const admin = await autenticar("admin");
   const aluno = await autenticar("aluno");
   const raiz = await criarCategoria(admin, { nome: "Listas", ordem: 1 });

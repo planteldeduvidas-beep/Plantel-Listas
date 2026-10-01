@@ -1,4 +1,4 @@
-function criarEstruturaAcervoController(service) {
+function criarEstruturaAcervoController(service, criarPastaIntegrada) {
   function responderLista(nome, operacao) {
     return async function executarLista(req, res, next) {
       try {
@@ -13,7 +13,7 @@ function criarEstruturaAcervoController(service) {
   function responderCriacao(nome, operacao) {
     return async function executarCriacao(req, res, next) {
       try {
-        const registro = await operacao(req.body);
+        const registro = await operacao(req.body, req.usuario);
         res.status(201).json({ [nome]: registro });
       } catch (erro) {
         next(erro);
@@ -45,7 +45,7 @@ function criarEstruturaAcervoController(service) {
     listarPublica: listarPublica,
     categorias: {
       listar: responderLista("categorias", service.listarCategorias),
-      criar: responderCriacao("categoria", service.criarCategoria),
+      criar: responderCriacao("categoria", criarPastaIntegrada || service.criarCategoria),
       editar: responderEdicao("categoria", service.editarCategoria),
       alterarAtivo: responderEdicao("categoria", service.alterarCategoriaAtivo)
     },

@@ -270,6 +270,10 @@ function criarPastaNoDrive(nome, categoriaPaiId) {
   return requisitar("/gestao-materiais/pastas", { method:"POST", body:JSON.stringify({nome:nome,categoriaPaiId:categoriaPaiId}) });
 }
 
+export function vincularPastaAoDrive(id) {
+  return requisitar("/gestao-materiais/pastas/" + id + "/vincular-drive", { method: "POST" });
+}
+
 function renomearPastaNoDrive(id, nome) {
   return requisitar("/gestao-materiais/pastas/" + id + "/nome", { method:"PATCH", body:JSON.stringify({nome:nome}) });
 }

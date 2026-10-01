@@ -134,7 +134,12 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   const rateLimiters = criarRateLimiters(configuracao);
   const estruturaRepository = criarEstruturaAcervoRepository(pool);
   const estruturaService = criarEstruturaAcervoService(estruturaRepository);
-  const estruturaController = criarEstruturaAcervoController(estruturaService);
+  const estruturaController = criarEstruturaAcervoController(estruturaService, async function criarPastaIntegrada(corpo, usuario) {
+    const { validarCategoria } = require("./modules/categorias/estruturaAcervoValidator");
+    const dados = validarCategoria(corpo, false);
+    const criada = await gestaoMateriaisService.criarPasta(usuario, dados);
+    return estruturaRepository.buscarCategoriaPorId(criada.id);
+  });
   const estruturaRoutes = criarEstruturaAcervoRoutes({
     controller: estruturaController,
     autenticar: autenticar,

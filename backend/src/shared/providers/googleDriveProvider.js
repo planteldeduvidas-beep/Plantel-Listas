@@ -509,6 +509,16 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     }, token);
   }
 
+  async function buscarPastasPorNome(refreshToken, paiId, nome) {
+    const escapar = valor => String(valor).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const resposta = await requisitarDrive("", {
+      q: "'" + escapar(paiId) + "' in parents and name='" + escapar(nome) + "' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+      pageSize: 2, supportsAllDrives: true, includeItemsFromAllDrives: true,
+      fields: "files(id,name,mimeType,parents,trashed)"
+    }, await obterTokenDeAcesso(refreshToken));
+    return resposta.files || [];
+  }
+
   async function buscarArquivoPorOperacao(refreshToken, operacaoChave) {
     if (!/^[0-9a-f-]{36}$/i.test(operacaoChave || "")) return null;
     const token = await obterTokenDeAcesso(refreshToken);
@@ -704,6 +714,7 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     encerrarCanal: encerrarCanal,
     obterItem: obterItem,
     buscarArquivoPorOperacao: buscarArquivoPorOperacao,
+    buscarPastasPorNome: buscarPastasPorNome,
     verificarDescendenteDaRaiz: verificarDescendenteDaRaiz,
     criarPasta: criarPasta,
     criarArquivo: criarArquivo,

@@ -17,6 +17,7 @@ function criarGestaoMateriaisRoutes(dependencias){
   });
   router.get("/pastas",dependencias.controller.listarPastas);
   router.post("/pastas",protegerContraCsrf,dependencias.controller.criarPasta);
+  router.post("/pastas/:categoriaId/vincular-drive",dependencias.autorizarAdmin,protegerContraCsrf,dependencias.controller.vincularPasta);
   router.patch("/pastas/:categoriaId/nome",protegerContraCsrf,dependencias.controller.renomearPasta);
   router.delete("/pastas/:categoriaId",dependencias.autorizarAdmin,protegerContraCsrf,dependencias.controller.excluirPasta);
   router.post("/",protegerContraCsrf,dependencias.rateLimiter,upload,dependencias.controller.adicionar);

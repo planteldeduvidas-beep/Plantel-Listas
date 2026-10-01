@@ -7,6 +7,36 @@ const AppError = require("../src/shared/errors/AppError");
 const criarService = require("../src/modules/materiais/gestaoMateriaisService");
 const { ESCOPO_GESTAO } = require("../src/shared/providers/googleDriveProvider");
 
+test("vinculacao preserva pasta preexistente em falha SQL e nao compensa commit incerto", async () => {
+  for (const preexistente of [false, true]) for (const incerto of [false, true]) {
+    const erro = new Error("falha SQL");
+    if (incerto) erro.estadoCommit = "desconhecido";
+    const fases = [];
+    const item = {id:"drivePastaNova",name:"Legada",mimeType:"application/vnd.google-apps.folder",parents:["drivePasta20"]};
+    const d = criarDependencias({repository:{
+      buscarCategoria:async id => id === 10 ? {id:10,nome:"Legada",ativo:true,categoriaPaiId:20,drivePastaId:null} : categoria(id),
+      possuiVinculacaoPendente:async()=>false, buscarCategoriaPorDriveId:async()=>null,
+      criarOperacaoDrive:async()=>{}, atualizarOperacaoDrive:async()=>{}, concluirOperacaoDrive:async()=>{},
+      registrarFalhaOperacaoDrive:async(chave,fase)=>fases.push(fase), criarPasta:async()=>{throw erro;}
+    },provider:{buscarPastasPorNome:async()=>preexistente?[item]:[], criarPasta:async()=>item}});
+    await assert.rejects(d.service.vincularPasta({id:2,papel:"admin"},10),/falha SQL/);
+    assert.deepEqual(d.chamadas, !preexistente && !incerto ? ["excluir"] : []);
+    assert.deepEqual(fases,incerto?["commit_incerto"]:[]);
+  }
+});
+
+test("retomada da vinculacao usa ID legado e nao cria segunda pasta", async () => {
+  const registros=[];
+  const d=criarDependencias({repository:{
+    listarOperacoesDrivePendentes:async()=>[{chave:"operacao",tipo:"pasta_criacao",usuarioId:2,detalhes:{categoriaExistenteId:10,categoriaPaiId:20,pastaPaiDriveId:"drivePasta20",driveFileId:"drivePastaNova"}}],
+    buscarCategoriaPorDriveId:async()=>null,
+    criarPasta:async dados=>registros.push(dados)
+  },provider:{obterItem:async()=>({id:"drivePastaNova",name:"Legada",mimeType:"application/vnd.google-apps.folder",parents:["drivePasta20"]})}});
+  assert.equal(await d.service.recuperarOperacoesPendentes(),1);
+  assert.equal(registros[0].categoriaExistenteId,10);
+  assert.deepEqual(d.chamadas,[]);
+});
+
 function material() {
   return { id: 1, nome: "original.pdf", driveFileId: "driveOriginal", driveParentFileId: "drivePasta", categoriaId: 10, categoriaDriveId: "drivePasta", estado: "disponivel", versao: 1 };
 }

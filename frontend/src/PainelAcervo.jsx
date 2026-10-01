@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   listarEstruturaPublica,
+  vincularPastaAoDrive,
   listarUsuarios,
   categorias as apiCategorias,
   disciplinas as apiDisciplinas,
@@ -412,6 +413,13 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
     }
   }
 
+  async function vincularCategoria(categoria) {
+    try {
+      await vincularPastaAoDrive(categoria.id);
+      await carregar("Pasta vinculada ao Drive e disponível para materiais.");
+    } catch (falha) { mostrarErro(falha.message); }
+  }
+
   async function alternarCategoria(categoria) {
     try {
       await apiCategorias.alterarAtivo(categoria.id, !categoria.ativo);
@@ -668,7 +676,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
                 return (
                   <li key={categoria.id} className={categoria.ativo ? "" : "inativo"}>
                     <span className="identidade-pasta-admin"><span className="icone-pasta-admin"><Icone nome="pasta" tamanho={18} /></span><span><strong>{categoria.nome}</strong><small>{pastaPai ? "Dentro de " + pastaPai.nome : "Pasta principal"}</small>{!categoria.ativo && <small className="estado-item">Oculta para os usuários</small>}</span></span>
-                    <div><button type="button" className="secundario" onClick={function editar() { iniciarEdicaoCategoria(categoria); }}>Editar</button><button type="button" className="secundario" onClick={function alternar() { alternarCategoria(categoria); }}>{categoria.ativo ? "Ocultar" : "Mostrar"}</button></div>
+                    <div>{!categoria.vinculadaDrive && categoria.ativo && <button type="button" className="secundario" onClick={() => vincularCategoria(categoria)}>Vincular ao Drive</button>}<button type="button" className="secundario" onClick={function editar() { iniciarEdicaoCategoria(categoria); }}>Editar</button><button type="button" className="secundario" onClick={function alternar() { alternarCategoria(categoria); }}>{categoria.ativo ? "Ocultar" : "Mostrar"}</button></div>
                   </li>
                 );
               })}

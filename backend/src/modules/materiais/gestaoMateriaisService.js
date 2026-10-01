@@ -124,7 +124,7 @@ function criarGestaoMateriaisService(dependencias) {
   }
 
   function validarNomePasta(corpo) {
-    if (!corpo || Object.keys(corpo).some(function invalido(chave) { return !["nome", "categoriaPaiId"].includes(chave); })) {
+    if (!corpo || Object.keys(corpo).some(function invalido(chave) { return !["nome", "categoriaPaiId", "descricao", "ordem"].includes(chave); })) {
       throw new AppError("Campos de pasta invalidos",400,"DADOS_INVALIDOS");
     }
     const nome = typeof corpo.nome === "string" ? corpo.nome.trim() : "";
@@ -145,12 +145,15 @@ function criarGestaoMateriaisService(dependencias) {
   async function criarPasta(usuario, corpo) {
     exigirPapelDeGestao(usuario);
     const nome = validarNomePasta(corpo);
-    const categoriaPaiId = inteiroPositivo(corpo.categoriaPaiId,"Pasta pai");
-    const pai = await exigirCategoria(usuario,categoriaPaiId);
-    await exigirDisciplinaParaCriacao(usuario,pai.id);
+    const { validarCategoria } = require("../categorias/estruturaAcervoValidator");
+    const dados = validarCategoria(corpo, false);
+    const categoriaPaiId = dados.categoriaPaiId;
+    if (categoriaPaiId === null && usuario.papel !== "admin") throw new AppError("Somente admin pode criar pasta principal",403,"SEM_PERMISSAO");
+    const pai = categoriaPaiId === null ? { id: null, drivePastaId: provider.pastaRaizId } : await exigirCategoria(usuario,categoriaPaiId);
+    if (pai.id !== null) await exigirDisciplinaParaCriacao(usuario,pai.id);
     const refreshToken = await token();
     await exigirPastaDoAcervo(refreshToken,pai.drivePastaId);
-    const detalhes = {nome:nome,categoriaPaiId:pai.id,pastaPaiDriveId:pai.drivePastaId};
+    const detalhes = {nome:nome,categoriaPaiId:pai.id,pastaPaiDriveId:pai.drivePastaId,descricao:dados.descricao,ordem:dados.ordem};
     const operacao = await iniciarOperacaoDrive("pasta_criacao",usuario.id,null,detalhes);
     let criada;
     try {
@@ -161,9 +164,41 @@ function criarGestaoMateriaisService(dependencias) {
       await deixarOperacaoPendente(operacao,"reconciliacao_pendente",erro,detalhes);
       throw erro;
     }
-    try { return await repository.criarPasta({nome:criada.name || nome,categoriaPaiId:pai.id,drivePastaId:criada.id},usuario.id,operacao); }
+    try { return await repository.criarPasta({...dados,nome:criada.name || nome,categoriaPaiId:pai.id,drivePastaId:criada.id},usuario.id,operacao); }
     catch (erro) {
       return tratarFalhaDepoisDoDrive(operacao,erro,detalhes,function removerPastaNova() { return provider.excluirArquivo(refreshToken,criada.id); });
+    }
+  }
+
+  async function vincularPasta(usuario, idInformado) {
+    if (!usuario || usuario.papel !== "admin") throw new AppError("Somente admin pode vincular pastas",403,"SEM_PERMISSAO");
+    const id = inteiroPositivo(idInformado,"Pasta");
+    const categoria = await repository.buscarCategoria(id);
+    if (!categoria || !categoria.ativo) throw new AppError("Pasta indisponivel",404,"PASTA_NAO_ENCONTRADA");
+    if (categoria.drivePastaId) return {id:categoria.id};
+    if (await repository.possuiVinculacaoPendente(id)) throw new AppError("Vinculacao em recuperacao. Aguarde a reconciliacao",409,"VINCULACAO_PENDENTE");
+    validarNomePasta({nome:categoria.nome});
+    const pai = categoria.categoriaPaiId === null ? {drivePastaId:provider.pastaRaizId} : await exigirCategoria(usuario,categoria.categoriaPaiId);
+    const refreshToken = await token();
+    await exigirPastaDoAcervo(refreshToken,pai.drivePastaId);
+    const candidatas = await executarGoogle(() => provider.buscarPastasPorNome(refreshToken,pai.drivePastaId,categoria.nome));
+    if (candidatas.length > 1) throw new AppError("Mais de uma pasta com esse nome no Drive. Revise antes de vincular",409,"PASTA_DRIVE_AMBIGUA");
+    if (candidatas.length && await repository.buscarCategoriaPorDriveId(candidatas[0].id)) throw new AppError("Pasta do Drive ja vinculada a outro cadastro",409,"PASTA_DRIVE_JA_VINCULADA");
+    const detalhes = {nome:categoria.nome,categoriaPaiId:categoria.categoriaPaiId,pastaPaiDriveId:pai.drivePastaId,categoriaExistenteId:id,preexistente:!!candidatas.length};
+    if (candidatas.length) detalhes.driveFileId = candidatas[0].id;
+    const operacao = await iniciarOperacaoDrive("pasta_criacao",usuario.id,null,detalhes);
+    let criada;
+    try {
+      criada = candidatas[0] || await executarGoogle(() => provider.criarPasta(refreshToken,categoria.nome,pai.drivePastaId,operacao));
+      detalhes.driveFileId = criada.id;
+      await atualizarOperacaoDrive(operacao,"drive_confirmado",detalhes);
+    } catch (erro) {
+      await deixarOperacaoPendente(operacao,"reconciliacao_pendente",erro,detalhes);
+      throw erro;
+    }
+    try { return await repository.criarPasta({nome:categoria.nome,categoriaPaiId:categoria.categoriaPaiId,drivePastaId:criada.id,categoriaExistenteId:id},usuario.id,operacao); }
+    catch (erro) {
+      return tratarFalhaDepoisDoDrive(operacao,erro,detalhes,async () => { if (!detalhes.preexistente) await provider.excluirArquivo(refreshToken,criada.id); });
     }
   }
 
@@ -462,8 +497,11 @@ function criarGestaoMateriaisService(dependencias) {
       }
       const existente = await repository.buscarCategoriaPorDriveId(item.id);
       if (!existente) {
-        await repository.criarPasta({nome:item.name,categoriaPaiId:detalhes.categoriaPaiId,drivePastaId:item.id},operacao.usuarioId,operacao.chave);
-      } else await concluirOperacaoDrive(operacao.chave);
+        await repository.criarPasta({nome:item.name,categoriaPaiId:detalhes.categoriaPaiId,drivePastaId:item.id,descricao:detalhes.descricao,ordem:detalhes.ordem,categoriaExistenteId:detalhes.categoriaExistenteId},operacao.usuarioId,operacao.chave);
+      } else {
+        if (detalhes.categoriaExistenteId && existente.id !== detalhes.categoriaExistenteId) throw new AppError("Pasta vinculada a outro cadastro",409,"PASTA_DRIVE_JA_VINCULADA");
+        await concluirOperacaoDrive(operacao.chave);
+      }
       return;
     }
     if (operacao.tipo === "pasta_renomeacao") {
@@ -569,6 +607,7 @@ function criarGestaoMateriaisService(dependencias) {
       return executarComTravaDeOperacao(function executar() { return excluirDefinitivamente(usuario, id, corpo); });
     },
     listarPastas: listarPastas,
+    vincularPasta: function vincularComTrava(usuario,id) { return executarComTravaDeOperacao(() => vincularPasta(usuario,id)); },
     excluirPasta: function excluirPastaComTrava(usuario,id) { return executarComTravaDeOperacao(function executar() { return excluirPasta(usuario,id); }); },
     criarPasta: function criarPastaComTrava(usuario,corpo) { return executarComTravaDeOperacao(function executar() { return criarPasta(usuario,corpo); }); },
     renomearPasta: function renomearPastaComTrava(usuario,id,corpo) { return executarComTravaDeOperacao(function executar() { return renomearPasta(usuario,id,corpo); }); },
