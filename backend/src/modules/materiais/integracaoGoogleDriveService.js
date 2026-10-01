@@ -172,6 +172,7 @@ function criarIntegracaoGoogleDriveService(dependencias) {
       etapa = "credencial";
       credencialDeUso = await obterCredencialDeUso(conexao);
       etapa = "listar_drive";
+      const inicioDaListagem = await repository.obterInicioDaListagem(conexao);
       await repository.liberarTravaDeSincronizacao(conexao);
       conexao = null;
       travaAtiva = false;
@@ -197,7 +198,8 @@ function criarIntegracaoGoogleDriveService(dependencias) {
         conexao,
         sincronizacaoId,
         arvore,
-        provider.pastaRaizId
+        provider.pastaRaizId,
+        inicioDaListagem
       );
       etapa = "concluir";
       await repository.concluirSincronizacao(conexao, sincronizacaoId, resumo);

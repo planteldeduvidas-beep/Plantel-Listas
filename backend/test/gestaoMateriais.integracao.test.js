@@ -80,6 +80,24 @@ test("vincula legado preservando ID e permissao; repete sem duplicar e recusa am
   assert.equal(conflito.body.erro.codigo,"PASTA_DRIVE_AMBIGUA");
 });
 
+test("admin reativa pasta vinculada oculta somente se ainda estiver no mesmo lugar no Drive", async function() {
+  const admin=await autenticar("admin");
+  const url=`/api/gestao-materiais/pastas/${pastaB}/vincular-drive`;
+  await pool.execute("UPDATE categorias SET ativo=0 WHERE id=?",[pastaB]);
+  const recuperada=await admin.agente.post(url).set("X-CSRF-Token",admin.csrf);
+  assert.equal(recuperada.status,200,JSON.stringify(recuperada.body));
+  assert.ok((await admin.agente.get("/api/gestao-materiais/pastas")).body.some(p=>p.id===pastaB));
+  const [auditoria]=await pool.execute("SELECT id FROM auditoria_geral WHERE entidade_id=? AND acao='pasta_reativada_drive'",[pastaB]);
+  assert.equal(auditoria.length,1);
+
+  await pool.execute("UPDATE categorias SET ativo=0 WHERE id=?",[pastaB]);
+  itensDrive.get("driveAreaB").parents=["driveProibida"];
+  const movida=await admin.agente.post(url).set("X-CSRF-Token",admin.csrf);
+  assert.equal(movida.status,409);
+  const [estado]=await pool.execute("SELECT ativo FROM categorias WHERE id=?",[pastaB]);
+  assert.equal(Number(estado[0].ativo),0);
+});
+
 test("pasta recém-criada e vazia aparece nos destinos e aceita o primeiro upload", async function() {
   const admin = await autenticar("admin");
   const criada = await admin.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token", admin.csrf)

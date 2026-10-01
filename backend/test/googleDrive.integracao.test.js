@@ -476,6 +476,11 @@ test("nova sincronizacao atualiza nomes e marca arquivos ausentes sem apagar reg
     size: "4096",
     parentId: "drivePastaMatematica12345"
   });
+  // A coluna legado de materiais guarda segundos: um item alterado no mesmo
+  // segundo da varredura deve esperar o ciclo seguinte antes de ser ocultado.
+  await pool.execute(
+    "UPDATE materiais SET atualizado_em=DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 2 SECOND) WHERE drive_file_id='driveArquivoPdf12345'"
+  );
 
   const resposta = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
     .set("X-CSRF-Token", admin.csrf).send({});
@@ -527,6 +532,45 @@ test("POST desacopla a sincronizacao, expoe status e impede concorrencia", async
   await execucao;
   const concluida = await admin.agente.get("/api/integracoes/google-drive/status");
   assert.equal(concluida.body.googleDrive.ultimaSincronizacao.status, "concluida");
+});
+
+test("varredura nao oculta pastas ou materiais alterados enquanto o Drive era listado", async function() {
+  const admin=await autenticar("admin");
+  await admin.agente.post("/api/integracoes/google-drive/sincronizar").set("X-CSRF-Token",admin.csrf).send({});
+  await executarProximaTarefa();
+  const [anterior]=await pool.execute("SELECT MAX(id) AS id FROM sincronizacoes_google_drive");
+  const sincronizacaoAnterior=Number(anterior[0].id);
+  const [recente]=await pool.execute(
+    "INSERT INTO categorias(nome,drive_pasta_id,ultima_sincronizacao_drive_id,atualizado_em) VALUES ('Pasta recente','driveRecente',?,'2020-01-01 00:00:00')",
+    [sincronizacaoAnterior]
+  );
+  const [antiga]=await pool.execute(
+    "INSERT INTO categorias(nome,drive_pasta_id,ultima_sincronizacao_drive_id,atualizado_em) VALUES ('Pasta antiga','driveAntiga',?,'2020-01-01 00:00:00')",
+    [sincronizacaoAnterior]
+  );
+  const [arquivo]=await pool.execute(
+    "INSERT INTO materiais(drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,disponivel,ultima_sincronizacao_drive_id,atualizado_em) VALUES ('driveArquivoRecente','driveRecente',?,'antes.pdf','application/pdf','pdf',1,?,'2020-01-01 00:00:00')",
+    [recente.insertId,sincronizacaoAnterior]
+  );
+  let liberarListagem;
+  esperaDaListagem=new Promise(resolve=>{liberarListagem=resolve;});
+  const listagemIniciada=new Promise(resolve=>{avisarInicioDaListagem=resolve;});
+  const solicitada=await admin.agente.post("/api/integracoes/google-drive/sincronizar").set("X-CSRF-Token",admin.csrf).send({});
+  assert.equal(solicitada.status,202);
+  const execucao=tarefasAgendadas.shift()();
+  await listagemIniciada;
+  try {
+    await pool.execute("UPDATE categorias SET nome='Pasta recente alterada' WHERE id=?",[recente.insertId]);
+    await pool.execute("UPDATE materiais SET nome='depois.pdf' WHERE id=?",[arquivo.insertId]);
+  } finally {
+    liberarListagem();
+    await execucao;
+  }
+  const [pastas]=await pool.execute("SELECT id,ativo FROM categorias WHERE id IN (?,?)",[recente.insertId,antiga.insertId]);
+  assert.equal(Number(pastas.find(p=>Number(p.id)===Number(recente.insertId)).ativo),1);
+  assert.equal(Number(pastas.find(p=>Number(p.id)===Number(antiga.insertId)).ativo),0);
+  const [materiais]=await pool.execute("SELECT disponivel FROM materiais WHERE id=?",[arquivo.insertId]);
+  assert.equal(Number(materiais[0].disponivel),1);
 });
 
 test("worker persiste falha sem manter a requisicao HTTP aberta", async function testarFalha() {

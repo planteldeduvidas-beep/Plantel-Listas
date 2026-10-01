@@ -26,7 +26,9 @@ function criarCenario(opcoes) {
       return conexao;
     },
     marcarSincronizando: async function marcar() { return true; },
-    aplicarSincronizacao: async function aplicar() {
+    obterInicioDaListagem: async function obterInicio() { return "2026-09-30 10:00:00.000000"; },
+    aplicarSincronizacao: async function aplicar(_conexao, _id, _arvore, _raiz, inicioDaListagem) {
+      assert.equal(inicioDaListagem, "2026-09-30 10:00:00.000000");
       estado.aplicacoes += 1;
       if (opcoes.falhaAplicacao) throw opcoes.falhaAplicacao;
       return {
@@ -121,7 +123,7 @@ test("rollback com falha nao substitui erro da importacao", async function () {
     }
   };
   await assert.rejects(
-    criarRepository({}).aplicarSincronizacao(conexao, 1, { pastas: [], arquivos: [] }, "raiz"),
+    criarRepository({}).aplicarSincronizacao(conexao, 1, { pastas: [], arquivos: [] }, "raiz", "2026-09-30 10:00:00.000000"),
     function (erro) { return erro === original; }
   );
   assert.equal(rollbackExecutado, true);

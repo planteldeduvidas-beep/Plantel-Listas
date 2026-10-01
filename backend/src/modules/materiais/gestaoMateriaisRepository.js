@@ -128,6 +128,21 @@ function criarGestaoMateriaisRepository(pool) {
     return registros.length ? buscarCategoria(Number(registros[0].id)) : null;
   }
 
+  async function reativarPastaVinculada(categoria, usuarioId) {
+    return executarTransacao(async function reativar(conexao) {
+      const [resultado] = await conexao.execute(
+        "UPDATE categorias SET ativo=1 WHERE id=? AND ativo=0 AND drive_pasta_id=? AND categoria_pai_id <=> ?",
+        [categoria.id,categoria.drivePastaId,categoria.categoriaPaiId]
+      );
+      if (resultado.affectedRows !== 1) throw new AppError("Pasta mudou durante verificacao",409,"PASTA_CONCORRENTE");
+      await conexao.execute(
+        "INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado) VALUES (?,'pasta_reativada_drive','pasta',?,'concluida')",
+        [usuarioId,categoria.id]
+      );
+      return {id:categoria.id,nome:categoria.nome,categoriaPaiId:categoria.categoriaPaiId};
+    });
+  }
+
   async function criarPasta(dados, usuarioId, operacaoChave) {
     return executarTransacao(async function criar(conexao) {
       if (dados.categoriaExistenteId) {
@@ -387,7 +402,7 @@ function criarGestaoMateriaisRepository(pool) {
     const [linhas] = await pool.execute("SELECT id FROM operacoes_google_drive_pendentes WHERE tipo='pasta_criacao' AND fase<>'concluida' AND JSON_UNQUOTE(JSON_EXTRACT(detalhes,'$.categoriaExistenteId'))=? LIMIT 1", [String(id)]);
     return linhas.length > 0;
   }
-  return { possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
+  return { possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, reativarPastaVinculada, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
 }
 
 module.exports = criarGestaoMateriaisRepository;

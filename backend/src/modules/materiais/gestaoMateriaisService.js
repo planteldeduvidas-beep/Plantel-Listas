@@ -174,8 +174,20 @@ function criarGestaoMateriaisService(dependencias) {
     if (!usuario || usuario.papel !== "admin") throw new AppError("Somente admin pode vincular pastas",403,"SEM_PERMISSAO");
     const id = inteiroPositivo(idInformado,"Pasta");
     const categoria = await repository.buscarCategoria(id);
-    if (!categoria || !categoria.ativo) throw new AppError("Pasta indisponivel",404,"PASTA_NAO_ENCONTRADA");
-    if (categoria.drivePastaId) return {id:categoria.id};
+    if (!categoria) throw new AppError("Pasta indisponivel",404,"PASTA_NAO_ENCONTRADA");
+    if (categoria.drivePastaId) {
+      if (categoria.ativo) return {id:categoria.id};
+      const pai = categoria.categoriaPaiId === null
+        ? {drivePastaId:provider.pastaRaizId}
+        : await exigirCategoria(usuario,categoria.categoriaPaiId);
+      const refreshToken = await token();
+      const pasta = await exigirPastaDoAcervo(refreshToken,categoria.drivePastaId);
+      if (!Array.isArray(pasta.parents) || !pasta.parents.includes(pai.drivePastaId)) {
+        throw new AppError("Pasta movida no Drive; sincronize o acervo antes de reativar",409,"PASTA_MOVIMENTADA");
+      }
+      return repository.reativarPastaVinculada(categoria,usuario.id);
+    }
+    if (!categoria.ativo) throw new AppError("Pasta indisponivel",404,"PASTA_NAO_ENCONTRADA");
     if (await repository.possuiVinculacaoPendente(id)) throw new AppError("Vinculacao em recuperacao. Aguarde a reconciliacao",409,"VINCULACAO_PENDENTE");
     validarNomePasta({nome:categoria.nome});
     const pai = categoria.categoriaPaiId === null ? {drivePastaId:provider.pastaRaizId} : await exigirCategoria(usuario,categoria.categoriaPaiId);

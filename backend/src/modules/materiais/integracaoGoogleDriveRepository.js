@@ -203,6 +203,13 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     return resultado.affectedRows === 1;
   }
 
+  async function obterInicioDaListagem(conexao) {
+    const [registros] = await conexao.execute(
+      "SELECT DATE_FORMAT(CURRENT_TIMESTAMP(3), '%Y-%m-%d %H:%i:%s.%f') AS instante"
+    );
+    return registros[0].instante;
+  }
+
   async function concluirSincronizacao(conexao, sincronizacaoId, resumo) {
     await conexao.beginTransaction();
     try {
@@ -359,7 +366,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     return existentes.length === 0 ? "criado" : "atualizado";
   }
 
-  async function aplicarSincronizacao(conexao, sincronizacaoId, arvore, pastaRaizId) {
+  async function aplicarSincronizacao(conexao, sincronizacaoId, arvore, pastaRaizId, inicioDaListagem) {
     const categoriasPorDriveId = new Map([[pastaRaizId, null]]);
     const ordemPorPai = new Map();
     let materiaisCriados = 0;
@@ -408,13 +415,14 @@ function criarIntegracaoGoogleDriveRepository(pool) {
 
       const [materiaisIndisponiveis] = await conexao.execute(
         "UPDATE materiais SET disponivel = 0 "
-        + "WHERE disponivel = 1 AND ultima_sincronizacao_drive_id <> ?",
-        [sincronizacaoId]
+        + "WHERE disponivel = 1 AND ultima_sincronizacao_drive_id <> ? "
+        + "AND atualizado_em < DATE_FORMAT(?, '%Y-%m-%d %H:%i:%s')",
+        [sincronizacaoId, inicioDaListagem]
       );
       await conexao.execute(
         "UPDATE categorias SET ativo = 0 "
-        + "WHERE drive_pasta_id IS NOT NULL AND ultima_sincronizacao_drive_id <> ?",
-        [sincronizacaoId]
+        + "WHERE drive_pasta_id IS NOT NULL AND ultima_sincronizacao_drive_id <> ? AND atualizado_em < ?",
+        [sincronizacaoId, inicioDaListagem]
       );
       await aplicarClassificacaoAutomatica(conexao);
       await conexao.commit();
@@ -444,6 +452,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     liberarTravaDeSincronizacao: liberarTravaDeSincronizacao,
     criarSincronizacaoAguardando: criarSincronizacaoAguardando,
     marcarSincronizando: marcarSincronizando,
+    obterInicioDaListagem: obterInicioDaListagem,
     concluirSincronizacao: concluirSincronizacao,
     falharSincronizacao: falharSincronizacao,
     falharSincronizacaoSemTrava: falharSincronizacaoSemTrava,
