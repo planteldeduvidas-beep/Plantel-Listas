@@ -91,8 +91,10 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
 
   async function criarPasta(evento) {
     evento.preventDefault();
-    const criada = await executar(function criar() { return criarPastaNoDrive(nomeNovaPasta,Number(paiNovaPasta)); }, "Pasta criada no Google Drive.");
+    let novaPasta;
+    const criada = await executar(async function criar() { novaPasta = await criarPastaNoDrive(nomeNovaPasta,Number(paiNovaPasta)); }, "Pasta criada no Google Drive.");
     if (criada) {
+      definirPastaEnvioId(String(novaPasta.id));
       definirNomeNovaPasta("");
       definirMostrarNovaPasta(false);
     }
@@ -244,6 +246,16 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
   useEffect(function atualizar() { carregar(); }, [categoriaId, busca, tipo, disciplinaId, concursoId, ordenar, pagina]);
   useEffect(function organizacaoInicial() { carregarOrganizacao().catch(function falhou(falha) { definirErro(mensagemHumana(falha)); }); }, []);
   useEffect(function gestaoInicial() { carregarPastasGerenciaveis().catch(function falhou(falha) { definirErro(mensagemHumana(falha)); }); }, []);
+  useEffect(function atualizarPastasAoRetornar() {
+    function atualizar() { carregarPastasGerenciaveis().catch(falha => definirErro(mensagemHumana(falha))); }
+    function aoVoltarAoApp() { if (!document.hidden) atualizar(); }
+    window.addEventListener("focus", atualizar);
+    document.addEventListener("visibilitychange", aoVoltarAoApp);
+    return () => {
+      window.removeEventListener("focus", atualizar);
+      document.removeEventListener("visibilitychange", aoVoltarAoApp);
+    };
+  }, [usuario.id, usuario.papel]);
   useEffect(function acompanharHistoricoDasPastas() {
     function acompanharVoltarDoNavegador() {
       definirCategoriaId(obterPastaDaUrl(window.location.search));

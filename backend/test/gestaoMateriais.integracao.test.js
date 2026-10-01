@@ -41,6 +41,24 @@ async function autenticar(papel){const agente=request.agent(app);const csrf=(awa
 test.beforeEach(async function preparar(){await limpar();operacoes.length=0;itensDrive.clear();itensDrive.set(configuracao.googleDrive.pastaRaizId,{id:configuracao.googleDrive.pastaRaizId,mimeType:"application/vnd.google-apps.folder",parents:[],trashed:false});itensDrive.set("driveAreaA",{id:"driveAreaA",mimeType:"application/vnd.google-apps.folder",parents:[configuracao.googleDrive.pastaRaizId],trashed:false});itensDrive.set("driveAreaB",{id:"driveAreaB",mimeType:"application/vnd.google-apps.folder",parents:["driveAreaA"],trashed:false});itensDrive.set("driveProibida",{id:"driveProibida",mimeType:"application/vnd.google-apps.folder",parents:[configuracao.googleDrive.pastaRaizId],trashed:false});itensDrive.set("driveMaterial6",{id:"driveMaterial6",name:"original.pdf",mimeType:"application/pdf",parents:["driveAreaA"],trashed:false});usuarios={admin:await usuario("admin6@example.com","admin"),professor:await usuario("prof6@example.com","professor"),aluno:await usuario("aluno6@example.com","aluno")};const[a]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Area A','driveAreaA')");pastaA=Number(a.insertId);const[b]=await pool.execute("INSERT INTO categorias(nome,categoria_pai_id,drive_pasta_id)VALUES('Subarea B',?,'driveAreaB')",[pastaA]);pastaB=Number(b.insertId);const[p]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Proibida','driveProibida')");pastaProibida=Number(p.insertId);await pool.execute("INSERT INTO permissoes_professor_categoria(professor_id,categoria_id,concedida_por_usuario_id)VALUES(?,?,?)",[usuarios.professor.id,pastaA,usuarios.admin.id]);const[m]=await pool.execute("INSERT INTO materiais(drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,extensao,tamanho_bytes,disponivel,ultima_sincronizacao_drive_id)VALUES('driveMaterial6','driveAreaA',?,'original.pdf','application/pdf','pdf','pdf',20,1,NULL)",[pastaA]);materialId=Number(m.insertId);});
 test.afterEach(async function limparDisciplinasDoProfessor(){await pool.execute("DELETE FROM professor_disciplinas");});
 
+test("pasta recém-criada e vazia aparece nos destinos e aceita o primeiro upload", async function() {
+  const admin = await autenticar("admin");
+  const criada = await admin.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token", admin.csrf)
+    .send({ nome: "Resolução Listas", categoriaPaiId: pastaB });
+  assert.equal(criada.status, 201);
+  const destinos = await admin.agente.get("/api/gestao-materiais/pastas");
+  assert.equal(destinos.status, 200);
+  assert.ok(destinos.body.some(p => p.id === criada.body.id && p.caminho.endsWith("Resolução Listas")));
+  const professor = await autenticar("professor");
+  const permitidas = await professor.agente.get("/api/gestao-materiais/pastas");
+  assert.ok(permitidas.body.some(p => p.id === criada.body.id));
+  assert.ok(!permitidas.body.some(p => p.id === pastaProibida));
+  const enviado = await admin.agente.post("/api/gestao-materiais").set("X-CSRF-Token", admin.csrf)
+    .field("categoriaId", String(criada.body.id))
+    .attach("arquivo", Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF"), { filename: "lista.pdf", contentType: "application/pdf" });
+  assert.equal(enviado.status, 201, JSON.stringify(enviado.body));
+});
+
 test("admin exclui pasta vazia aninhada com auditoria e journal; demais papeis protegidos",async function(){
   const admin=await autenticar("admin");
   const criada=await admin.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",admin.csrf).send({nome:"Pasta errada",categoriaPaiId:pastaB});
