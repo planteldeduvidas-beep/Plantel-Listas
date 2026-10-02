@@ -84,3 +84,20 @@ test("expiracao, cancelamento, limpeza e conclusao perdida preservam o ID reserv
   await assert.rejects(c.service.consultar(c.usuario,k.id),{codigo:"UPLOAD_EXPIRADO"});
   await c.service.limparAbandonados();assert.equal(c.linhas.get(k.id).estado,"cancelado");
 });
+
+test("monitor de limpeza adia concorrencia esperada, sem ocultar falha SQL",async t=>{
+  let tick,intervalo,falha={codigo:"GOOGLE_DRIVE_OPERACAO_CONCORRENTE"};
+  const avisos=[],adiamentos=[];
+  t.mock.method(global,"setInterval",(fn,ms)=>{tick=fn;intervalo=ms;return {unref(){}};});
+  const service=criarUploadRetomavelService({repository:{},provider:{},
+    gestao:{comTravaUpload:async()=>{throw falha;}},integracaoService:{},
+    configuracao:{googleDrive:{},seguranca:{}},
+    logger:{debug:msg=>adiamentos.push(msg),warn:(dados,msg)=>avisos.push({dados,msg})}});
+  service.iniciarLimpeza();assert.equal(intervalo,65000);
+  tick();await new Promise(setImmediate);
+  assert.equal(adiamentos.length,1);assert.equal(avisos.length,0);
+  falha={code:"ER_PARSE_ERROR",message:"conteudo privado que nao deve aparecer"};
+  tick();await new Promise(setImmediate);
+  assert.equal(avisos.length,1);assert.equal(avisos[0].dados.codigo,"ER_PARSE_ERROR");
+  assert.equal(JSON.stringify(avisos).includes("conteudo privado"),false);
+});

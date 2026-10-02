@@ -171,7 +171,16 @@ function criarUploadRetomavelService({repository,gestao,provider,integracaoServi
     } finally { limpando = false; }
   }
   return {iniciar,consultar,parte,finalizar,cancelar,autorizarParte,limparAbandonados,
-    iniciarLimpeza() { if (!timer) { timer = setInterval(() => { void limparAbandonados().catch(() => logger?.warn("Limpeza de uploads temporariamente indisponivel")); },60000); timer.unref?.(); } },
+    iniciarLimpeza() { if (!timer) { timer = setInterval(() => { void limparAbandonados().catch(falha => {
+      // Nao disputar a trava sempre no mesmo instante dos monitores de 60 segundos.
+      if (falha.codigo === "GOOGLE_DRIVE_OPERACAO_CONCORRENTE") {
+        logger?.debug?.("Limpeza de uploads adiada: outra operacao Drive em andamento");
+        return;
+      }
+      const conhecido = ["ER_NO_SUCH_TABLE","ER_PARSE_ERROR","ER_BAD_FIELD_ERROR","ER_TABLEACCESS_DENIED_ERROR","ECONNREFUSED","PROTOCOL_CONNECTION_LOST"];
+      const codigo = conhecido.includes(falha.code) ? falha.code : "FALHA_INTERNA";
+      logger?.warn({codigo},"Limpeza de uploads temporariamente indisponivel: " + codigo);
+    }); },65000); timer.unref?.(); } },
     pararLimpeza() { clearInterval(timer); timer = null; }};
 }
 module.exports = {criarUploadRetomavelService,CHUNK_BYTES};

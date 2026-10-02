@@ -54,7 +54,7 @@ commit com resposta perdida é resolvido relendo a sessão. Não apagar arquivo 
 As sincronizações completa/incremental ignoram IDs de sessões não concluídas, impedindo
 publicação antecipada ou ressurgimento de um cancelamento ainda em reconciliação.
 
-Sessões expiram em 24 horas. O monitor, a cada minuto, trata lotes de quatro sessões,
+Sessões expiram em 24 horas. O monitor, a cada 65 segundos, trata lotes de quatro sessões,
 exclui o ID reservado se houver arquivo, preserva tombstones e remove registros terminais
 após oito dias. Rechecagens de cancelados após expiração detectam conclusão externa tardia.
 Falhas de limpeza são registradas sem credenciais e limitadas a vinte tentativas; depois
