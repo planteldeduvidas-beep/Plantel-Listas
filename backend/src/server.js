@@ -42,7 +42,13 @@ async function iniciarServidor() {
     servidor.listen(configuracao.porta, function informarInicio() {
       logger.info(
         { porta: configuracao.porta, ambiente: configuracao.ambiente },
-        "Servidor iniciado"
+        "Servidor iniciado; proxy=" + configuracao.confiarProxy
+        + "; pool=" + configuracao.banco.limiteDeConexoes
+        + "; fila=" + configuracao.banco.limiteDaFila
+        + "; janela_min=" + configuracao.seguranca.janelaRateLimitMinutos
+        + "; login_ip=" + configuracao.seguranca.limiteAutenticacaoPorIp
+        + "; cadastro_ip=" + configuracao.seguranca.limiteCadastro
+        + "; consulta_usuario_min=" + configuracao.seguranca.limiteConsultaAcervo
       );
     });
 

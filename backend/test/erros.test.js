@@ -36,3 +36,18 @@ test("nao expoe stack trace de erro inesperado em producao", function testarErro
   assert.equal(JSON.stringify(res.corpoRecebido).includes("detalhe sensivel"), false);
 });
 
+test("mensagem operacional do log inclui apenas codigo e local seguros", async () => {
+  const logs = [];
+  const req = { app: { locals: { configuracao: { ambiente: "production" }, logger: { error: (dados, mensagem) => logs.push(mensagem) } } } };
+  const erro = new Error("senha=segredo-nao-publicar");
+  erro.code = "ER_CON_COUNT_ERROR";
+  erro.stack = "Error: senha=segredo-nao-publicar\n    at banco (conexao.js:12:3)";
+  await tratarErros(erro, req, criarResposta(), () => {});
+  assert.match(logs[0], /ER_CON_COUNT_ERROR \(HTTP 500\).*conexao.js:12:3/);
+  assert.ok(!logs[0].includes("segredo"));
+  erro.code = "senha=segredo";
+  await tratarErros(erro, req, criarResposta(), () => {});
+  assert.match(logs[1], /ERRO_INTERNO/);
+  assert.ok(!logs[1].includes("segredo"));
+});
+

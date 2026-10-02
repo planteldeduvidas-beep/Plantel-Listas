@@ -428,6 +428,68 @@ test("recusa arquivo sem capacidade de download com erro funcional", async funct
   assert.equal(chamadas, 1);
 });
 
+test("download continua por mais de 30s com progresso, expira sem dados e cancela upstream", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let origem, sinal, cancelamentos = 0;
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientFake,
+    fetch: async (url, opcoes) => {
+      if (!new URL(url).searchParams.has("alt")) return criarResposta({ trashed: false, capabilities: { canDownload: true } });
+      sinal = opcoes.signal;
+      return new Response(new ReadableStream({ start(c) { origem = c; }, cancel() { cancelamentos++; } }),
+        { status: 206, headers: { "content-range": "bytes 0-3/4" } });
+    }
+  });
+  const resposta = await provider.obterConteudoArquivo("refresh-token-de-teste", "arquivoSeguro12345", "bytes=0-3");
+  assert.equal(resposta.status, 206);
+  assert.equal(resposta.headers.get("content-range"), "bytes 0-3/4");
+  const leitor = resposta.body.getReader();
+  for (let i = 0; i < 3; i++) {
+    const leitura = leitor.read();
+    await new Promise(setImmediate);
+    t.mock.timers.tick(20000);
+    origem.enqueue(Uint8Array.of(i));
+    assert.deepEqual((await leitura).value, Uint8Array.of(i));
+    assert.equal(sinal.aborted, false);
+  }
+  origem.close();
+  assert.equal((await leitor.read()).done, true);
+  t.mock.timers.tick(60000);
+  assert.equal(sinal.aborted, false);
+
+  const parada = await provider.obterConteudoArquivo("refresh-token-de-teste", "arquivoSeguro12345", null);
+  const leituraParada = parada.body.getReader().read();
+  const rejeicao = assert.rejects(leituraParada, { codigo: "GOOGLE_DRIVE_INDISPONIVEL" });
+  await new Promise(setImmediate);
+  t.mock.timers.tick(30000);
+  await rejeicao;
+  assert.equal(sinal.aborted, true);
+  assert.equal(cancelamentos, 1);
+
+  const cancelada = await provider.obterConteudoArquivo("refresh-token-de-teste", "arquivoSeguro12345", null);
+  await cancelada.body.cancel();
+  assert.equal(sinal.aborted, true);
+  assert.equal(cancelamentos, 2);
+});
+
+test("download preserva timeout antes da resposta do Drive", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let sinal;
+  const provider = criarGoogleDriveProvider(criarConfiguracao(), {
+    OAuth2Client: OAuth2ClientFake,
+    fetch: async (url, opcoes) => {
+      if (!new URL(url).searchParams.has("alt")) return criarResposta({ trashed: false, capabilities: { canDownload: true } });
+      sinal = opcoes.signal;
+      return new Promise((resolve, reject) => sinal.addEventListener("abort", () => reject(new Error("timeout")), { once: true }));
+    }
+  });
+  const falha = assert.rejects(provider.obterConteudoArquivo("refresh-token-de-teste", "arquivoSeguro12345", null), { codigo: "GOOGLE_DRIVE_INDISPONIVEL" });
+  await new Promise(setImmediate);
+  t.mock.timers.tick(30000);
+  await falha;
+  assert.equal(sinal.aborted, true);
+});
+
 test("lista somente a subarvore afetada e nao segue atalhos", async function testarSubarvore() {
   const consultas = [];
   const provider = criarGoogleDriveProvider(criarConfiguracao(), {

@@ -12,6 +12,40 @@ const URL_CHANNELS_DRIVE = "https://www.googleapis.com/drive/v3/channels/stop";
 const MIME_ATALHO = "application/vnd.google-apps.shortcut";
 const TEMPO_LIMITE_REQUISICAO_MS = 30000;
 
+function limitarEsperaPorDados(resposta, abortar) {
+  if (!resposta.body) return resposta;
+  const leitor = resposta.body.getReader();
+  const corpo = new ReadableStream({
+    async pull(destino) {
+      let timer;
+      try {
+        const parte = await Promise.race([
+          leitor.read(),
+          new Promise((resolve, reject) => {
+            timer = setTimeout(() => {
+              const erro = new AppError("Google Drive temporariamente indisponivel", 503, "GOOGLE_DRIVE_INDISPONIVEL");
+              reject(erro);
+              abortar.abort(erro);
+              void leitor.cancel(erro).catch(() => {});
+            }, TEMPO_LIMITE_REQUISICAO_MS);
+          })
+        ]);
+        if (parte.done) destino.close();
+        else destino.enqueue(parte.value);
+      } catch (erro) {
+        destino.error(erro);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    cancel(motivo) {
+      abortar.abort();
+      return leitor.cancel(motivo);
+    }
+  }, { highWaterMark: 0 });
+  return new Response(corpo, { status: resposta.status, statusText: resposta.statusText, headers: resposta.headers });
+}
+
 async function classificarFalhaDrive(resposta, codigoPadrao) {
   if (resposta.status === 401) return { codigo: "GOOGLE_AUTORIZACAO_INVALIDA", status: 503 };
   if (resposta.status === 404) return { codigo: "GOOGLE_ARQUIVO_NAO_ENCONTRADO", status: 409 };
@@ -288,18 +322,22 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     }
 
     let resposta;
+    const abortar = new AbortController();
+    const timer = setTimeout(() => abortar.abort(), TEMPO_LIMITE_REQUISICAO_MS);
     try {
-      resposta = await buscar(url, {
+      resposta = limitarEsperaPorDados(await buscar(url, {
         method: "GET",
         headers: headers,
-        signal: AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS)
-      });
+        signal: abortar.signal
+      }), abortar);
     } catch (erro) {
       throw new AppError(
         "Google Drive temporariamente indisponivel",
         503,
         "GOOGLE_DRIVE_INDISPONIVEL"
       );
+    } finally {
+      clearTimeout(timer);
     }
 
     if (![200, 206, 416].includes(resposta.status)) {

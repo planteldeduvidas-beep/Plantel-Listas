@@ -1,4 +1,5 @@
 const AppError = require("../errors/AppError");
+const { serializarErroSeguro } = require("../config/logger");
 
 async function tratarErros(erro, req, res, next) {
   // Erros conhecidos do parser nao sao falhas internas nem devem registrar body.
@@ -19,7 +20,10 @@ async function tratarErros(erro, req, res, next) {
   if (req.app.locals.defesaAtiva) await req.app.locals.defesaAtiva.registrarErro(req, codigo, statusCode);
 
   if (statusCode >= 500 && logger) {
-    logger.error({ err: erro, codigo: codigo }, "Falha ao processar requisicao");
+    const tecnico = serializarErroSeguro(erro);
+    logger.error({ err: erro, codigo: codigo },
+      "Falha ao processar requisicao: " + tecnico.codigo + " (HTTP " + statusCode + ")"
+      + (tecnico.locais.length ? " em " + tecnico.locais.join(", ") : ""));
   }
 
   const resposta = {
