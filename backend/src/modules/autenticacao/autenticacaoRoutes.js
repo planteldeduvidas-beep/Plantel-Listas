@@ -15,13 +15,14 @@ function criarAutenticacaoRoutes(dependencias) {
   router.get("/csrf", emitirTokenCsrf);
   router.post(
     "/cadastro",
-    rateLimiters.autenticacao,
+    rateLimiters.cadastro,
     protegerContraCsrf,
     controller.cadastrar
   );
   router.post(
     "/login",
     rateLimiters.autenticacao,
+    rateLimiters.loginPorConta,
     protegerContraCsrf,
     controller.entrar
   );

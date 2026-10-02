@@ -24,10 +24,11 @@ const GUIAS = Object.freeze({
         ], dica: "O histórico é só seu. Materiais que não estão mais disponíveis deixam de aparecer."
       },
       {
-        area: "suporte", titulo: "Suporte", resumo: "Envie uma dúvida à equipe.",
+        area: "suporte", titulo: "Suporte", resumo: "Tire dúvidas e compartilhe sugestões.",
         passos: [
           "No menu, toque em Suporte.",
-          "Escreva um assunto curto e explique o problema no campo Mensagem. Diga em qual pasta ou arquivo ele ocorreu.",
+          "Leia as Dúvidas frequentes se quiser uma resposta rápida. Para falar com a equipe, escreva um assunto curto e conte sua dúvida, problema, opinião ou sugestão no campo Mensagem.",
+          "Se relatar um problema com material, diga em qual pasta ou arquivo ele ocorreu e qual aviso apareceu.",
           "Toque em Enviar mensagem e aguarde a confirmação na tela. A resposta será enviada ao e-mail da sua conta."
         ], dica: "Nunca envie senha ou código de acesso na mensagem."
       }
@@ -50,15 +51,15 @@ const GUIAS = Object.freeze({
         passos: [
           "Abra Biblioteca no menu. Entre em uma pasta pelo nome ou use Buscar e Filtros para localizar o conteúdo.",
           "Para criar uma subpasta, toque em Nova pasta, informe o nome, confira o destino e confirme. Faça isso apenas dentro de uma pasta que você gerencia.",
-          "Para enviar um arquivo, toque em Adicionar material, selecione um PDF ou vídeo e confira a pasta de destino. O Nome do material é opcional: escreva só o título, mesmo com números e pontos, pois a extensão correta é adicionada automaticamente. Toque em Adicionar material no formulário e aguarde a conclusão antes de repetir.",
+          "Para enviar um arquivo, toque em Adicionar material, selecione um PDF ou vídeo e escolha uma pasta que você pode gerenciar. O Nome do material, a Disciplina e o Concurso são opcionais; se escrever um título, a extensão correta será adicionada automaticamente. Toque em Adicionar material no formulário e aguarde a conclusão antes de repetir.",
           "Nos materiais que você pode gerenciar, abra as opções para editar o nome, mover, substituir o arquivo ou enviar para a lixeira. Confira o destino antes de salvar."
         ], dica: "Se a ação não estiver disponível ou for negada, confirme a pasta em Pastas liberadas."
       },
       {
-        area: "suporte", titulo: "Suporte", resumo: "Peça ajuda quando uma ação não funcionar.",
+        area: "suporte", titulo: "Suporte", resumo: "Peça ajuda ou envie sugestões.",
         passos: [
           "No menu, toque em Suporte.",
-          "Descreva no Assunto o que tentou fazer e, na Mensagem, informe o nome da pasta ou arquivo e a mensagem de erro exibida.",
+          "Consulte as Dúvidas frequentes ou envie uma mensagem com sua dúvida, opinião ou sugestão. Se uma ação falhou, informe o nome da pasta ou arquivo e a mensagem de erro exibida.",
           "Toque em Enviar mensagem. A equipe responderá ao e-mail da sua conta."
         ], dica: "Não inclua senhas, códigos ou links privados na mensagem."
       }
@@ -81,8 +82,9 @@ const GUIAS = Object.freeze({
         area: "acervo", titulo: "Biblioteca", resumo: "Cuide dos arquivos e das pastas do acervo.",
         passos: [
           "Abra Biblioteca. Use pastas, Busca e Filtros para chegar ao lugar desejado; confira o caminho antes de modificar algo.",
-          "Toque em Nova pasta para criar uma pasta no destino correto. Para enviar um material, toque em Adicionar material, escolha PDF/vídeo, pasta e classificação. Nome do material é opcional: escreva só o título, mesmo com pontos como Prova 2020.21; a extensão correta é adicionada automaticamente. Confirme o envio e aguarde a conclusão.",
+          "Toque em Nova pasta para criar uma pasta no destino correto. Para enviar um material, toque em Adicionar material, escolha PDF ou vídeo e selecione a pasta de destino. Nome do material, Disciplina e Concurso são opcionais; você pode escrever só o título, mesmo com pontos como Prova 2020.21. A extensão correta é adicionada automaticamente. Confirme o envio e aguarde a conclusão.",
           "No material, abra as opções para renomear, mover, substituir ou enviar à lixeira. Confirme o nome e a pasta antes de salvar.",
+          "Se aparecer 'pasta para revisar', você pode continuar enviando arquivos normalmente. Para resolver o aviso, marque a pasta, escolha a Disciplina e/ou o Concurso indicados como pendentes (ou 'Não se aplica') e toque em Salvar escolhas. 'Não alterar' mantém a pendência para depois.",
           "Abra Lixeira para restaurar um item. A exclusão definitiva não pode ser desfeita: confira o item antes de confirmar."
         ], dica: "Mudanças em pastas e arquivos vinculados ao Google Drive também afetam a integração. Evite repetir uma ação enquanto ela estiver processando."
       },
@@ -111,7 +113,7 @@ const GUIAS = Object.freeze({
           "Toque em Nova pasta para informar nome e destino. Uma pasta principal é criada dentro da raiz do acervo no Google Drive; uma subpasta é criada dentro da pasta escolhida. Aguarde a confirmação antes de enviar materiais.",
           "Se uma pasta antiga mostrar Vincular ao Drive, use esse botão para corrigir o cadastro mantendo seus acessos. Vincule primeiro a pasta principal e depois suas subpastas. Se houver nomes duplicados ou conflito, o sistema interrompe a operação para revisão.",
           "Mais abaixo, gerencie os catálogos Disciplinas e Concursos, que são opções usadas nos filtros e na classificação.",
-          "Para renomear ou mover uma pasta vinculada ao Google Drive, use o fluxo da Biblioteca; a edição somente local é bloqueada para evitar divergência."
+          "Para renomear uma pasta vinculada ao Google Drive, use a opção da pasta na Biblioteca. Para excluí-la, confira a confirmação: o conteúdo e as subpastas também serão enviados à lixeira do Drive. A edição somente local é bloqueada para evitar divergência."
         ], dica: "Antes de ocultar uma pasta, verifique se ela contém materiais que alunos ou professores ainda precisam."
       },
       {

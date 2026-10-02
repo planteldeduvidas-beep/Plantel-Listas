@@ -123,3 +123,39 @@ test("consultas caras limitam por usuario sem afetar outro aluno ou streaming", 
   assert.equal((await request(app).get("/materiais/1/conteudo").set("Range", "bytes=0-9")).status, 204);
   assert.equal((await request(app).get("/materiais/1/download")).status, 204);
 });
+
+test("login bem-sucedido nao esgota cota compartilhada e falhas sao limitadas por conta", async () => {
+  const criarLimitadores = require("../src/shared/middlewares/criarRateLimiters");
+  const app = express();
+  app.use(express.json());
+  const limitadores = criarLimitadores({ seguranca: {
+    janelaRateLimitMinutos: 15, limiteAutenticacao: 2,
+    limiteAutenticacaoPorIp: 8, limiteCadastro: 4
+  } });
+  app.post("/login", limitadores.autenticacao, limitadores.loginPorConta,
+    (req, res) => res.sendStatus(req.body.senha === "certa" ? 200 : 401));
+  for (let indice = 0; indice < 4; indice += 1) {
+    assert.equal((await request(app).post("/login").send({ email: "aluno@example.com", senha: "certa" })).status, 200);
+  }
+  for (let indice = 0; indice < 2; indice += 1) {
+    assert.equal((await request(app).post("/login").send({ email: "aluno@example.com", senha: "errada" })).status, 401);
+  }
+  assert.equal((await request(app).post("/login").send({ email: "ALUNO@example.com", senha: "errada" })).status, 429);
+  assert.equal((await request(app).post("/login").send({ email: "outro@example.com", senha: "errada" })).status, 401);
+});
+
+test("upload e suporte de usuarios distintos nao dividem cota por IP", async () => {
+  const criarLimitadores = require("../src/shared/middlewares/criarRateLimiters");
+  const app = express();
+  const limitadores = criarLimitadores({ seguranca: {
+    janelaRateLimitMinutos: 15, limiteUpload: 1, limiteSuporte: 1
+  } });
+  app.use((req, res, next) => { req.usuario = { id: Number(req.headers["x-user-id"]) }; next(); });
+  app.post("/upload", limitadores.upload, (req, res) => res.sendStatus(204));
+  app.post("/suporte", limitadores.suporte, (req, res) => res.sendStatus(204));
+  for (const rota of ["/upload", "/suporte"]) {
+    assert.equal((await request(app).post(rota).set("X-User-Id", "1")).status, 204);
+    assert.equal((await request(app).post(rota).set("X-User-Id", "2")).status, 204);
+    assert.equal((await request(app).post(rota).set("X-User-Id", "1")).status, 429);
+  }
+});

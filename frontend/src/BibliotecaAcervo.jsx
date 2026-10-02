@@ -9,6 +9,7 @@ import {
 import { Esqueleto, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, obterPastaDaUrl } from "./navegacao.js";
 import SeletorPasta from "./SeletorPasta.jsx";
+import { pendenciasDaSelecao, validarOrganizacaoPendente } from "./organizacaoPendente.js";
 
 function tamanhoAmigavel(bytes) {
   if (bytes === null || bytes === undefined) return "Tamanho não informado";
@@ -32,8 +33,8 @@ function valorInicial(pasta, dimensao) {
   return estado === "definida" && pasta[dimensao] ? "definida:" + pasta[dimensao].id : (estado || "herdar");
 }
 
-function OpcoesClassificacao({ itens, incluirManter }) {
-  return <>{incluirManter && <option value="manter">Manter como está</option>}<option value="herdar">Usar a organização da pasta acima</option><option value="nao_se_aplica">Não se aplica</option>{itens.map(function opcao(item) { return <option key={item.id} value={"definida:" + item.id}>{item.nome}</option>; })}</>;
+function OpcoesClassificacao({ itens, incluirManter, incluirHerdar = true }) {
+  return <>{incluirManter && <option value="manter">Não alterar</option>}{incluirHerdar && <option value="herdar">Usar a organização da pasta acima</option>}<option value="nao_se_aplica">Não se aplica</option>{itens.map(function opcao(item) { return <option key={item.id} value={"definida:" + item.id}>{item.nome}</option>; })}</>;
 }
 
 function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtualizar, aoErro, aoMensagem }) {
@@ -301,14 +302,17 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
     try { await excluirPastaNoDrive(id); aoMensagem("Pasta enviada à lixeira do Google Drive."); await recarregarTudo(); return true; }
     catch (falha) { definirErro(mensagemHumana(falha)); return false; }
   }
-  function alternar(id) { definirSelecionadas(function atualizar(atuais) { return atuais.includes(id) ? atuais.filter(function remover(item) { return item !== id; }) : atuais.concat(id); }); }
+  function alternar(id) { definirErro(""); definirSelecionadas(function atualizar(atuais) { return atuais.includes(id) ? atuais.filter(function remover(item) { return item !== id; }) : atuais.concat(id); }); }
   async function salvarLote(evento) {
     evento.preventDefault();
-    if (!selecionadas.length || (disciplinaLote === "manter" && concursoLote === "manter")) { definirErro("Selecione ao menos uma pasta e uma opção de organização."); return; }
+    const validacao = validarOrganizacaoPendente(organizacao.pastasPendentes, selecionadas, disciplinaLote, concursoLote);
+    if (validacao) { definirErro(validacao); return; }
+    definirErro("");
     try {
       await classificarPastas(selecionadas, disciplinaLote === "manter" ? null : lerEscolha(disciplinaLote), concursoLote === "manter" ? null : lerEscolha(concursoLote));
       definirSelecionadas([]); definirDisciplinaLote("manter"); definirConcursoLote("manter");
       await Promise.all([carregar(), carregarOrganizacao()]);
+      aoMensagem("Organização da pasta salva.");
     } catch (falha) { definirErro(mensagemHumana(falha)); }
   }
   function limparFiltros() { definirBuscaDigitada(""); definirBusca(""); definirTipo(""); definirDisciplinaId(""); definirConcursoId(""); definirOrdenar("nome_asc"); definirPagina(1); }
@@ -317,6 +321,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
   const disciplinaAtiva = filtros.disciplinas.find(function encontrar(item) { return String(item.id) === String(disciplinaId); });
   const concursoAtivo = filtros.concursos.find(function encontrar(item) { return String(item.id) === String(concursoId); });
   const quantidadeFiltrosAtivos = [tipo, disciplinaId, concursoId, ordenar !== "nome_asc" ? ordenar : ""].filter(Boolean).length;
+  const pendenciasSelecionadas = pendenciasDaSelecao(organizacao?.pastasPendentes || [], selecionadas);
 
   return (
     <section className="biblioteca" aria-labelledby="titulo-biblioteca">
@@ -329,7 +334,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
         {usuario.papel === "admin" && organizacao && (
           <span className={organizacao.pastasPendentes.length ? "status-organizacao pendente" : "status-organizacao"}>
             <Icone nome={organizacao.pastasPendentes.length ? "alerta" : "sucesso"} />
-            {organizacao.pastasPendentes.length ? organizacao.pastasPendentes.length + " pastas para organizar" : "Todos os materiais estão organizados"}
+            {organizacao.pastasPendentes.length ? organizacao.pastasPendentes.length + (organizacao.pastasPendentes.length === 1 ? " pasta para revisar" : " pastas para revisar") : "Nenhum material para revisar"}
           </span>
         )}
         {dados && <div className="resumo-biblioteca" aria-label="Resumo desta visualização">
@@ -363,9 +368,9 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
 
       {usuario.papel === "admin" && organizacao && organizacao.pastasPendentes.length > 0 && (
         <form className="organizacao-lote" onSubmit={salvarLote}>
-          <div><h3>Pastas que precisam de organização</h3><p>Marque as pastas e escolha como os materiais devem aparecer nos filtros.</p></div>
-          <div className="lista-pastas-pendentes">{organizacao.pastasPendentes.map(function pastaPendente(item) { return <label key={item.id}><input type="checkbox" checked={selecionadas.includes(item.id)} onChange={function mudar() { alternar(item.id); }} /><span><strong>{item.caminho}</strong><small>{item.quantidadeMateriais} materiais</small></span></label>; })}</div>
-          <div className="campos-lote"><label>Disciplina<select value={disciplinaLote} onChange={function mudar(evento) { definirDisciplinaLote(evento.target.value); }}><OpcoesClassificacao itens={filtros.disciplinas} incluirManter /></select></label><label>Concurso<select value={concursoLote} onChange={function mudar(evento) { definirConcursoLote(evento.target.value); }}><OpcoesClassificacao itens={filtros.concursos} incluirManter /></select></label><button type="submit">Salvar organização</button></div>
+          <div><h3>Revisar organização das pastas</h3><p>Isto é opcional e não impede o envio de arquivos. Para retirar uma pasta desta lista, escolha os campos pendentes ou marque “Não se aplica”. “Não alterar” mantém a pasta para revisão.</p></div>
+          <div className="lista-pastas-pendentes">{organizacao.pastasPendentes.map(function pastaPendente(item) { return <label key={item.id}><input type="checkbox" checked={selecionadas.includes(item.id)} onChange={function mudar() { alternar(item.id); }} /><span><strong>{item.caminho}</strong><small>{item.quantidadeMateriais} {item.quantidadeMateriais === 1 ? "material" : "materiais"} · {[(item.disciplinaPendente ? "Disciplina pendente" : ""), (item.concursoPendente ? "Concurso pendente" : "")].filter(Boolean).join(" · ")}</small></span></label>; })}</div>
+          <div className="campos-lote"><label>Disciplina{pendenciasSelecionadas.disciplina ? " (pendente)" : ""}<select value={disciplinaLote} onChange={function mudar(evento) { definirErro(""); definirDisciplinaLote(evento.target.value); }}><OpcoesClassificacao itens={filtros.disciplinas} incluirManter incluirHerdar={false} /></select></label><label>Concurso{pendenciasSelecionadas.concurso ? " (pendente)" : ""}<select value={concursoLote} onChange={function mudar(evento) { definirErro(""); definirConcursoLote(evento.target.value); }}><OpcoesClassificacao itens={filtros.concursos} incluirManter incluirHerdar={false} /></select></label><button type="submit">Salvar escolhas</button></div>
         </form>
       )}
 

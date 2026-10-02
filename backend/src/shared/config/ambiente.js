@@ -256,6 +256,8 @@ function validarVariaveisDeAmbiente(variaveis) {
         1,
         1000
       ),
+      limiteAutenticacaoPorIp: lerInteiro(variaveis, "AUTH_IP_RATE_LIMIT_MAX", 120, 10, 2000),
+      limiteCadastro: lerInteiro(variaveis, "REGISTRATION_RATE_LIMIT_MAX", 60, 1, 1000),
       limiteRecuperacao: lerInteiro(
         variaveis,
         "RECOVERY_RATE_LIMIT_MAX",

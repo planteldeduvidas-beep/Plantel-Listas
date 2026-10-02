@@ -771,6 +771,30 @@ p, small {
   margin-top: 16px;
 }
 
+.organizacao-lote .campos-lote {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(180px, .75fr);
+}
+
+@media (max-width: 900px) {
+  .organizacao-lote .campos-lote {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .organizacao-lote .campos-lote button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .organizacao-lote .campos-lote {
+    grid-template-columns: 1fr;
+  }
+
+  .organizacao-lote .campos-lote button {
+    grid-column: auto;
+  }
+}
+
 .grupo-resultados {
   margin: 26px 0;
 }

@@ -1,4 +1,5 @@
-const { rateLimit } = require("express-rate-limit");
+const crypto = require("node:crypto");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
 function criarHandlerRateLimit(codigo) {
   return async function responderLimiteExcedido(req, res) {
@@ -12,14 +13,26 @@ function criarHandlerRateLimit(codigo) {
   };
 }
 
-function criarLimitador(janelaMs, limite, codigo) {
+function criarLimitador(janelaMs, limite, codigo, opcoes = {}) {
   return rateLimit({
     windowMs: janelaMs,
     limit: limite,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    handler: criarHandlerRateLimit(codigo)
+    handler: criarHandlerRateLimit(codigo),
+    ...opcoes
   });
+}
+
+function chaveUsuario(req) {
+  return "usuario:" + String(req.usuario.id);
+}
+
+function chaveLogin(req) {
+  const ip = ipKeyGenerator(req.ip);
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase().slice(0, 254) : "";
+  const identificador = crypto.createHash("sha256").update(email).digest("hex");
+  return ip + ":" + identificador;
 }
 
 function criarRateLimiters(configuracao) {
@@ -28,9 +41,14 @@ function criarRateLimiters(configuracao) {
   return {
     autenticacao: criarLimitador(
       janelaMs,
-      configuracao.seguranca.limiteAutenticacao,
-      "LIMITE_AUTENTICACAO"
+      configuracao.seguranca.limiteAutenticacaoPorIp || 120,
+      "LIMITE_AUTENTICACAO",
+      { skipSuccessfulRequests: true }
     ),
+    loginPorConta: criarLimitador(janelaMs, configuracao.seguranca.limiteAutenticacao,
+      "LIMITE_AUTENTICACAO", { keyGenerator: chaveLogin, skipSuccessfulRequests: true }),
+    cadastro: criarLimitador(janelaMs, configuracao.seguranca.limiteCadastro || 60,
+      "LIMITE_CADASTRO"),
     recuperacao: criarLimitador(
       janelaMs,
       configuracao.seguranca.limiteRecuperacao,
@@ -39,9 +57,11 @@ function criarRateLimiters(configuracao) {
     suporte: criarLimitador(
       janelaMs,
       configuracao.seguranca.limiteSuporte,
-      "LIMITE_SUPORTE"
+      "LIMITE_SUPORTE",
+      { keyGenerator: chaveUsuario }
     ),
-    upload: criarLimitador(janelaMs, configuracao.seguranca.limiteUpload, "LIMITE_UPLOAD"),
+    upload: criarLimitador(janelaMs, configuracao.seguranca.limiteUpload,
+      "LIMITE_UPLOAD", { keyGenerator: chaveUsuario }),
     consultaAcervo: rateLimit({
       windowMs: 60000,
       limit: configuracao.seguranca.limiteConsultaAcervo || 120,

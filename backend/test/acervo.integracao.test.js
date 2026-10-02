@@ -654,6 +654,27 @@ test("reconcilia renomeacao, movimentacao e remocao de subarvore sem full sync",
   assert.equal(Number(estadoPastas[0].ativas), 0);
 });
 
+test("pasta principal permanece para revisao ate resolver disciplina e concurso", async function() {
+  const admin = await autenticar("admin");
+  const classificar = (dados) => admin.agente.patch("/api/acervo/organizacao")
+    .set("X-CSRF-Token", admin.csrf)
+    .send({ categoriaIds: [categoriaId], ...dados });
+
+  const somenteDisciplina = await classificar({ disciplina: { estado: "nao_se_aplica", id: null } });
+  assert.equal(somenteDisciplina.status, 200);
+  const parcial = await admin.agente.get("/api/acervo/organizacao");
+  assert.equal(parcial.status, 200);
+  assert.equal(parcial.body.pastasPendentes.length, 1);
+  assert.equal(parcial.body.pastasPendentes[0].disciplinaPendente, false);
+  assert.equal(parcial.body.pastasPendentes[0].concursoPendente, true);
+
+  const concursoResolvido = await classificar({ concurso: { estado: "nao_se_aplica", id: null } });
+  assert.equal(concursoResolvido.status, 200);
+  const concluida = await admin.agente.get("/api/acervo/organizacao");
+  assert.equal(concluida.status, 200);
+  assert.equal(concluida.body.pastasPendentes.length, 0);
+});
+
 test("pasta preenchida movida ao Drive monitorado importa descendentes sem duplicar", async function() {
   await pool.execute("INSERT INTO estado_changes_google_drive (id,page_token,atualizado_em) VALUES (1,'antes-movimento',NOW(3))");
   const repository = criarChangesRepository(pool, { nomeTrava: "plantel_changes_teste_movimento" });
