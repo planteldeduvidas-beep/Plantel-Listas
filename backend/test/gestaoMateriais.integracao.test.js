@@ -43,7 +43,7 @@ async function autenticar(papel){const agente=request.agent(app);const csrf=(awa
 test.beforeEach(async function preparar(){await limpar();operacoes.length=0;itensDrive.clear();itensDrive.set(configuracao.googleDrive.pastaRaizId,{id:configuracao.googleDrive.pastaRaizId,mimeType:"application/vnd.google-apps.folder",parents:[],trashed:false});itensDrive.set("driveAreaA",{id:"driveAreaA",mimeType:"application/vnd.google-apps.folder",parents:[configuracao.googleDrive.pastaRaizId],trashed:false});itensDrive.set("driveAreaB",{id:"driveAreaB",mimeType:"application/vnd.google-apps.folder",parents:["driveAreaA"],trashed:false});itensDrive.set("driveProibida",{id:"driveProibida",mimeType:"application/vnd.google-apps.folder",parents:[configuracao.googleDrive.pastaRaizId],trashed:false});itensDrive.set("driveMaterial6",{id:"driveMaterial6",name:"original.pdf",mimeType:"application/pdf",parents:["driveAreaA"],trashed:false});usuarios={admin:await usuario("admin6@example.com","admin"),professor:await usuario("prof6@example.com","professor"),aluno:await usuario("aluno6@example.com","aluno")};const[a]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Area A','driveAreaA')");pastaA=Number(a.insertId);const[b]=await pool.execute("INSERT INTO categorias(nome,categoria_pai_id,drive_pasta_id)VALUES('Subarea B',?,'driveAreaB')",[pastaA]);pastaB=Number(b.insertId);const[p]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Proibida','driveProibida')");pastaProibida=Number(p.insertId);await pool.execute("INSERT INTO permissoes_professor_categoria(professor_id,categoria_id,concedida_por_usuario_id)VALUES(?,?,?)",[usuarios.professor.id,pastaA,usuarios.admin.id]);const[m]=await pool.execute("INSERT INTO materiais(drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,extensao,tamanho_bytes,disponivel,ultima_sincronizacao_drive_id)VALUES('driveMaterial6','driveAreaA',?,'original.pdf','application/pdf','pdf','pdf',20,1,NULL)",[pastaA]);materialId=Number(m.insertId);});
 test.afterEach(async function limparDisciplinasDoProfessor(){await pool.execute("DELETE FROM professor_disciplinas");});
 
-test("Organizacao cria principal e subpasta no Drive com metadados; professor nao cria principal", async function() {
+test("Organizacao cria principal e subpasta no Drive; professor cria principal pela gestao", async function() {
   const admin=await autenticar("admin");
   const raiz=await admin.agente.post("/api/categorias").set("X-CSRF-Token",admin.csrf).send({nome:"Resolucao principal",descricao:"Material resolvido",ordem:4});
   assert.equal(raiz.status,201,JSON.stringify(raiz.body));
@@ -57,8 +57,82 @@ test("Organizacao cria principal e subpasta no Drive com metadados; professor na
   const destinos=await admin.agente.get("/api/gestao-materiais/pastas");
   assert.ok(destinos.body.some(p=>p.id===filha.body.categoria.id));
   const professor=await autenticar("professor");
-  assert.equal((await professor.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",professor.csrf).send({nome:"Proibida",categoriaPaiId:null})).status,403);
+  assert.equal((await professor.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",professor.csrf).send({nome:"Principal professor",categoriaPaiId:null})).status,201);
   assert.equal((await admin.agente.post("/api/categorias").set("X-CSRF-Token",admin.csrf).send({nome:"Teste",drivePastaId:"injetado"})).status,400);
+});
+
+test("professor com permissao por pasta cria subpastas vinculadas e herda o escopo sem disciplina", async function() {
+  const {agente,csrf}=await autenticar("professor");
+  const destinos=await agente.get("/api/gestao-materiais/pastas");
+  assert.equal(destinos.body.find(p=>p.id===pastaA).podeCriar,true);
+  assert.equal(destinos.body.find(p=>p.id===pastaB).podeCriar,true);
+  assert.ok(!destinos.body.some(p=>p.id===pastaProibida));
+  let pai=pastaB,drivePai="driveAreaB";
+  for(const nome of ["Nova autorizada","Descendente autorizada"]){
+    const resposta=await agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",csrf).send({nome,categoriaPaiId:pai});
+    assert.equal(resposta.status,201,JSON.stringify(resposta.body));
+    const [linhas]=await pool.execute("SELECT drive_pasta_id,categoria_pai_id FROM categorias WHERE id=?",[resposta.body.id]);
+    assert.equal(Number(linhas[0].categoria_pai_id),pai);
+    assert.deepEqual(itensDrive.get(linhas[0].drive_pasta_id).parents,[drivePai]);
+    const [auditoria]=await pool.execute("SELECT id FROM auditoria_geral WHERE entidade_id=? AND ator_usuario_id=? AND acao='pasta_criada'",[resposta.body.id,usuarios.professor.id]);
+    assert.equal(auditoria.length,1);
+    assert.ok((await agente.get("/api/gestao-materiais/pastas")).body.some(p=>p.id===resposta.body.id&&p.podeCriar));
+    pai=resposta.body.id;drivePai=linhas[0].drive_pasta_id;
+  }
+  const antes=operacoes.length;
+  for(const categoriaPaiId of [pastaProibida]){
+    assert.equal((await agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",csrf).send({nome:"Nao autorizada",categoriaPaiId})).status,403);
+  }
+  assert.equal((await agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",csrf).send({nome:"Injecao",categoriaPaiId:pastaB,papel:"admin"})).status,400);
+  assert.equal((await agente.post("/api/gestao-materiais/pastas").send({nome:"Sem CSRF",categoriaPaiId:pastaB})).status,403);
+  await pool.execute("UPDATE permissoes_professor_categoria SET revogada_em=CURRENT_TIMESTAMP WHERE professor_id=?",[usuarios.professor.id]);
+  assert.equal((await agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",csrf).send({nome:"Permissao revogada",categoriaPaiId:pai})).status,403);
+  assert.equal(operacoes.length,antes);
+  const aluno=await autenticar("aluno");
+  assert.equal((await aluno.agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",aluno.csrf).send({nome:"Leitura nao e gestao",categoriaPaiId:pastaA})).status,403);
+});
+
+test("principal do professor concede apenas seu novo ramo e nao revive permissao revogada", async function() {
+  await pool.execute("DELETE FROM permissoes_professor_categoria");
+  const {agente,csrf}=await autenticar("professor");
+  const criada=await agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",csrf).send({nome:"Meu novo ramo",categoriaPaiId:null});
+  assert.equal(criada.status,201,JSON.stringify(criada.body));
+  const id=criada.body.id;
+  const [linhas]=await pool.execute("SELECT drive_pasta_id,categoria_pai_id FROM categorias WHERE id=?",[id]);
+  assert.equal(linhas[0].categoria_pai_id,null);
+  assert.deepEqual(itensDrive.get(linhas[0].drive_pasta_id).parents,[provider.pastaRaizId]);
+  const destinos=(await agente.get("/api/gestao-materiais/pastas")).body;
+  assert.deepEqual(destinos.map(p=>p.id),[id]);assert.equal(destinos[0].podeCriar,true);
+  const filha=await agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",csrf).send({nome:"Minhas aulas",categoriaPaiId:id});
+  assert.equal(filha.status,201);
+  const outro=await usuario("outroprof@example.com","professor");
+  const repo=require("../src/modules/materiais/gestaoMateriaisRepository")(pool);
+  assert.equal(await repo.professorPodeAcessarCategoria(outro.id,id),false);
+  assert.equal(await repo.professorPodeAcessarCategoria(usuarios.professor.id,filha.body.id),true);
+  assert.equal((await agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",csrf).send({nome:"Injecao",categoriaPaiId:pastaProibida,concederGestaoAoCriador:true})).status,400);
+  await repo.concluirCriacaoPrincipalRecuperada(id,usuarios.professor.id,null);
+  const [permissoes]=await pool.execute("SELECT id FROM permissoes_professor_categoria WHERE professor_id=?",[usuarios.professor.id]);assert.equal(permissoes.length,1);
+  const [auditoria]=await pool.execute("SELECT id FROM auditoria_geral WHERE entidade_id=? AND acao='permissao_criador_pasta'",[id]);assert.equal(auditoria.length,1);
+  await pool.execute("UPDATE permissoes_professor_categoria SET revogada_em=CURRENT_TIMESTAMP WHERE professor_id=?",[usuarios.professor.id]);
+  await repo.concluirCriacaoPrincipalRecuperada(id,usuarios.professor.id,null);
+  assert.equal(await repo.professorPodeAcessarCategoria(usuarios.professor.id,id),false);
+});
+
+test("falha da auditoria da permissao desfaz pasta principal e compensa Drive",async t=>{
+  await pool.execute("DELETE FROM permissoes_professor_categoria");
+  const {agente,csrf}=await autenticar("professor");
+  const obterConexao=pool.getConnection.bind(pool);
+  const mockConexao=t.mock.method(pool,"getConnection",async()=>{
+    const c=await obterConexao(),executar=c.execute.bind(c),liberar=c.release.bind(c);
+    c.execute=(sql,args)=>String(sql).includes("'permissao_criador_pasta'")?Promise.reject(new Error("falha SQL simulada")):executar(sql,args);
+    c.release=()=>{c.execute=executar;c.release=liberar;liberar();};return c;
+  });
+  const resposta=await agente.post("/api/gestao-materiais/pastas").set("X-CSRF-Token",csrf).send({nome:"Principal com falha",categoriaPaiId:null});
+  mockConexao.mock.restore();assert.equal(resposta.status,500);
+  const [pastas]=await pool.execute("SELECT id FROM categorias WHERE nome='Principal com falha'");assert.equal(pastas.length,0);
+  const [permissoes]=await pool.execute("SELECT id FROM permissoes_professor_categoria WHERE professor_id=?",[usuarios.professor.id]);assert.equal(permissoes.length,0);
+  assert.ok(operacoes.some(op=>op[0]==="excluir"));
+  assert.ok(![...itensDrive.values()].some(item=>item.name==="Principal com falha"));
 });
 
 test("vincula legado preservando ID e permissao; repete sem duplicar e recusa ambiguidade", async function() {

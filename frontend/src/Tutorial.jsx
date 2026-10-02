@@ -50,7 +50,7 @@ const GUIAS = Object.freeze({
         area: "acervo", titulo: "Biblioteca", resumo: "Pesquise, envie e organize materiais autorizados.",
         passos: [
           "Abra Biblioteca no menu. Entre em uma pasta pelo nome ou use Buscar e Filtros para localizar o conteúdo.",
-          "Para criar uma subpasta, toque em Nova pasta, informe o nome, confira o destino e confirme. Faça isso apenas dentro de uma pasta que você gerencia.",
+          "Para criar uma pasta, toque em Nova pasta e informe o nome. Escolha Pasta principal para ela aparecer no início da Biblioteca: você receberá permissão para gerenciar essa nova pasta e suas subpastas, sem acesso às demais. Escolha Subpasta para criar dentro de uma pasta que você já gerencia; procure pelo nome e confira o caminho. Aguarde a confirmação: ela será salva também no Google Drive.",
           "Para enviar um arquivo, toque em Adicionar material, selecione um PDF ou vídeo e escolha uma pasta que você pode gerenciar. O Nome do material, a Disciplina e o Concurso são opcionais; se escrever um título, a extensão correta será adicionada automaticamente. Toque em Adicionar material no formulário e aguarde a conclusão antes de repetir.",
           "O progresso mostra os bytes confirmados no Google Drive. Mantenha a tela aberta, inclusive no aplicativo instalado. Se o envio parar, selecione o mesmo arquivo e use Retomar envio: os dados e a pasta originais serão mantidos. O envio fica disponível por até 24 horas; use Cancelar envio pendente para descartá-lo. O material só aparece após a confirmação final.",
           "Nos materiais que você pode gerenciar, abra as opções para editar o nome, mover, substituir o arquivo ou enviar para a lixeira. Confira o destino antes de salvar."
@@ -112,7 +112,7 @@ const GUIAS = Object.freeze({
         area: "organizacao", titulo: "Organização", resumo: "Mantenha pastas, disciplinas e concursos organizados.",
         passos: [
           "Em Organização, use Localizar pasta para encontrar uma pasta pelo nome e conferir se ela é principal ou filha.",
-          "Toque em Nova pasta para informar nome e destino. Uma pasta principal é criada dentro da raiz do acervo no Google Drive; uma subpasta é criada dentro da pasta escolhida. Aguarde a confirmação antes de enviar materiais.",
+          "Toque em Nova pasta, informe o nome e escolha onde criar. Pasta principal aparece no início da Biblioteca; Subpasta fica dentro da pasta que você escolher. Use Localizar pasta e confira o caminho completo. As duas opções criam a pasta também no Google Drive. Aguarde a confirmação antes de enviar materiais. Professores também podem criar pastas principais e recebem gestão somente sobre a nova pasta e suas subpastas.",
           "Se uma pasta antiga mostrar Vincular ao Drive, use esse botão para corrigir o cadastro mantendo seus acessos. Vincule primeiro a pasta principal e depois suas subpastas. Se houver nomes duplicados ou conflito, o sistema interrompe a operação para revisão.",
           "Mais abaixo, gerencie os catálogos Disciplinas e Concursos, que são opções usadas nos filtros e na classificação.",
           "Para renomear uma pasta vinculada ao Google Drive, use a opção da pasta na Biblioteca. Para excluí-la, confira a confirmação: o conteúdo e as subpastas também serão enviados à lixeira do Drive. A edição somente local é bloqueada para evitar divergência."

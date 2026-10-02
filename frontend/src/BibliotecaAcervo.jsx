@@ -48,6 +48,7 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   const [mostrarNovaPasta, definirMostrarNovaPasta] = useState(false);
   const [nomeNovaPasta, definirNomeNovaPasta] = useState("");
   const [paiNovaPasta, definirPaiNovaPasta] = useState("");
+  const [tipoNovaPasta, definirTipoNovaPasta] = useState("");
   const [pastaEnvioId, definirPastaEnvioId] = useState("");
   const [ocupado, definirOcupado] = useState(false);
   const [materialParaExcluir, definirMaterialParaExcluir] = useState(null);
@@ -113,10 +114,16 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   async function criarPasta(evento) {
     evento.preventDefault();
     let novaPasta;
-    const criada = await executar(async function criar() { novaPasta = await criarPastaNoDrive(nomeNovaPasta,Number(paiNovaPasta)); }, "Pasta criada no Google Drive.");
+    if (!tipoNovaPasta || (tipoNovaPasta === "subpasta" && !paiNovaPasta)) {
+      aoErro("Escolha onde criar a pasta. Para uma subpasta, selecione também a pasta que vai recebê-la.");
+      return;
+    }
+    const criada = await executar(async function criar() { novaPasta = await criarPastaNoDrive(nomeNovaPasta,tipoNovaPasta === "principal" ? null : Number(paiNovaPasta)); }, "Pasta criada e salva no Google Drive. Você já pode adicionar materiais nela.");
     if (criada) {
       definirPastaEnvioId(String(novaPasta.id));
       definirNomeNovaPasta("");
+      definirTipoNovaPasta("");
+      definirPaiNovaPasta("");
       definirMostrarNovaPasta(false);
     }
   }
@@ -149,7 +156,23 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
       },"Envio cancelado.")}>Cancelar envio pendente</button>}
     </div>}
     <div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais da biblioteca."}</p></div><div className="acoes-gestao-pastas"><button type="button" className="botao-secundario" onClick={function alternar() { definirMostrarNovaPasta(!mostrarNovaPasta); }}><Icone nome={mostrarNovaPasta ? "fechar" : "mais"} />{mostrarNovaPasta ? "Cancelar" : "Nova pasta"}</button><button type="button" className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div></div>
-    {mostrarNovaPasta && <form className="formulario-material" onSubmit={criarPasta}><label>Nome da nova pasta<input required maxLength="120" value={nomeNovaPasta} onChange={function mudar(evento) { definirNomeNovaPasta(evento.target.value); }} /></label><SeletorPasta rotulo="Criar dentro de" pastas={pastas.filter(function permitida(item) { return item.podeCriar; })} valor={paiNovaPasta} aoAlterar={definirPaiNovaPasta} obrigatorio opcaoVazia="Escolha uma pasta autorizada" /><button type="submit" disabled={ocupado}>{ocupado ? "Criando..." : "Criar pasta"}</button></form>}
+    {mostrarNovaPasta && <form className="formulario-material" onSubmit={criarPasta}>
+      <label>Nome da nova pasta<input required disabled={ocupado} maxLength="120" placeholder="Ex.: Aulas de revisão" value={nomeNovaPasta} onChange={evento => definirNomeNovaPasta(evento.target.value)} /></label>
+      <label>Onde você quer criar a pasta?
+        <select required disabled={ocupado} value={tipoNovaPasta} onChange={evento => definirTipoNovaPasta(evento.target.value)}>
+          <option value="" disabled>Escolha uma opção</option>
+          <option value="principal">Pasta principal — aparece no início da Biblioteca</option>
+          <option value="subpasta">Subpasta — fica dentro de outra pasta</option>
+        </select>
+      </label>
+      {tipoNovaPasta === "subpasta" && <SeletorPasta rotulo="Dentro de qual pasta?" pastas={pastas.filter(item => item.podeCriar)} valor={paiNovaPasta} aoAlterar={definirPaiNovaPasta} obrigatorio opcaoVazia="Escolha a pasta que vai receber a nova subpasta" />}
+      <p className="orientacao-nova-pasta" aria-live="polite">
+        {tipoNovaPasta === "principal" ? "Ela ficará no início da Biblioteca, ao lado das outras pastas principais." : tipoNovaPasta === "subpasta" ? "Use Localizar pasta para procurar pelo nome. Confira o caminho completo antes de criar." : "Escolha Pasta principal para começar uma nova área, ou Subpasta para organizar uma área existente."}
+        {usuario.papel === "professor" && (tipoNovaPasta === "principal" ? " Você poderá gerenciar esta nova pasta e suas subpastas. Isso não libera acesso às demais pastas." : " Só aparecem destinos que você tem permissão para gerenciar.")}
+        {" A pasta será salva também no Google Drive. Aguarde a confirmação."}
+      </p>
+      <button type="submit" disabled={ocupado}>{ocupado ? "Criando pasta..." : "Criar pasta"}</button>
+    </form>}
     {mostrarEnvio && <form className="formulario-material" onSubmit={enviar}><label>Arquivo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><SeletorPasta rotulo="Adicionar na pasta" pastas={pastas} valor={pastaEnvioId} aoAlterar={definirPastaEnvioId} nome="categoriaId" obrigatorio /><label>Nome do material <small>(opcional; extensão automática)</small><input name="nome" placeholder="Usar o nome do arquivo" /></label><label>Disciplina <small>(opcional)</small><select name="disciplinaId" defaultValue=""><option value="">Não informar</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><label>Concurso <small>(opcional)</small><select name="concursoId" defaultValue=""><option value="">Não informar</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Enviando..." : "Adicionar material"}</button></form>}
     {usuario.papel === "admin" && <details className="lixeira-materiais"><summary><span><Icone nome="historico" /> Lixeira</span><span className="contador">{lixeira.length}</span></summary>{!lixeira.length && <Vazio titulo="A lixeira está vazia" texto="Os materiais enviados para cá aparecerão nesta lista." />}{lixeira.map(function itemLixeira(item) { return <article key={item.id}><div><strong>{item.nome}</strong><small>{item.pasta ? "Pasta anterior: " + item.pasta : "Pasta anterior indisponível"}</small>{item.exclusaoPendente && <small>Exclusão aguardando conclusão</small>}</div><div><button type="button" className="secundario" disabled={ocupado || item.exclusaoPendente} onClick={function restaurarItem() { restaurar(item); }}>Restaurar</button><button type="button" className="perigo" disabled={ocupado} onClick={function excluirItem() { definirMaterialParaExcluir(item); definirTextoExclusao(""); }}>{item.exclusaoPendente ? "Finalizar exclusão" : "Excluir definitivamente"}</button></div></article>; })}</details>}
     {materialParaExcluir && <Modal titulo="Excluir este arquivo definitivamente?" aoFechar={function fechar() { definirMaterialParaExcluir(null); }}><form onSubmit={excluir}><p>Essa ação não poderá ser desfeita. Digite <strong>EXCLUIR</strong> para confirmar.</p><label>Confirmação<input value={textoExclusao} onChange={function mudar(evento) { definirTextoExclusao(evento.target.value); }} autoFocus autoComplete="off" /></label><div className="acoes-formulario"><button type="submit" className="perigo" disabled={ocupado || textoExclusao !== "EXCLUIR"}>{ocupado ? "Excluindo..." : "Excluir definitivamente"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirMaterialParaExcluir(null); }}>Cancelar</button></div></form></Modal>}

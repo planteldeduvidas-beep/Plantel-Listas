@@ -143,6 +143,23 @@ function criarGestaoMateriaisRepository(pool) {
     });
   }
 
+  async function concederGestaoPrincipal(conexao, categoriaId, usuarioId) {
+    const [usuarios] = await conexao.execute("SELECT papel,ativo FROM usuarios WHERE id=? FOR UPDATE",[usuarioId]);
+    if (!usuarios.length || usuarios[0].papel !== "professor" || !usuarios[0].ativo) return;
+    // Retomadas nao reativam uma permissao que o administrador ja revogou.
+    const [existentes] = await conexao.execute("SELECT id FROM permissoes_professor_categoria WHERE professor_id=? AND categoria_id=?",[usuarioId,categoriaId]);
+    if (existentes.length) return;
+    await conexao.execute("INSERT INTO permissoes_professor_categoria (professor_id,categoria_id,concedida_por_usuario_id) VALUES (?,?,?)",[usuarioId,categoriaId,usuarioId]);
+    await conexao.execute("INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado,contexto) VALUES (?,'permissao_criador_pasta','pasta',?,'concluida',?)",[usuarioId,categoriaId,JSON.stringify({origem:"criacao_pasta_principal",professorId:usuarioId})]);
+  }
+
+  async function concluirCriacaoPrincipalRecuperada(categoriaId, usuarioId, operacaoChave) {
+    return executarTransacao(async conexao => {
+      await concederGestaoPrincipal(conexao,categoriaId,usuarioId);
+      await concluirOperacaoNaTransacao(conexao,operacaoChave,null);
+    });
+  }
+
   async function criarPasta(dados, usuarioId, operacaoChave) {
     return executarTransacao(async function criar(conexao) {
       if (dados.categoriaExistenteId) {
@@ -159,6 +176,7 @@ function criarGestaoMateriaisRepository(pool) {
         [dados.nome,dados.categoriaPaiId,dados.drivePastaId,dados.descricao || null,dados.ordem || 0]
       );
       const id = Number(resultado.insertId);
+      if (dados.categoriaPaiId === null && dados.concederGestaoAoCriador === true) await concederGestaoPrincipal(conexao,id,usuarioId);
       await conexao.execute("INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado,contexto) VALUES (?,'pasta_criada','pasta',?,'concluida',?)", [usuarioId,id,JSON.stringify({categoriaPaiId:dados.categoriaPaiId})]);
       await concluirOperacaoNaTransacao(conexao,operacaoChave,null);
       return {id:id,nome:dados.nome,categoriaPaiId:dados.categoriaPaiId};
@@ -231,10 +249,10 @@ function criarGestaoMateriaisRepository(pool) {
         + "CASE WHEN c.disciplina_estado='definida' THEN c.disciplina_id WHEN c.disciplina_estado='nao_se_aplica' THEN NULL ELSE a.disciplina_efetiva END, "
         + "(a.legado OR EXISTS(SELECT 1 FROM permissoes_professor_categoria pc WHERE pc.categoria_id=c.id AND pc.professor_id=? AND pc.revogada_em IS NULL)) "
         + "FROM categorias c INNER JOIN arvore a ON c.categoria_pai_id=a.id WHERE c.ativo=1) "
-        + "SELECT a.id,a.nome,a.caminho,EXISTS(SELECT 1 FROM professor_disciplinas pd INNER JOIN disciplinas d ON d.id=pd.disciplina_id AND d.ativo=1 WHERE pd.professor_id=? AND pd.disciplina_id=a.disciplina_efetiva) AS pode_criar FROM arvore a WHERE a.drive_pasta_id IS NOT NULL AND "
+        + "SELECT a.id,a.nome,a.caminho,1 AS pode_criar FROM arvore a WHERE a.drive_pasta_id IS NOT NULL AND "
         + "(a.legado=1 OR EXISTS(SELECT 1 FROM professor_disciplinas pd INNER JOIN disciplinas d ON d.id=pd.disciplina_id AND d.ativo=1 "
         + "WHERE pd.professor_id=? AND pd.disciplina_id=a.disciplina_efetiva)) ORDER BY a.caminho",
-        [usuario.id,usuario.id,usuario.id,usuario.id]
+        [usuario.id,usuario.id,usuario.id]
       );
     }
     return registros.map(function mapear(item) { return { id: Number(item.id), nome: item.nome, caminho: item.caminho, podeCriar:Boolean(item.pode_criar) }; });
@@ -405,7 +423,7 @@ function criarGestaoMateriaisRepository(pool) {
     const [linhas] = await pool.execute("SELECT id FROM operacoes_google_drive_pendentes WHERE tipo='pasta_criacao' AND fase<>'concluida' AND JSON_UNQUOTE(JSON_EXTRACT(detalhes,'$.categoriaExistenteId'))=? LIMIT 1", [String(id)]);
     return linhas.length > 0;
   }
-  return { possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, reativarPastaVinculada, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
+  return { concluirCriacaoPrincipalRecuperada, possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, reativarPastaVinculada, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
 }
 
 module.exports = criarGestaoMateriaisRepository;

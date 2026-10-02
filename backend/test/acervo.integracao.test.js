@@ -652,6 +652,13 @@ test("reconcilia renomeacao, movimentacao e remocao de subarvore sem full sync",
     + "('driveSubarvoreFase5','driveFilhaSubarvoreFase5') AND ativo=1"
   );
   assert.equal(Number(estadoPastas[0].ativas), 0);
+  const conexaoRestauracao = await repository.adquirirTrava();
+  try { await repository.aplicarAlteracoes(conexaoRestauracao,[alteracaoSubarvore],"pagina-restauracao"); }
+  finally { await repository.liberarTrava(conexaoRestauracao); }
+  const [restauradas] = await pool.execute("SELECT id,ativo FROM categorias WHERE drive_pasta_id IN ('driveSubarvoreFase5','driveFilhaSubarvoreFase5')");
+  assert.equal(restauradas.length,2);
+  assert.ok(restauradas.every(p=>Number(p.ativo)===1));
+  assert.ok(restauradas.some(p=>Number(p.id)===Number(afetada.insertId)));
 });
 
 test("pasta principal permanece para revisao ate resolver disciplina e concurso", async function() {

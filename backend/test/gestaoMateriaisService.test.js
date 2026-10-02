@@ -25,6 +25,17 @@ test("vinculacao preserva pasta preexistente em falha SQL e nao compensa commit 
   }
 });
 
+test("retomada da principal do professor recupera concessao no registro sincronizado",async()=>{
+  const chamadas=[];
+  const d=criarDependencias({repository:{
+    listarOperacoesDrivePendentes:async()=>[{chave:"op-professor",tipo:"pasta_criacao",usuarioId:7,detalhes:{categoriaPaiId:null,pastaPaiDriveId:"driveRaiz",driveFileId:"driveNovaPrincipal",concederGestaoAoCriador:true}}],
+    buscarCategoriaPorDriveId:async()=>({id:90,categoriaPaiId:null}),
+    concluirCriacaoPrincipalRecuperada:async(...args)=>chamadas.push(args)
+  },provider:{obterItem:async()=>({id:"driveNovaPrincipal",name:"Principal",mimeType:"application/vnd.google-apps.folder",parents:["driveRaiz"]})}});
+  assert.equal(await d.service.recuperarOperacoesPendentes(),1);
+  assert.deepEqual(chamadas,[[90,7,"op-professor"]]);
+});
+
 test("retomada da vinculacao usa ID legado e nao cria segunda pasta", async () => {
   const registros=[];
   const d=criarDependencias({repository:{
@@ -211,12 +222,24 @@ test("retoma renomeacao pendente usando o estado confirmado no MySQL",async func
 });
 
 test("pasta criada no Drive e removida se a transacao MySQL falhar",async function(){
+  for (const papel of ["admin","professor"]) {
   const dependencias=criarDependencias({
     repository:{criarPasta:async function falhar(){throw new Error("falha banco");}},
     provider:{criarPasta:async function criar(token,nome,pai){dependencias.chamadas.push("criar-pasta:"+nome+":"+pai);return{id:"drivePastaNova",name:nome};}}
   });
-  await assert.rejects(dependencias.service.criarPasta({id:2,papel:"admin"},{nome:"Nova pasta",categoriaPaiId:10}),/falha banco/);
+  await assert.rejects(dependencias.service.criarPasta({id:2,papel},{nome:"Nova pasta",categoriaPaiId:10}),/falha banco/);
   assert.deepEqual(dependencias.chamadas,["criar-pasta:Nova pasta:drivePasta10","excluir"]);
+  }
+});
+
+test("falha ao criar pasta no Drive nao grava categoria para admin ou professor",async function(){
+  for (const papel of ["admin","professor"]) {
+    let gravacoes=0;
+    const d=criarDependencias({repository:{criarPasta:async()=>{gravacoes++;}},
+      provider:{criarPasta:async()=>{throw new AppError("Drive indisponivel",503,"GOOGLE_DRIVE_INDISPONIVEL");}}});
+    await assert.rejects(d.service.criarPasta({id:2,papel},{nome:"Nova pasta",categoriaPaiId:10}),{codigo:"GOOGLE_DRIVE_INDISPONIVEL"});
+    assert.equal(gravacoes,0);
+  }
 });
 
 test("renomeacao de pasta compensa falha SQL e preserva nome anterior",async function(){
@@ -228,8 +251,8 @@ test("renomeacao de pasta compensa falha SQL e preserva nome anterior",async fun
   assert.deepEqual(dependencias.chamadas,["renomear:Pasta nova","renomear:Pasta antiga"]);
 });
 
-test("professor nao cria pasta fora de disciplina vinculada",async function(){
-  const dependencias=criarDependencias({repository:{buscarDisciplinaEfetiva:async()=>9,professorPossuiDisciplina:async()=>false}});
-  await assert.rejects(dependencias.service.criarPasta({id:7,papel:"professor"},{nome:"Tentativa",categoriaPaiId:10}),function verificar(erro){return erro.codigo==="SEM_PERMISSAO_DISCIPLINA";});
+test("professor nao cria pasta sem autorizacao de gestao",async function(){
+  const dependencias=criarDependencias({repository:{professorPodeAcessarCategoria:async()=>false}});
+  await assert.rejects(dependencias.service.criarPasta({id:7,papel:"professor"},{nome:"Tentativa",categoriaPaiId:10}),function verificar(erro){return erro.codigo==="SEM_PERMISSAO_PASTA";});
   assert.deepEqual(dependencias.chamadas,[]);
 });

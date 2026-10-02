@@ -7024,6 +7024,7 @@ textarea {
 .progresso-upload { display: grid; gap: 10px; margin: 16px; padding: 16px; border: 1px solid rgb(34 137 120 / 30%); border-radius: 12px; min-width: 0; overflow-wrap: anywhere; }
 .progresso-upload progress { display: block; width: 100%; max-width: 100%; height: 12px; accent-color: #148577; }
 .progresso-upload p { margin: 0; line-height: 1.5; }
+.formulario-material .orientacao-nova-pasta { grid-column: 1 / -1; margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .progresso-upload button { width: fit-content; max-width: 100%; }
 @media (max-width: 760px) { .grade-engajamento > section { padding: 18px; } .tutorial-orientacao { padding: 18px; } .tutorial-area summary { gap: 12px; padding: 16px; } .tutorial-area-corpo { padding: 0 16px 18px; } }
 @media (max-width: 420px) { .numeros-engajamento { grid-template-columns: 1fr; } }

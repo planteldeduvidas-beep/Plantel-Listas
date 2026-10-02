@@ -134,26 +134,18 @@ function criarGestaoMateriaisService(dependencias) {
     return nome;
   }
 
-  async function exigirDisciplinaParaCriacao(usuario, categoriaId) {
-    if (usuario.papel !== "professor") return;
-    const disciplinaId = await repository.buscarDisciplinaEfetiva(categoriaId);
-    if (!disciplinaId || !await repository.professorPossuiDisciplina(usuario.id,disciplinaId)) {
-      throw new AppError("A pasta precisa pertencer a uma disciplina autorizada",403,"SEM_PERMISSAO_DISCIPLINA");
-    }
-  }
-
   async function criarPasta(usuario, corpo) {
     exigirPapelDeGestao(usuario);
     const nome = validarNomePasta(corpo);
     const { validarCategoria } = require("../categorias/estruturaAcervoValidator");
     const dados = validarCategoria(corpo, false);
     const categoriaPaiId = dados.categoriaPaiId;
-    if (categoriaPaiId === null && usuario.papel !== "admin") throw new AppError("Somente admin pode criar pasta principal",403,"SEM_PERMISSAO");
+    const concederGestaoAoCriador = categoriaPaiId === null && usuario.papel === "professor";
     const pai = categoriaPaiId === null ? { id: null, drivePastaId: provider.pastaRaizId } : await exigirCategoria(usuario,categoriaPaiId);
-    if (pai.id !== null) await exigirDisciplinaParaCriacao(usuario,pai.id);
+    // exigirCategoria ja valida gestao por pasta/ancestral OU disciplina autorizada.
     const refreshToken = await token();
     await exigirPastaDoAcervo(refreshToken,pai.drivePastaId);
-    const detalhes = {nome:nome,categoriaPaiId:pai.id,pastaPaiDriveId:pai.drivePastaId,descricao:dados.descricao,ordem:dados.ordem};
+    const detalhes = {nome:nome,categoriaPaiId:pai.id,pastaPaiDriveId:pai.drivePastaId,descricao:dados.descricao,ordem:dados.ordem,concederGestaoAoCriador};
     const operacao = await iniciarOperacaoDrive("pasta_criacao",usuario.id,null,detalhes);
     let criada;
     try {
@@ -164,7 +156,7 @@ function criarGestaoMateriaisService(dependencias) {
       await deixarOperacaoPendente(operacao,"reconciliacao_pendente",erro,detalhes);
       throw erro;
     }
-    try { return await repository.criarPasta({...dados,nome:criada.name || nome,categoriaPaiId:pai.id,drivePastaId:criada.id},usuario.id,operacao); }
+    try { return await repository.criarPasta({...dados,nome:criada.name || nome,categoriaPaiId:pai.id,drivePastaId:criada.id,concederGestaoAoCriador},usuario.id,operacao); }
     catch (erro) {
       return tratarFalhaDepoisDoDrive(operacao,erro,detalhes,function removerPastaNova() { return provider.excluirArquivo(refreshToken,criada.id); });
     }
@@ -509,10 +501,12 @@ function criarGestaoMateriaisService(dependencias) {
       }
       const existente = await repository.buscarCategoriaPorDriveId(item.id);
       if (!existente) {
-        await repository.criarPasta({nome:item.name,categoriaPaiId:detalhes.categoriaPaiId,drivePastaId:item.id,descricao:detalhes.descricao,ordem:detalhes.ordem,categoriaExistenteId:detalhes.categoriaExistenteId},operacao.usuarioId,operacao.chave);
+        await repository.criarPasta({nome:item.name,categoriaPaiId:detalhes.categoriaPaiId,drivePastaId:item.id,descricao:detalhes.descricao,ordem:detalhes.ordem,categoriaExistenteId:detalhes.categoriaExistenteId,concederGestaoAoCriador:detalhes.concederGestaoAoCriador===true},operacao.usuarioId,operacao.chave);
       } else {
         if (detalhes.categoriaExistenteId && existente.id !== detalhes.categoriaExistenteId) throw new AppError("Pasta vinculada a outro cadastro",409,"PASTA_DRIVE_JA_VINCULADA");
-        await concluirOperacaoDrive(operacao.chave);
+        if (detalhes.concederGestaoAoCriador === true && detalhes.categoriaPaiId === null && existente.categoriaPaiId === null) {
+          await repository.concluirCriacaoPrincipalRecuperada(existente.id,operacao.usuarioId,operacao.chave);
+        } else await concluirOperacaoDrive(operacao.chave);
       }
       return;
     }
