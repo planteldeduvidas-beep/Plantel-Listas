@@ -249,7 +249,7 @@ function criarGestaoMateriaisRepository(pool) {
     );
   }
 
-  async function criarMaterial(dados, usuarioId, operacaoChave) {
+  async function criarMaterial(dados, usuarioId, operacaoChave, uploadId) {
     return executarTransacao(async function criar(conexao) {
       const [resultado] = await conexao.execute(
         "INSERT INTO materiais (drive_file_id,drive_parent_file_id,categoria_id,disciplina_id,concurso_id,nome,mime_type,tipo,extensao,tamanho_bytes,checksum_md5,drive_criado_em,drive_modificado_em,resource_key,disponivel,estado_gestao,ultima_sincronizacao_drive_id) "
@@ -259,6 +259,9 @@ function criarGestaoMateriaisRepository(pool) {
       const id = Number(resultado.insertId);
       await registrarAuditoria(conexao, id, usuarioId, "upload", "concluida", { categoriaId: dados.categoriaId, tipo: dados.tipo });
       await concluirOperacaoNaTransacao(conexao,operacaoChave,id);
+      if (uploadId) {
+        await conexao.execute("UPDATE uploads_retomaveis SET estado='concluido',material_id=?,recebido=tamanho,sessao_criptografada=NULL,atualizado_em=CURRENT_TIMESTAMP(3) WHERE id=?", [id,uploadId]);
+      }
       return buscarMaterial(id, conexao);
     });
   }

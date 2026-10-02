@@ -596,6 +596,21 @@ function criarGestaoMateriaisService(dependencias) {
   function pararRetomada(){if(temporizadorDeRetomada){clearInterval(temporizadorDeRetomada);temporizadorDeRetomada=null;}}
 
   return {
+    comTravaUpload: executarComTravaDeOperacao,
+    async autorizarUpload(usuario, dados) {
+      exigirPapelDeGestao(usuario);
+      const categoria = await exigirCategoria(usuario,dados.categoriaId);
+      if (usuario.papel === "professor" && dados.disciplinaId !== null
+          && dados.disciplinaId !== await repository.buscarDisciplinaEfetiva(categoria.id)) {
+        throw new AppError("Disciplina diferente da pasta",403,"SEM_PERMISSAO_DISCIPLINA");
+      }
+      const refreshToken = await token();
+      await exigirPastaDoAcervo(refreshToken,categoria.drivePastaId);
+      return {refreshToken,categoria};
+    },
+    async concluirUploadRetomavel(usuario, dados, categoria, item, uploadId) {
+      return publicar(await repository.criarMaterial(dadosDoDrive(item,dados,categoria),usuario.id,null,uploadId));
+    },
     adicionar: function adicionarComTrava(usuario, corpo, arquivo) {
       return executarComTravaDeOperacao(function executar() { return adicionar(usuario, corpo, arquivo); }, arquivo);
     },

@@ -365,6 +365,66 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
     return resposta.status === 204 ? {} : resposta.json();
   }
 
+  function validarUrlUpload(valor) {
+    const url = new URL(valor);
+    if (url.protocol !== "https:" || url.hostname !== "www.googleapis.com" || url.port
+        || url.username || url.password || url.pathname !== "/upload/drive/v3/files") {
+      throw new AppError("Sessao de envio indisponivel", 503, "UPLOAD_SESSAO_INVALIDA");
+    }
+    return url;
+  }
+
+  async function reservarIdUpload(refreshToken) {
+    const dados = await requisitarJson(new URL(URL_API_DRIVE + "/generateIds?count=1&space=drive&type=files"), {}, await obterTokenDeAcesso(refreshToken));
+    if (!dados.ids?.[0]) throw new AppError("Nao foi possivel preparar o envio",503,"GOOGLE_DRIVE_INDISPONIVEL");
+    return dados.ids[0];
+  }
+
+  async function iniciarUploadRetomavel(refreshToken, dados) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    let resposta;
+    try {
+      resposta = await buscar(new URL("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,name,mimeType,size,parents,md5Checksum,modifiedTime"), {
+        method:"POST", redirect:"manual", signal:AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS),
+        headers:{Authorization:"Bearer " + token,"Content-Type":"application/json","X-Upload-Content-Type":dados.mimeType,"X-Upload-Content-Length":String(dados.tamanho)},
+        body:JSON.stringify({id:dados.driveId,name:dados.nome,mimeType:dados.mimeType,parents:[dados.pastaDriveId]})
+      });
+    } catch { throw new AppError("Nao foi possivel preparar o envio. Tente novamente.",503,"GOOGLE_DRIVE_INDISPONIVEL"); }
+    if (!resposta.ok) {
+      const falha = await classificarFalhaDrive(resposta);
+      throw new AppError("Nao foi possivel preparar o envio",falha.status,falha.codigo);
+    }
+    return validarUrlUpload(resposta.headers.get("location")).href;
+  }
+
+  async function transferirParteUpload(refreshToken, sessao, tamanho, offset, corpo) {
+    const token = await obterTokenDeAcesso(refreshToken);
+    const consulta = !corpo;
+    let resposta;
+    try {
+      resposta = await buscar(validarUrlUpload(sessao), {
+        method:"PUT", redirect:"manual", signal:AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS),
+        headers:{Authorization:"Bearer " + token,"Content-Type":"application/octet-stream","Content-Length":String(corpo?.length || 0),
+          "Content-Range":consulta ? "bytes */" + tamanho : `bytes ${offset}-${offset + corpo.length - 1}/${tamanho}`},
+        body:corpo || Buffer.alloc(0)
+      });
+    } catch { throw new AppError("Envio interrompido. Retome para conferir o progresso salvo.",503,"UPLOAD_INTERROMPIDO"); }
+    if ([200,201].includes(resposta.status)) return {completo:true,recebido:tamanho,item:await resposta.json()};
+    if (resposta.status === 308) {
+      const intervalo = resposta.headers.get("range");
+      const match = intervalo && /^bytes=0-(\d+)$/.exec(intervalo);
+      const recebido = match ? Number(match[1]) + 1 : 0;
+      if ((intervalo && !match) || !Number.isSafeInteger(recebido) || recebido > tamanho) {
+        throw new AppError("Progresso do envio indisponivel",503,"UPLOAD_PROTOCOLO_INVALIDO");
+      }
+      return {completo:false,recebido};
+    }
+    if ([404,410].includes(resposta.status)) throw new AppError("A sessao de envio expirou. Selecione o arquivo novamente.",410,"UPLOAD_EXPIRADO");
+    if ([400,409,416].includes(resposta.status)) throw new AppError("O Drive recusou esta sessao. Cancele o envio pendente e selecione o arquivo novamente.",410,"UPLOAD_SESSAO_REJEITADA");
+    const falha = await classificarFalhaDrive(resposta);
+    throw new AppError("Nao foi possivel enviar esta parte. Consulte o progresso antes de retomar.",falha.status,falha.codigo);
+  }
+
   async function criarArquivo(refreshToken, dados) {
     const token = await obterTokenDeAcesso(refreshToken);
     const iniciarUrl = new URL("https://www.googleapis.com/upload/drive/v3/files");
@@ -698,6 +758,9 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
   }
 
   return {
+    reservarIdUpload,
+    iniciarUploadRetomavel,
+    transferirParteUpload,
     escopo: ESCOPO_GESTAO,
     escopoGestaoNecessario: ESCOPO_GESTAO,
     pastaRaizId: configuracao.pastaRaizId,

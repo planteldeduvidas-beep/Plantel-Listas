@@ -269,7 +269,8 @@ function validarVariaveisDeAmbiente(variaveis) {
       limiteUpload: lerInteiro(variaveis, "UPLOAD_RATE_LIMIT_MAX", 20, 1, 1000),
       limiteConsultaAcervo: lerInteiro(variaveis, "ACERVO_QUERY_RATE_LIMIT_MAX", 120, 10, 1000),
       tamanhoMaximoPdfBytes: lerInteiro(variaveis, "UPLOAD_MAX_PDF_MB", 50, 1, 500) * 1024 * 1024,
-      tamanhoMaximoVideoBytes: lerInteiro(variaveis, "UPLOAD_MAX_VIDEO_MB", 500, 1, 5000) * 1024 * 1024
+      tamanhoMaximoVideoBytes: lerInteiro(variaveis, "UPLOAD_MAX_VIDEO_MB", 500, 1, 5000) * 1024 * 1024,
+      tamanhoMaximoVideoRetomavelBytes: lerInteiro(variaveis, "UPLOAD_RESUMABLE_MAX_VIDEO_MB", 3072, 1, 5000) * 1024 * 1024
     }),
     banco: Object.freeze({
       host: exigirTexto(variaveis, "DB_HOST"),

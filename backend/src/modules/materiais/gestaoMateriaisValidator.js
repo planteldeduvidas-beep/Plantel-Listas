@@ -36,6 +36,10 @@ async function identificarArquivo(arquivo, configuracao) {
   } finally {
     await descritor.close();
   }
+  return identificarAssinatura(arquivo, configuracao, assinatura);
+}
+
+function identificarAssinatura(arquivo, configuracao, assinatura) {
   const extensao = path.extname(arquivo.originalname || "").toLowerCase().slice(1);
   let tipo = null;
   let mimeType = null;
@@ -67,8 +71,12 @@ async function identificarArquivo(arquivo, configuracao) {
 }
 
 async function validarUpload(corpo, arquivo, configuracao) {
-  validarCampos(corpo, ["categoriaId", "nome", "disciplinaId", "concursoId"]);
   const detectado = await identificarArquivo(arquivo, configuracao);
+  return validarDadosUpload(corpo, arquivo, detectado);
+}
+
+function validarDadosUpload(corpo, arquivo, detectado) {
+  validarCampos(corpo, ["categoriaId", "nome", "disciplinaId", "concursoId"]);
   let titulo = nomeSeguro(String(corpo.nome || "").trim(), arquivo.originalname);
   const extensaoDoTitulo = path.extname(titulo).toLowerCase().slice(1);
   if (["pdf", "mp4", "m4v", "webm"].includes(extensaoDoTitulo)) {
@@ -116,6 +124,8 @@ function validarVersao(corpo) {
 }
 
 module.exports = {
+  identificarAssinatura,
+  validarDadosUpload,
   inteiroPositivo: inteiroPositivo,
   validarUpload: validarUpload,
   validarEdicao: validarEdicao,

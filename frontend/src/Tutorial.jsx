@@ -52,6 +52,7 @@ const GUIAS = Object.freeze({
           "Abra Biblioteca no menu. Entre em uma pasta pelo nome ou use Buscar e Filtros para localizar o conteúdo.",
           "Para criar uma subpasta, toque em Nova pasta, informe o nome, confira o destino e confirme. Faça isso apenas dentro de uma pasta que você gerencia.",
           "Para enviar um arquivo, toque em Adicionar material, selecione um PDF ou vídeo e escolha uma pasta que você pode gerenciar. O Nome do material, a Disciplina e o Concurso são opcionais; se escrever um título, a extensão correta será adicionada automaticamente. Toque em Adicionar material no formulário e aguarde a conclusão antes de repetir.",
+          "O progresso mostra os bytes confirmados no Google Drive. Mantenha a tela aberta, inclusive no aplicativo instalado. Se o envio parar, selecione o mesmo arquivo e use Retomar envio: os dados e a pasta originais serão mantidos. O envio fica disponível por até 24 horas; use Cancelar envio pendente para descartá-lo. O material só aparece após a confirmação final.",
           "Nos materiais que você pode gerenciar, abra as opções para editar o nome, mover, substituir o arquivo ou enviar para a lixeira. Confira o destino antes de salvar."
         ], dica: "Se a ação não estiver disponível ou for negada, confirme a pasta em Pastas liberadas."
       },
@@ -83,6 +84,7 @@ const GUIAS = Object.freeze({
         passos: [
           "Abra Biblioteca. Use pastas, Busca e Filtros para chegar ao lugar desejado; confira o caminho antes de modificar algo.",
           "Toque em Nova pasta para criar uma pasta no destino correto. Para enviar um material, toque em Adicionar material, escolha PDF ou vídeo e selecione a pasta de destino. Nome do material, Disciplina e Concurso são opcionais; você pode escrever só o título, mesmo com pontos como Prova 2020.21. A extensão correta é adicionada automaticamente. Confirme o envio e aguarde a conclusão.",
+          "Uploads novos são enviados em partes, com progresso confirmado pelo Drive. Mantenha a tela aberta. Em caso de interrupção, selecione o mesmo arquivo e use Retomar envio; a pasta original não muda. Você pode retomar por até 24 horas ou cancelar o envio pendente. A substituição de um material ainda utiliza o envio simples e seu limite próprio.",
           "No material, abra as opções para renomear, mover, substituir ou enviar à lixeira. Confirme o nome e a pasta antes de salvar.",
           "Se aparecer 'pasta para revisar', você pode continuar enviando arquivos normalmente. Para resolver o aviso, marque a pasta, escolha a Disciplina e/ou o Concurso indicados como pendentes (ou 'Não se aplica') e toque em Salvar escolhas. 'Não alterar' mantém a pendência para depois.",
           "Abra Lixeira para restaurar um item. A exclusão definitiva não pode ser desfeita: confira o item antes de confirmar."

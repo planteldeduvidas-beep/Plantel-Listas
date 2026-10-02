@@ -1,5 +1,5 @@
-const API_CONFIGURADA = import.meta.env.VITE_API_URL || "/api";
-const API_BASE = import.meta.env.DEV ? "/api" : API_CONFIGURADA;
+const API_CONFIGURADA = import.meta.env?.VITE_API_URL || "/api";
+const API_BASE = import.meta.env?.DEV ? "/api" : API_CONFIGURADA;
 
 let tokenCsrfEmMemoria = null;
 
@@ -50,7 +50,7 @@ async function requisitar(caminho, opcoesInformadas) {
   opcoes.credentials = "include";
   opcoes.headers = Object.assign({}, opcoes.headers || {});
 
-  if (opcoes.body && !(opcoes.body instanceof FormData)) {
+  if (opcoes.body && !(opcoes.body instanceof FormData) && !(opcoes.body instanceof Blob)) {
     opcoes.headers["Content-Type"] = "application/json";
   }
 
@@ -63,9 +63,12 @@ async function requisitar(caminho, opcoesInformadas) {
 
   if (!resposta.ok) {
     const erro = new Error(
-      dados && dados.erro ? dados.erro.mensagem : "Nao foi possivel concluir a operacao"
+      dados && dados.erro ? dados.erro.mensagem : caminho.startsWith("/uploads")
+        ? (resposta.status === 413 ? "O servidor recusou o tamanho desta parte. Informe o suporte; nao reinicie o arquivo inteiro."
+          : "O envio foi interrompido pelo servidor. Use Retomar envio para conferir o progresso salvo.")
+        : "Nao foi possivel concluir a operacao"
     );
-    erro.codigo = dados && dados.erro ? dados.erro.codigo : "ERRO_REQUISICAO";
+    erro.codigo = dados && dados.erro ? dados.erro.codigo : caminho.startsWith("/uploads") ? "UPLOAD_RESPOSTA_INVALIDA" : "ERRO_REQUISICAO";
     erro.status = resposta.status;
     throw erro;
   }
@@ -323,6 +326,7 @@ function excluirMaterial(materialId, versao) {
 }
 
 export {
+  requisitar,
   cadastrar,
   entrar,
   sair,

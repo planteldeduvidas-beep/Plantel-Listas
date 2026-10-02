@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import {lerUpload,salvarUpload,prepararEnvio,executarEnvio,cancelarEnvio} from "./uploadRetomavel.js";
 import {
   consultarAcervo, obterUrlDoMaterial, classificarPasta,
   obterOrganizacaoAcervo, classificarPastas, listarPastasGerenciaveis,
@@ -38,6 +39,10 @@ function OpcoesClassificacao({ itens, incluirManter, incluirHerdar = true }) {
 }
 
 function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtualizar, aoErro, aoMensagem }) {
+  const [envioPendente,definirEnvioPendente] = useState(() => lerUpload(usuario.id));
+  const [progressoUpload,definirProgressoUpload] = useState(null);
+  const [arquivoRetomada,definirArquivoRetomada] = useState(null);
+  const enviandoRef = useRef(false);
   const [lixeira, definirLixeira] = useState([]);
   const [mostrarEnvio, definirMostrarEnvio] = useState(false);
   const [mostrarNovaPasta, definirMostrarNovaPasta] = useState(false);
@@ -82,10 +87,25 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   async function enviar(evento) {
     evento.preventDefault();
     const elementoFormulario = evento.currentTarget;
-    const formulario = new FormData(elementoFormulario);
-    const enviado = await executar(function adicionar() { return adicionarMaterial(formulario); }, "Material adicionado.");
+    return realizarEnvio(new FormData(elementoFormulario),elementoFormulario);
+  }
+  async function realizarEnvio(formulario,elementoFormulario) {
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
+    const enviado = await executar(async function adicionar() {
+      const arquivo = formulario.get("arquivo");
+      // Arquivos muito pequenos mantem a compatibilidade do multipart existente.
+      if (arquivo.size < 16 && !envioPendente) return adicionarMaterial(formulario);
+      const pendente = await prepararEnvio(formulario,envioPendente);
+      definirEnvioPendente(pendente); salvarUpload(usuario.id,pendente);
+      await executarEnvio(arquivo,pendente,definirProgressoUpload);
+      definirEnvioPendente(null); salvarUpload(usuario.id,null);
+      definirProgressoUpload(null);
+    }, "Material adicionado.");
+    enviandoRef.current = false;
     if (enviado) {
-      elementoFormulario.reset();
+      if (elementoFormulario) elementoFormulario.reset();
+      definirArquivoRetomada(null);
       definirMostrarEnvio(false);
     }
   }
@@ -114,6 +134,20 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   }
 
   return <section className="painel-gestao-materiais">
+    {(envioPendente || progressoUpload) && <div className="progresso-upload" role="status" aria-live="polite">
+      <strong>{ocupado ? (progressoUpload?.estado === "finalizando" ? "Confirmando material na biblioteca…" : "Enviando arquivo…") : "Envio pendente"}</strong>
+      {progressoUpload && <><progress aria-label="Progresso confirmado do envio" max={progressoUpload.tamanho} value={progressoUpload.recebido} /><span>{Math.floor(100*progressoUpload.recebido/progressoUpload.tamanho)}% · {tamanhoAmigavel(progressoUpload.recebido)} de {tamanhoAmigavel(progressoUpload.tamanho)}</span></>}
+      <p>{ocupado ? "Mantenha esta tela aberta. Se a conexão cair, será possível retomar." : "Selecione abaixo o mesmo arquivo e toque em Retomar envio. A pasta e os dados do envio original serão mantidos."}</p>
+      {envioPendente && !ocupado && <>
+        <span>Arquivo original: {envioPendente.selecao?.nome}</span>
+        <label>Arquivo original para retomar<input type="file" accept="application/pdf,video/mp4,video/webm,.m4v" onChange={e => definirArquivoRetomada(e.target.files[0] || null)} /></label>
+        <button type="button" disabled={!arquivoRetomada} onClick={() => {const dados=new FormData();dados.set("arquivo",arquivoRetomada);void realizarEnvio(dados,null);}}>Retomar envio</button>
+      </>}
+      {envioPendente && <button type="button" disabled={ocupado} onClick={() => executar(async () => {
+        try { await cancelarEnvio(envioPendente.id); } catch (e) { if (e.codigo !== "UPLOAD_NAO_ENCONTRADO") throw e; }
+        definirEnvioPendente(null); definirProgressoUpload(null); salvarUpload(usuario.id,null);
+      },"Envio cancelado.")}>Cancelar envio pendente</button>}
+    </div>}
     <div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais da biblioteca."}</p></div><div className="acoes-gestao-pastas"><button type="button" className="botao-secundario" onClick={function alternar() { definirMostrarNovaPasta(!mostrarNovaPasta); }}><Icone nome={mostrarNovaPasta ? "fechar" : "mais"} />{mostrarNovaPasta ? "Cancelar" : "Nova pasta"}</button><button type="button" className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div></div>
     {mostrarNovaPasta && <form className="formulario-material" onSubmit={criarPasta}><label>Nome da nova pasta<input required maxLength="120" value={nomeNovaPasta} onChange={function mudar(evento) { definirNomeNovaPasta(evento.target.value); }} /></label><SeletorPasta rotulo="Criar dentro de" pastas={pastas.filter(function permitida(item) { return item.podeCriar; })} valor={paiNovaPasta} aoAlterar={definirPaiNovaPasta} obrigatorio opcaoVazia="Escolha uma pasta autorizada" /><button type="submit" disabled={ocupado}>{ocupado ? "Criando..." : "Criar pasta"}</button></form>}
     {mostrarEnvio && <form className="formulario-material" onSubmit={enviar}><label>Arquivo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><SeletorPasta rotulo="Adicionar na pasta" pastas={pastas} valor={pastaEnvioId} aoAlterar={definirPastaEnvioId} nome="categoriaId" obrigatorio /><label>Nome do material <small>(opcional; extensão automática)</small><input name="nome" placeholder="Usar o nome do arquivo" /></label><label>Disciplina <small>(opcional)</small><select name="disciplinaId" defaultValue=""><option value="">Não informar</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><label>Concurso <small>(opcional)</small><select name="concursoId" defaultValue=""><option value="">Não informar</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Enviando..." : "Adicionar material"}</button></form>}

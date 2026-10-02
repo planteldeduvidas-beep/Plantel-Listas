@@ -63,6 +63,8 @@ function mensagemHumana(falhaOuMensagem) {
     return "Não foi possível falar com o sistema. Verifique sua conexão e tente novamente.";
   }
 
+  if (codigo?.startsWith("UPLOAD_")) return mensagem;
+
   if (codigo === "API_INDISPONIVEL" || status >= 500) {
     return "O sistema está temporariamente indisponível. Tente novamente em instantes.";
   }

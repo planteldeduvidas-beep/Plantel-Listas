@@ -327,6 +327,8 @@ function criarIntegracaoGoogleDriveRepository(pool) {
   }
 
   async function sincronizarMaterial(conexao, arquivo, categoriaId, sincronizacaoId) {
+    const [uploads] = await conexao.execute("SELECT id FROM uploads_retomaveis WHERE drive_id=? AND estado<>'concluido' LIMIT 1",[arquivo.id]);
+    if (uploads.length) return "upload_pendente";
     const [existentes] = await conexao.execute(
       "SELECT id FROM materiais WHERE drive_file_id = ? LIMIT 1",
       [arquivo.id]
@@ -408,7 +410,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
         );
         if (resultado === "criado") {
           materiaisCriados += 1;
-        } else {
+        } else if (resultado !== "upload_pendente") {
           materiaisAtualizados += 1;
         }
       }

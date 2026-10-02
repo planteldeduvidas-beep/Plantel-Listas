@@ -45,6 +45,9 @@ const criarGestaoMateriaisRepository = require("./modules/materiais/gestaoMateri
 const criarGestaoMateriaisService = require("./modules/materiais/gestaoMateriaisService");
 const criarGestaoMateriaisController = require("./modules/materiais/gestaoMateriaisController");
 const criarGestaoMateriaisRoutes = require("./modules/materiais/gestaoMateriaisRoutes");
+const criarUploadRetomavelRepository = require("./modules/materiais/uploadRetomavelRepository");
+const {criarUploadRetomavelService} = require("./modules/materiais/uploadRetomavelService");
+const criarUploadRetomavelRoutes = require("./modules/materiais/uploadRetomavelRoutes");
 const criarAnalyticsRepository = require("./modules/analytics/analyticsRepository");
 const criarAnalyticsService = require("./modules/analytics/analyticsService");
 const criarAnalyticsController = require("./modules/analytics/analyticsController");
@@ -195,6 +198,10 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     logger: logger
   });
   aplicacao.locals.gestaoMateriaisService = gestaoMateriaisService;
+  const uploadRetomavelService = criarUploadRetomavelService({repository:criarUploadRetomavelRepository(pool),
+    gestao:gestaoMateriaisService,provider:googleDriveProvider,integracaoService:integracaoGoogleDriveService,configuracao,logger});
+  aplicacao.locals.uploadRetomavelService = uploadRetomavelService;
+  aplicacao.use("/api/uploads",criarUploadRetomavelRoutes({service:uploadRetomavelService,autenticar,limitarInicio:rateLimiters.upload}));
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
     controller: criarAutenticacaoController(serviceAutenticacao, configuracao),

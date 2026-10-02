@@ -35,6 +35,7 @@ async function iniciarServidor() {
         );
       });
     aplicacao.locals.gestaoMateriaisService.iniciarRetomada();
+    aplicacao.locals.uploadRetomavelService.iniciarLimpeza();
     aplicacao.locals.googleDriveChangesService.iniciarMonitor();
     const servidor = http.createServer(aplicacao);
 
@@ -61,6 +62,7 @@ async function iniciarServidor() {
 
         aplicacao.locals.googleDriveChangesService.pararMonitor();
         aplicacao.locals.gestaoMateriaisService.pararRetomada();
+        aplicacao.locals.uploadRetomavelService.pararLimpeza();
         try {
           await new Promise(function aguardarServidor(resolve, reject) {
             servidor.close(function finalizar(erro) {

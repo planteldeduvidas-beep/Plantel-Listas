@@ -31,6 +31,7 @@ const provider={
   excluirArquivo:async function excluir(token,id){operacoes.push(["excluir",id]);itensDrive.delete(id);return{};},
   gerarUrlAutorizacao:function gerar(){return"https://google.test";},trocarCodigoPorRefreshToken:async function trocar(){return"refresh-token-fase-seis";},listarArvore:async function listar(){return{raiz:{},pastas:[],arquivos:[]};}
 };
+configuracao.googleDrive.encryptionKey = "chave-exclusiva-de-teste-upload-32-caracteres";
 const app=criarAplicacao(configuracao,pino({level:"silent"}),{pool:pool,emailProvider:criarEmailProviderFake(),googleDriveProvider:provider,agendarTarefaGoogleDrive:function ignorar(){},agendarTarefaGoogleDriveChanges:function ignorar(){}});
 let usuarios;let pastaA;let pastaB;let pastaProibida;let materialId;
 
@@ -177,6 +178,60 @@ test("upload multipart do PWA aceita PDF generico com nome sem extensao e rejeit
   assert.equal((await enviar("nao e pdf")).body.erro.codigo,"TIPO_ARQUIVO_INVALIDO");
 });
 test.after(async function encerrar(){await limpar();await pool.end();});
+
+test("upload em partes integra permissao, CSRF, Drive fake, MySQL, biblioteca e auditoria unica",async(t)=>{
+  const crypto=require("node:crypto");
+  await pool.execute("DELETE FROM uploads_retomaveis");
+  t.after(async()=>{await pool.execute("DELETE FROM uploads_retomaveis");});
+  const sessoes=new Map();
+  provider.reservarIdUpload=async()=>"driveUpload"+crypto.randomUUID();
+  provider.iniciarUploadRetomavel=async(token,dados)=>{const url="https://www.googleapis.com/upload/drive/v3/files?upload_id="+dados.driveId;sessoes.set(url,{dados,recebido:0});return url;};
+  provider.transferirParteUpload=async(token,url,total,offset,corpo)=>{
+    const sessao=sessoes.get(url);
+    if(corpo){assert.equal(offset,sessao.recebido);sessao.recebido+=corpo.length;}
+    const completo=sessao.recebido===total;
+    const item={id:sessao.dados.driveId,name:sessao.dados.nome,mimeType:sessao.dados.mimeType,size:String(total),parents:[sessao.dados.pastaDriveId],trashed:false};
+    if(completo)itensDrive.set(item.id,item);
+    return {completo,recebido:sessao.recebido,item:completo?item:undefined};
+  };
+  const professor=await autenticar("professor"),admin=await autenticar("admin");
+  const prefixo=Buffer.from("0000ftypisom0000");
+  const corpo={id:crypto.randomUUID(),campos:{categoriaId:String(pastaB)},arquivo:{nome:"aula.mp4",mime:"video/mp4",tamanho:16,assinatura:prefixo.toString("base64")}};
+  assert.equal((await professor.agente.post("/api/uploads").send(corpo)).status,403);
+  assert.equal((await professor.agente.post("/api/uploads").set("X-CSRF-Token",professor.csrf).send({...corpo,campos:{categoriaId:String(pastaProibida)}})).status,403);
+  const inicio=await professor.agente.post("/api/uploads").set("X-CSRF-Token",professor.csrf).send(corpo);
+  assert.equal(inicio.status,201,JSON.stringify(inicio.body));
+  assert.equal((await admin.agente.get("/api/uploads/"+corpo.id)).status,404);
+  assert.equal((await professor.agente.post(`/api/uploads/${corpo.id}/finalizar`).set("X-CSRF-Token",professor.csrf).send({})).status,409);
+  const enviar=()=>professor.agente.put(`/api/uploads/${corpo.id}/partes`).set("X-CSRF-Token",professor.csrf).set("Content-Type","application/octet-stream").set("X-Upload-Offset","0").send(prefixo);
+  assert.equal((await enviar()).status,200);
+  assert.equal((await enviar()).status,200);
+  const [antes]=await pool.execute("SELECT drive_id FROM uploads_retomaveis WHERE id=?",[corpo.id]);
+  // O Changes nao pode tornar visivel um arquivo ainda nao finalizado.
+  const changes=criarChangesRepository(pool);const con=await pool.getConnection();
+  try{await changes.aplicarAlteracoes(con,[{disponivel:true,item:{...itensDrive.get(antes[0].drive_id),parentId:"driveAreaB"}}],"upload-teste");}finally{con.release();}
+  const [naoPublicado]=await pool.execute("SELECT id FROM materiais WHERE drive_file_id=?",[antes[0].drive_id]);assert.equal(naoPublicado.length,0);
+  const finalizar=()=>professor.agente.post(`/api/uploads/${corpo.id}/finalizar`).set("X-CSRF-Token",professor.csrf).send({});
+  const obterConexao=pool.getConnection.bind(pool);
+  const mockConexao=t.mock.method(pool,"getConnection",async()=>{
+    const c=await obterConexao(),executar=c.execute.bind(c),liberar=c.release.bind(c);
+    c.execute=(sql,args)=>String(sql).startsWith("INSERT INTO auditoria_materiais")?Promise.reject(new Error("falha SQL simulada")):executar(sql,args);
+    c.release=()=>{c.execute=executar;c.release=liberar;liberar();};return c;
+  });
+  assert.equal((await finalizar()).status,500);
+  mockConexao.mock.restore();
+  const [rollback]=await pool.execute("SELECT id FROM materiais WHERE drive_file_id=?",[antes[0].drive_id]);assert.equal(rollback.length,0);
+  const [retomavel]=await pool.execute("SELECT estado FROM uploads_retomaveis WHERE id=?",[corpo.id]);assert.equal(retomavel[0].estado,"enviado");
+  assert.ok(itensDrive.has(antes[0].drive_id));
+  const fim=await finalizar();assert.equal(fim.status,200,JSON.stringify(fim.body));assert.ok(fim.body.materialId);
+  assert.equal((await finalizar()).body.materialId,fim.body.materialId);
+  const [materiais]=await pool.execute("SELECT categoria_id,tamanho_bytes,drive_file_id FROM materiais WHERE id=?",[fim.body.materialId]);
+  assert.equal(Number(materiais[0].categoria_id),pastaB);assert.equal(Number(materiais[0].tamanho_bytes),16);
+  assert.deepEqual(itensDrive.get(materiais[0].drive_file_id).parents,["driveAreaB"]);
+  const [auditoria]=await pool.execute("SELECT id FROM auditoria_materiais WHERE material_id=? AND operacao='upload'",[fim.body.materialId]);assert.equal(auditoria.length,1);
+  const biblioteca=await professor.agente.get("/api/acervo").query({categoriaId:pastaB,busca:"aula"});
+  assert.equal(biblioteca.status,200);assert.ok(JSON.stringify(biblioteca.body).includes("aula.mp4"));
+});
 
 test("upload valida PDF, video, CSRF, papeis, nomes, raiz e permissao por subarvore",async function(){const professor=await autenticar("professor");const pdf=Buffer.from("%PDF-1.7\nconteudo seguro","utf8");const ok=await professor.agente.post("/api/gestao-materiais").set("X-CSRF-Token",professor.csrf).field("categoriaId",String(pastaB)).attach("arquivo",pdf,{filename:"lista.pdf",contentType:"application/pdf"});assert.equal(ok.status,201);assert.equal(ok.body.nome,"lista.pdf");assert.equal(Object.prototype.hasOwnProperty.call(ok.body,"driveFileId"),false);assert.equal((await professor.agente.post("/api/gestao-materiais").field("categoriaId",String(pastaA)).attach("arquivo",pdf,{filename:"sem-csrf.pdf",contentType:"application/pdf"})).status,403);const proibido=await professor.agente.post("/api/gestao-materiais").set("X-CSRF-Token",professor.csrf).field("categoriaId",String(pastaProibida)).attach("arquivo",pdf,{filename:"lista.pdf",contentType:"application/pdf"});assert.equal(proibido.status,403);const falso=await professor.agente.post("/api/gestao-materiais").set("X-CSRF-Token",professor.csrf).field("categoriaId",String(pastaA)).attach("arquivo",Buffer.from("nao e pdf"),{filename:"falso.pdf",contentType:"application/pdf"});assert.equal(falso.status,400);const nomeInvalido=await professor.agente.post("/api/gestao-materiais").set("X-CSRF-Token",professor.csrf).field("categoriaId",String(pastaA)).field("nome","invalido/arquivo.pdf").attach("arquivo",pdf,{filename:"lista.pdf",contentType:"application/pdf"});assert.equal(nomeInvalido.status,400);const admin=await autenticar("admin");const video=Buffer.concat([Buffer.alloc(4),Buffer.from("ftyp"),Buffer.from("video seguro")]);const videoOk=await admin.agente.post("/api/gestao-materiais").set("X-CSRF-Token",admin.csrf).field("categoriaId",String(pastaProibida)).attach("arquivo",video,{filename:"aula.mp4",contentType:"video/mp4"});assert.equal(videoOk.status,201);assert.equal(videoOk.body.tipo,"video");const[fora]=await pool.execute("INSERT INTO categorias(nome,drive_pasta_id)VALUES('Fora da raiz','driveForaRaiz')");const foraRaiz=await admin.agente.post("/api/gestao-materiais").set("X-CSRF-Token",admin.csrf).field("categoriaId",String(fora.insertId)).attach("arquivo",pdf,{filename:"fora.pdf",contentType:"application/pdf"});assert.equal(foraRaiz.status,403);assert.equal(foraRaiz.body.erro.codigo,"PASTA_FORA_DA_RAIZ");const aluno=await autenticar("aluno");assert.equal((await aluno.agente.post("/api/gestao-materiais").set("X-CSRF-Token",aluno.csrf).field("categoriaId",String(pastaA)).attach("arquivo",pdf,{filename:"aluno.pdf",contentType:"application/pdf"})).status,403);});
 

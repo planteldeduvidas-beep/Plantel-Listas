@@ -57,7 +57,7 @@ test("desenvolvimento entrega conteudo pela mesma origem usando proxy seguro", f
   const api = fs.readFileSync(path.resolve(__dirname, "../../frontend/src/api.js"), "utf8");
   const vite = fs.readFileSync(path.resolve(__dirname, "../../frontend/vite.config.js"), "utf8");
 
-  assert.match(api, /import\.meta\.env\.DEV \? "\/api" : API_CONFIGURADA/);
+  assert.match(api, /import\.meta\.env\?\.DEV \? "\/api" : API_CONFIGURADA/);
   assert.match(vite, /"\/api"/);
   assert.match(vite, /target: destinoApi/);
 });

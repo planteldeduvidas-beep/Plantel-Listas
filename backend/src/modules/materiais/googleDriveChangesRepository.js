@@ -65,6 +65,8 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
   }
 
   async function salvarMaterial(conexao, item, categoriaId, sincronizacaoId) {
+    const [uploads] = await conexao.execute("SELECT id FROM uploads_retomaveis WHERE drive_id=? AND estado<>'concluido' LIMIT 1",[item.id]);
+    if (uploads.length) return;
     await conexao.execute(
       "INSERT INTO materiais (drive_file_id,drive_parent_file_id,categoria_id,nome,mime_type,tipo,"
       + "extensao,tamanho_bytes,checksum_md5,drive_criado_em,drive_modificado_em,resource_key,"
