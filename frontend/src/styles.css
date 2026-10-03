@@ -7039,3 +7039,14 @@ textarea {
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.analytics-escopo, .analytics-legado { margin: 20px 0; padding: 16px; border: 1px solid var(--cor-borda); border-radius: 12px; line-height: 1.6; background: var(--cor-superficie-suave); }
+.analytics-legado summary { cursor: pointer; font-weight: 700; }
+.analytics-barras { display: grid; gap: 18px; padding: 0; margin: 20px 0; list-style: none; min-width: 0; }
+.analytics-barras li { min-width: 0; overflow-wrap: anywhere; }
+.analytics-barras li > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.analytics-barras strong { font-variant-numeric: tabular-nums; }
+.analytics-barras small { font-weight: 400; color: var(--cor-texto-suave); }
+.analytics-trilho { display: block; height: 9px; border-radius: 5px; margin: 8px 0 4px; background: var(--cor-superficie-suave); overflow: hidden; }
+.analytics-trilho i { display: block; height: 100%; background: var(--cor-primaria); border-radius: inherit; }
+.analytics-lista-rolavel { max-height: 360px; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--cor-primaria) transparent; }
+.grade-dados > section { min-width: 0; }

@@ -6,6 +6,7 @@ test("painel separa navegacoes, interacoes e totais mensais sem somar pessoas po
   const repository = {
     resumo: async () => ({ materiais: { total: 2, pdfs: 1, videos: 1 }, usuarios: { total: 3, alunos: 2, professores: 0, administradores: 1, ativos: 3 } }),
     porDisciplina: async () => [], porConcurso: async () => [],
+    cobertura: async () => ({ resumos: [], eventosSemPapel: 0 }),
     evolucao: async () => [
       { dia: "2026-08-31", acessos: 3, visualizacoes: 1, downloads: 0, alunos_ativos: 2 },
       { dia: "2026-09-01", acessos: 2, visualizacoes: 1, downloads: 1, alunos_ativos: 1 }

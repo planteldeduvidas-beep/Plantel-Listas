@@ -146,6 +146,61 @@ test("analytics agrega uso e permanece exclusivo de admin", async function testa
   assert.ok(adminId > 0);
 });
 
+test("analytics exclui equipe, preserva perfil no evento, legado e segmentacao apos retencao", async () => {
+  const repository = require("../src/modules/analytics/analyticsRepository")(pool);
+  const service = require("../src/modules/analytics/analyticsService")(repository);
+  const [pasta] = await pool.execute("INSERT INTO categorias(nome,drive_pasta_id) VALUES ('Pasta QA','analytics-qa')");
+  const [material] = await pool.execute("INSERT INTO materiais(drive_file_id,categoria_id,nome,mime_type,tipo,extensao) VALUES ('analytics-pdf',?,'QA.pdf','application/pdf','pdf','pdf')", [pasta.insertId]);
+  const ids = {};
+  for (const papel of ["aluno", "admin", "professor"]) {
+    ids[papel] = await usuario(papel + "-segmentacao@example.invalid", papel);
+    await repository.registrarConsulta(ids[papel], pasta.insertId, null, papel + "-acesso", "acesso");
+    await repository.registrarConsulta(ids[papel], pasta.insertId, "=formula-qa", papel + "-busca", "busca");
+    for (const tipo of ["visualizacao", "download"]) await repository.registrarUso({ id: ids[papel], papel }, material.insertId, tipo, papel + tipo);
+  }
+  // Mudancas futuras de perfil nao podem reclassificar eventos novos.
+  await pool.execute("UPDATE usuarios SET papel='professor' WHERE id=?", [ids.aluno]);
+  await pool.execute("UPDATE usuarios SET papel='aluno' WHERE id=?", [ids.admin]);
+  const antes = await service.obterPainel({ periodo: 30 });
+  assert.equal(antes.publico, "aluno");
+  assert.equal(antes.evolucao[0].acessos, 1);
+  assert.equal(antes.evolucao[0].visualizacoes, 1);
+  assert.equal(antes.evolucao[0].downloads, 1);
+  assert.equal(antes.evolucao[0].alunosAtivos, 1);
+  assert.equal(antes.engajamento.alunosComNavegacao, 1);
+  assert.equal(antes.engajamento.taxaDeInteracao, 100);
+  assert.equal(antes.termosMaisPesquisados[0].quantidade, 1);
+  assert.equal(antes.pastasMaisAcessadas[0].quantidade, 1);
+  assert.equal(antes.materiaisMaisUsados[0].acessos, 2);
+  const [[quantidade]] = await pool.query("SELECT COUNT(*) n FROM eventos_uso_acervo");
+  assert.equal(Number(quantidade.n), 12); // Nao descartou a atividade da equipe.
+  await pool.execute("INSERT INTO analytics_resumo_diario(dia,acessos,visualizacoes,downloads) VALUES (DATE_SUB(CURRENT_DATE,INTERVAL 20 DAY),99,88,77)");
+  const [legadoAntes] = await pool.query("SELECT * FROM analytics_resumo_diario");
+  await pool.execute("UPDATE eventos_uso_acervo SET criado_em=DATE_SUB(CURRENT_DATE,INTERVAL 10 DAY)");
+  await service.executarRetencao({ retencaoEventosDias: 5, loteRetencao: 100 });
+  const depois = await service.obterPainel({ periodo: 30 });
+  assert.equal(depois.evolucao.length, 1);
+  assert.equal(depois.evolucao[0].acessos, 1);
+  assert.equal(depois.evolucao[0].visualizacoes, 1);
+  assert.equal(depois.evolucao[0].downloads, 1);
+  assert.equal(depois.evolucao[0].alunosAtivos, 1);
+  assert.equal(depois.termosMaisPesquisados[0].quantidade, 1);
+  assert.equal(depois.pastasMaisAcessadas[0].quantidade, 1);
+  assert.equal(depois.materiaisMaisUsados[0].acessos, 2);
+  assert.equal(depois.cobertura.engajamentoParcial, true);
+  assert.equal(depois.cobertura.historicoSemSegmentacao[0].navegacoes, 99);
+  const [legadoDepois] = await pool.query("SELECT * FROM analytics_resumo_diario WHERE navegacoes_alunos IS NULL");
+  assert.deepEqual(legadoDepois, legadoAntes);
+  const [[totais]] = await pool.query("SELECT acessos FROM analytics_resumo_diario WHERE navegacoes_alunos IS NOT NULL");
+  assert.equal(Number(totais.acessos), 3);
+  await service.executarRetencao({ retencaoEventosDias: 5, loteRetencao: 100 });
+  assert.deepEqual((await service.obterPainel({ periodo: 30 })).evolucao, depois.evolucao);
+  assert.equal((await service.obterPainel({ periodo: 7 })).evolucao.length, 0);
+  const csv = await service.gerarCsv({ periodo: 30 });
+  assert.ok(csv.includes("'=")); // Termos livres nunca executam formula na planilha.
+  assert.ok(csv.includes('"99","88","77"'));
+});
+
 test("historico registra autoria, filtra, pagina e nao oferece mutacao", async function testarAuditoria() {
   await usuario("admin-auditoria@example.com", "admin");
   const admin = await sessao("admin-auditoria@example.com");

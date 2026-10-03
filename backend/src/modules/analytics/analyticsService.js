@@ -37,7 +37,7 @@ function criarAnalyticsService(repository) {
     const resultados = await Promise.all([
       repository.resumo(), repository.porDisciplina(), repository.porConcurso(),
       repository.evolucao(filtros.periodo), repository.maisUsados(filtros.periodo),
-      repository.recentes(), repository.atividade(filtros.periodo), repository.buscas(filtros.periodo), repository.pastasMaisAcessadas(filtros.periodo), repository.engajamento(filtros.periodo)
+      repository.recentes(), repository.atividade(filtros.periodo), repository.buscas(filtros.periodo), repository.pastasMaisAcessadas(filtros.periodo), repository.engajamento(filtros.periodo), repository.cobertura(filtros.periodo)
     ]);
     const evolucao = resultados[3].map(function mapear(item) { return { dia: item.dia, acessos: numero(item.acessos), alunosAtivos: numero(item.alunos_ativos), visualizacoes: numero(item.visualizacoes), downloads: numero(item.downloads) }; });
     const meses = new Map();
@@ -53,6 +53,12 @@ function criarAnalyticsService(repository) {
     const alunosComMaterial = numero(resultados[9].alunos_com_material);
     return {
       periodo: filtros.periodo,
+      publico: "aluno",
+      cobertura: {
+        eventosComPerfilAtual: resultados[10].eventosSemPapel,
+        engajamentoParcial: resultados[10].resumos.length > 0,
+        historicoSemSegmentacao: resultados[10].resumos.filter(item => Number(item.sem_segmentacao)).map(item => ({ dia: item.dia, navegacoes: numero(item.acessos), aberturas: numero(item.visualizacoes), downloads: numero(item.downloads) }))
+      },
       resumo: {
         materiais: numero(resultados[0].materiais.total),
         pdfs: numero(resultados[0].materiais.pdfs),
@@ -79,8 +85,23 @@ function criarAnalyticsService(repository) {
   async function gerarCsv(query) {
     const painel = await obterPainel(query);
     const linhas = [["Indicador", "Valor"], ["Materiais", painel.resumo.materiais], ["PDFs", painel.resumo.pdfs], ["Videos", painel.resumo.videos], ["Usuarios", painel.resumo.usuarios], ["Alunos", painel.resumo.alunos], ["Professores", painel.resumo.professores]];
+    linhas.push(["Atividade abaixo", "Somente alunos; navegacoes nao sao logins"], ["Data", "Navegacoes de alunos", "Aberturas de alunos", "Downloads de alunos", "Alunos que navegaram no dia"]);
+    for (const dia of painel.evolucao) linhas.push([new Date(dia.dia).toISOString().slice(0, 10), dia.acessos, dia.visualizacoes, dia.downloads, dia.alunosAtivos]);
+    linhas.push(["Termo pesquisado por alunos", "Ocorrencias"]);
+    for (const item of painel.termosMaisPesquisados) linhas.push([item.termo, item.quantidade]);
+    linhas.push(["Pasta acessada por alunos", "Navegacoes"]);
+    for (const item of painel.pastasMaisAcessadas) linhas.push([item.nome, item.quantidade]);
+    linhas.push(["Material usado por alunos", "Aberturas", "Downloads"]);
+    for (const item of painel.materiaisMaisUsados) linhas.push([item.nome, item.visualizacoes, item.downloads]);
+    linhas.push(["Historico preservado sem separacao de perfis - fora dos graficos de alunos"], ["Data", "Navegacoes de todos os perfis", "Aberturas de todos os perfis", "Downloads de todos os perfis"]);
+    for (const dia of painel.cobertura.historicoSemSegmentacao) linhas.push([new Date(dia.dia).toISOString().slice(0, 10), dia.navegacoes, dia.aberturas, dia.downloads]);
+    linhas.push(["Eventos antigos classificados pelo perfil atual", painel.cobertura.eventosComPerfilAtual], ["Engajamento de pessoas limitado aos eventos detalhados", painel.cobertura.engajamentoParcial ? "Sim" : "Nao"]);
     return linhas.map(function linha(itens) {
-      return itens.map(function campo(valor) { return '"' + String(valor).replace(/"/g, '""') + '"'; }).join(",");
+      return itens.map(function campo(valor) {
+        const texto = String(valor);
+        const seguro = /^[\s]*[=+@-]/.test(texto) ? "'" + texto : texto;
+        return '"' + seguro.replace(/"/g, '""') + '"';
+      }).join(",");
     }).join("\r\n") + "\r\n";
   }
 

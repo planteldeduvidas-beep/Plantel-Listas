@@ -74,8 +74,9 @@ const GUIAS = Object.freeze({
         area: "estatisticas", titulo: "Visão geral", resumo: "Entenda o uso real da biblioteca.",
         passos: [
           "No menu, toque em Visão geral. Em Período, escolha 7, 30 ou 90 dias.",
-          "Leia Atividade por dia para comparar navegações, aberturas de arquivos e downloads; a seção por mês resume os dias incluídos no período.",
-          "Em Engajamento, veja quantos alunos distintos navegaram ou abriram materiais. Consulte também termos pesquisados, materiais e pastas mais usados.",
+          "Os gráficos de atividade mostram somente alunos. Compare navegações, aberturas de arquivos e downloads por dia e por mês; administradores e professores ficam fora dessas contagens.",
+          "Em Engajamento, veja quantos alunos distintos navegaram ou abriram materiais. Não some as pessoas de dias diferentes. Consulte também os gráficos de buscas, pastas, materiais, disciplinas e concursos.",
+          "Os cartões de contas e os gráficos de composição do acervo mostram o cadastro atual. Operações da equipe e resumos antigos sem separação de perfis aparecem em seções próprias; os dados são preservados.",
           "Toque em Relatório CSV para baixar os dados quando precisar analisá-los fora do sistema."
         ], dica: "Navegação é entrada na biblioteca ou em pasta; não é login nem número de visitantes únicos."
       },
