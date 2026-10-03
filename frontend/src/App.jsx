@@ -205,6 +205,7 @@ function Aplicacao() {
         <span className="marca">Acesso à biblioteca</span>
         <h1 id="titulo-principal">{configuracaoDaTela.titulo}</h1>
         <p className="descricao">{configuracaoDaTela.texto}</p>
+        {tela === "recuperar" && <p className="aviso-recuperacao-email" role="note">Confira também a pasta <strong>Spam ou Lixo eletrônico</strong>: as instruções de recuperação podem chegar lá. Se encontrar a mensagem do Plantel, marque como “Não é spam”.</p>}
 
         <form onSubmit={configuracaoDaTela.acao}>
           {tela === "cadastro" && (

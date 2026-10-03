@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { obterDuvidasSuporte } from '../src/duvidasSuporte.js';
+
+test('aviso de spam permanece na recuperação antes e depois do envio', () => {
+  const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  assert.match(app, /tela === "recuperar" && <p className="aviso-recuperacao-email" role="note">Confira também a pasta <strong>Spam ou Lixo eletrônico/);
+});
 
 test('aluno recebe histórico, sem orientações de gestão', () => {
   const texto = JSON.stringify(obterDuvidasSuporte('aluno'));
@@ -18,7 +24,16 @@ test('professor e admin recebem apenas as perguntas de seu papel', () => {
 test('papel desconhecido recebe somente dúvidas comuns, incluindo feedback', () => {
   for (const papel of [undefined, 'desconhecido', 'constructor']) {
     const duvidas = obterDuvidasSuporte(papel);
-    assert.equal(duvidas.length, 5);
+    assert.equal(duvidas.length, 6);
     assert.match(JSON.stringify(duvidas), /sugestões, opiniões ou elogios/);
+  }
+});
+
+test('todos os perfis recebem orientação sobre e-mails na pasta de spam', () => {
+  for (const papel of ['aluno', 'professor', 'admin']) {
+    const duvida = obterDuvidasSuporte(papel).find(item => item.pergunta.startsWith('Não recebi o e-mail'));
+    assert.ok(duvida);
+    assert.match(duvida.resposta, /Spam ou Lixo eletrônico/);
+    assert.match(duvida.resposta, /Não é spam/);
   }
 });

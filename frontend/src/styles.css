@@ -7028,3 +7028,14 @@ textarea {
 .progresso-upload button { width: fit-content; max-width: 100%; }
 @media (max-width: 760px) { .grade-engajamento > section { padding: 18px; } .tutorial-orientacao { padding: 18px; } .tutorial-area summary { gap: 12px; padding: 16px; } .tutorial-area-corpo { padding: 0 16px 18px; } }
 @media (max-width: 420px) { .numeros-engajamento { grid-template-columns: 1fr; } }
+.aviso-recuperacao-email {
+  padding: 12px 14px;
+  margin: 0 0 20px;
+  border-left: 3px solid var(--cor-primaria);
+  border-radius: 8px;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-texto);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
