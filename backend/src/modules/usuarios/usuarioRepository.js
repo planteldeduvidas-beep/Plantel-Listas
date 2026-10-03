@@ -1,4 +1,9 @@
 const AppError = require("../../shared/errors/AppError");
+const { normalizarEmail } = require("../autenticacao/autenticacaoValidator");
+
+function emailDuplicado() {
+  return new AppError("Já existe uma conta cadastrada com este e-mail.", 409, "EMAIL_JA_CADASTRADO");
+}
 
 function mapearUsuario(registro) {
   if (!registro) {
@@ -19,6 +24,45 @@ function mapearUsuario(registro) {
 }
 
 function criarUsuarioRepository(pool) {
+  async function comEmailProtegido(emailInformado, usuarioId, executorInformado, gravar) {
+    const email = normalizarEmail(emailInformado);
+    const conexao = executorInformado || (pool.getConnection ? await pool.getConnection() : pool);
+    const transacaoPropria = !executorInformado;
+    try {
+      if (transacaoPropria) await conexao.beginTransaction();
+      // O INSERT/UPDATE da chave unica mantem o lock InnoDB ate COMMIT/ROLLBACK.
+      await conexao.execute("INSERT INTO usuarios_email_travas (email) VALUES (?) ON DUPLICATE KEY UPDATE email=VALUES(email)", [email]);
+      let mesmoEmail = false;
+      let emailParaGravar = email;
+      if (usuarioId !== null) {
+        const [atual] = await conexao.execute("SELECT email FROM usuarios WHERE id=? FOR UPDATE", [usuarioId]);
+        // Editar outros dados de uma conta historica nao exige deduplicacao.
+        mesmoEmail = atual.length > 0 && atual[0].email.trim().toLowerCase() === email;
+        if (mesmoEmail) emailParaGravar = atual[0].email;
+      }
+      if (!mesmoEmail) {
+        // FOR UPDATE evita um snapshot antigo de transacao externa. Contas
+        // bloqueadas tambem reservam o email. Nao normalizar dados historicos.
+        const [existentes] = await conexao.execute(
+          "SELECT id FROM usuarios WHERE LOWER(TRIM(email))=? LIMIT 1 FOR UPDATE", [email]
+        );
+        if (existentes.length) throw emailDuplicado();
+      }
+      const resultado = await gravar(conexao, emailParaGravar);
+      if (transacaoPropria) await conexao.commit();
+      return resultado;
+    } catch (erro) {
+      if (transacaoPropria) await conexao.rollback().catch(() => {});
+      if (erro?.code === "ER_DUP_ENTRY") throw emailDuplicado();
+      if (["ER_LOCK_DEADLOCK", "ER_LOCK_WAIT_TIMEOUT"].includes(erro?.code)) {
+        throw new AppError("Outro cadastro ou alteração está em andamento. Tente novamente.", 409, "ALTERACAO_CONCORRENTE");
+      }
+      throw erro;
+    } finally {
+      if (transacaoPropria && conexao !== pool) conexao.release();
+    }
+  }
+
   async function buscarPorEmail(email) {
     const [registros] = await pool.execute(
       "SELECT id, nome, email, senha_hash, versao_sessao, papel, ativo, criado_em, atualizado_em "
@@ -39,20 +83,13 @@ function criarUsuarioRepository(pool) {
   }
 
   async function criar(nome, email, senhaHash, papel, executorInformado) {
-    const executor = executorInformado || pool;
-    try {
+    return comEmailProtegido(email, null, executorInformado, async (executor, normalizado) => {
       const [resultado] = await executor.execute(
         "INSERT INTO usuarios (nome, email, senha_hash, papel) VALUES (?, ?, ?, ?)",
-        [nome, email, senhaHash, papel]
+        [nome, normalizado, senhaHash, papel]
       );
       return buscarPorId(resultado.insertId, executor);
-    } catch (erro) {
-      if (erro && erro.code === "ER_DUP_ENTRY") {
-        throw new AppError("Email ja cadastrado", 409, "EMAIL_JA_CADASTRADO");
-      }
-
-      throw erro;
-    }
+    });
   }
 
   function criarAluno(nome, email, senhaHash) {
@@ -106,27 +143,20 @@ function criarUsuarioRepository(pool) {
   }
 
   async function atualizarEmail(usuarioId, email) {
-    try {
-      const [resultado] = await pool.execute("UPDATE usuarios SET email=? WHERE id=?", [email, usuarioId]);
+    return comEmailProtegido(email, usuarioId, null, async (executor, normalizado) => {
+      const [resultado] = await executor.execute("UPDATE usuarios SET email=? WHERE id=?", [normalizado, usuarioId]);
       return resultado.affectedRows > 0;
-    } catch (erro) {
-      if (erro && erro.code === "ER_DUP_ENTRY") throw new AppError("Email ja cadastrado", 409, "EMAIL_JA_CADASTRADO");
-      throw erro;
-    }
+    });
   }
 
   async function atualizarDados(usuarioId, nome, email, executorInformado) {
-    const executor = executorInformado || pool;
-    try {
+    return comEmailProtegido(email, usuarioId, executorInformado, async (executor, normalizado) => {
       const [resultado] = await executor.execute(
         "UPDATE usuarios SET nome=?,email=? WHERE id=?",
-        [nome, email, usuarioId]
+        [nome, normalizado, usuarioId]
       );
       return resultado.affectedRows > 0;
-    } catch (erro) {
-      if (erro && erro.code === "ER_DUP_ENTRY") throw new AppError("Email ja cadastrado", 409, "EMAIL_JA_CADASTRADO");
-      throw erro;
-    }
+    });
   }
 
   async function contarAdminsAtivos(executorInformado) {

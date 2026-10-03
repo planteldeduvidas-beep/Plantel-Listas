@@ -76,10 +76,9 @@ async function executar() {
   try {
     await verificarConexaoComBanco(pool);
     const senhaHash = await criarHashDaSenha(senha);
-    await pool.execute(
-      "INSERT INTO usuarios (nome, email, senha_hash, papel) VALUES (?, ?, ?, ?), (?, ?, ?, ?)",
-      ["QA 9 Admin", emails[0], senhaHash, "admin", "QA 9 Aluno", emails[1], senhaHash, "aluno"]
-    );
+    const usuarios = require("../src/modules/usuarios/usuarioRepository")(pool);
+    await usuarios.criar("QA 9 Admin", emails[0], senhaHash, "admin");
+    await usuarios.criar("QA 9 Aluno", emails[1], senhaHash, "aluno");
 
     const app = criarAplicacao(configuracao, pino({ level: "silent" }), {
       pool: pool,

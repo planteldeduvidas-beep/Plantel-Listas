@@ -40,11 +40,9 @@ async function executar() {
 
   async function criarUsuario(papel) {
     const email = papel + "." + identificador + "@teste-fase-6.local";
-    const [resultado] = await pool.execute(
-      "INSERT INTO usuarios (email,senha_hash,papel) VALUES (?,?,?)",
-      [email, await criarHashDaSenha(senha), papel]
-    );
-    const usuario = { id: Number(resultado.insertId), email: email, papel: papel };
+    const criado = await require("../src/modules/usuarios/usuarioRepository")(pool)
+      .criar("Teste " + papel, email, await criarHashDaSenha(senha), papel);
+    const usuario = { id: Number(criado.id), email: email, papel: papel };
     usuarios.push(usuario);
     return usuario;
   }

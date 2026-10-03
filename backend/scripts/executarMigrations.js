@@ -107,6 +107,15 @@ async function executarMigrations(configuracaoInformada) {
       const caminho = path.join(DIRETORIO_MIGRATIONS, nomeDaMigration);
       const comandoSql = await fs.readFile(caminho, "utf8");
 
+      if (nomeDaMigration === "024_unicidade_email_novas_contas.sql") {
+        const [[total]] = await conexao.query("SELECT COUNT(*) AS usuarios FROM usuarios");
+        const [[duplicados]] = await conexao.query(
+          "SELECT COUNT(*) AS grupos,COALESCE(SUM(quantidade),0) AS contas FROM "
+          + "(SELECT COUNT(*) AS quantidade FROM usuarios GROUP BY LOWER(TRIM(email)) HAVING COUNT(*)>1) d"
+        );
+        console.log("Inventario somente leitura antes da migration 024: " + JSON.stringify({ ...total, ...duplicados }));
+      }
+
       await conexao.beginTransaction();
       try {
         await conexao.query(comandoSql);
