@@ -183,7 +183,39 @@ function criarGestaoMateriaisRepository(pool) {
     });
   }
 
-  async function excluirPastaComConteudo(categoria, usuarioId, operacaoChave) {
+  async function solicitarExclusaoPasta(categoria, usuarioId) {
+    return executarTransacao(async conexao => {
+      const [existentes] = await conexao.execute("SELECT id FROM solicitacoes_exclusao_pastas WHERE categoria_id=? AND estado='pendente' LIMIT 1", [categoria.id]);
+      if (existentes.length) return { pendente: true };
+      const [resultado] = await conexao.execute("INSERT INTO solicitacoes_exclusao_pastas(categoria_id,solicitante_id,pasta_nome,drive_pasta_id,categoria_pai_id) VALUES (?,?,?,?,?)", [categoria.id,usuarioId,categoria.nome,categoria.drivePastaId,categoria.categoriaPaiId]);
+      await conexao.execute("INSERT INTO auditoria_geral(ator_usuario_id,acao,entidade,entidade_id,resultado) VALUES (?,'pasta_exclusao_solicitada','pasta',?,'concluida')", [usuarioId,categoria.id]);
+      return { id:Number(resultado.insertId),pendente:true };
+    });
+  }
+
+  async function listarSolicitacoesExclusao(usuario) {
+    const [linhas] = await pool.execute(
+      "SELECT s.id,s.categoria_id AS categoriaId,s.pasta_nome AS nome,s.estado,s.criado_em AS criadoEm,u.nome AS solicitante "
+      + "FROM solicitacoes_exclusao_pastas s INNER JOIN usuarios u ON u.id=s.solicitante_id WHERE "
+      + (usuario.papel === 'admin' ? "s.estado='pendente'" : "s.solicitante_id=?") + " ORDER BY s.id DESC LIMIT 100", usuario.papel === 'admin' ? [] : [usuario.id]);
+    return linhas;
+  }
+
+  async function buscarSolicitacaoExclusao(id) {
+    const [linhas] = await pool.execute("SELECT s.*,u.papel,u.ativo FROM solicitacoes_exclusao_pastas s INNER JOIN usuarios u ON u.id=s.solicitante_id WHERE s.id=?", [id]);
+    return linhas[0] || null;
+  }
+
+  async function recusarExclusaoPasta(id, usuarioId) {
+    return executarTransacao(async conexao => {
+      const [r] = await conexao.execute("UPDATE solicitacoes_exclusao_pastas SET estado='recusada',decidido_por=?,decidido_em=CURRENT_TIMESTAMP(3) WHERE id=? AND estado='pendente'", [usuarioId,id]);
+      if (r.affectedRows !== 1) throw new AppError("Esta solicitação já foi analisada.",409,"SOLICITACAO_JA_DECIDIDA");
+      await conexao.execute("INSERT INTO auditoria_geral(ator_usuario_id,acao,entidade,entidade_id,resultado) VALUES (?,'pasta_exclusao_recusada','solicitacao',?,'concluida')", [usuarioId,id]);
+      return { estado:'recusada' };
+    });
+  }
+
+  async function excluirPastaComConteudo(categoria, usuarioId, operacaoChave, solicitacaoId) {
     return executarTransacao(async function excluir(conexao) {
       await conexao.execute("SELECT id FROM categorias WHERE id=? FOR UPDATE", [categoria.id]);
       const [subarvore] = await conexao.execute(
@@ -203,6 +235,11 @@ function criarGestaoMateriaisRepository(pool) {
       }
       await conexao.execute("INSERT INTO auditoria_geral (ator_usuario_id,acao,entidade,entidade_id,resultado,contexto) VALUES (?,'pasta_enviada_lixeira','pasta',?,'concluida',?)", [usuarioId,categoria.id,JSON.stringify({nome:categoria.nome,pastas,materiais})]);
       await concluirOperacaoNaTransacao(conexao,operacaoChave,null);
+      if (solicitacaoId) {
+        const [r] = await conexao.execute("UPDATE solicitacoes_exclusao_pastas SET estado='aprovada',decidido_por=?,decidido_em=CURRENT_TIMESTAMP(3) WHERE id=? AND estado='pendente'", [usuarioId,solicitacaoId]);
+        if (r.affectedRows !== 1) throw new AppError("Esta solicitação já foi analisada.",409,"SOLICITACAO_JA_DECIDIDA");
+        await conexao.execute("INSERT INTO auditoria_geral(ator_usuario_id,acao,entidade,entidade_id,resultado) VALUES (?,'pasta_exclusao_aprovada','solicitacao',?,'concluida')", [usuarioId,solicitacaoId]);
+      }
       return {id:categoria.id,excluida:true,pastas,materiais};
     });
   }
@@ -229,6 +266,17 @@ function criarGestaoMateriaisRepository(pool) {
     const classificada = registros.find(function definida(item) { return item.disciplina_estado !== "herdar"; });
     return Boolean(classificada && classificada.disciplina_estado === "definida"
       && await professorPossuiDisciplina(professorId,Number(classificada.disciplina_id)));
+  }
+
+  async function professorPodeExcluirSubarvore(professorId, categoriaId) {
+    const [descendentes] = await pool.execute(
+      "WITH RECURSIVE arvore AS (SELECT id FROM categorias WHERE id=? UNION ALL SELECT c.id FROM categorias c INNER JOIN arvore a ON c.categoria_pai_id=a.id) SELECT id FROM arvore", [categoriaId]
+    );
+    // Reutiliza a mesma regra de gestao por ancestral/disciplina, inclusive overrides.
+    for (const item of descendentes) {
+      if (!await professorPodeAcessarCategoria(professorId, Number(item.id))) return false;
+    }
+    return descendentes.length > 0;
   }
 
   async function listarPastasGerenciaveis(usuario) {
@@ -423,7 +471,7 @@ function criarGestaoMateriaisRepository(pool) {
     const [linhas] = await pool.execute("SELECT id FROM operacoes_google_drive_pendentes WHERE tipo='pasta_criacao' AND fase<>'concluida' AND JSON_UNQUOTE(JSON_EXTRACT(detalhes,'$.categoriaExistenteId'))=? LIMIT 1", [String(id)]);
     return linhas.length > 0;
   }
-  return { concluirCriacaoPrincipalRecuperada, possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, reativarPastaVinculada, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
+  return { solicitarExclusaoPasta, listarSolicitacoesExclusao, buscarSolicitacaoExclusao, recusarExclusaoPasta, professorPodeExcluirSubarvore, concluirCriacaoPrincipalRecuperada, possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, reativarPastaVinculada, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
 }
 
 module.exports = criarGestaoMateriaisRepository;

@@ -206,13 +206,37 @@ function criarGestaoMateriaisService(dependencias) {
     }
   }
 
-  async function excluirPasta(usuario, idInformado) {
-    if (!usuario || usuario.papel !== "admin") throw new AppError("Somente administradores podem excluir pastas",403,"SEM_PERMISSAO");
+  async function solicitarExclusaoPasta(usuario, idInformado) {
+    if (!usuario || usuario.papel !== "professor") throw new AppError("Somente professores podem solicitar esta exclusão.",403,"SEM_PERMISSAO");
+    const categoria = await exigirCategoria(usuario,inteiroPositivo(idInformado,"Pasta"));
+    if (!await repository.professorPodeExcluirSubarvore(usuario.id,categoria.id)) {
+      throw new AppError("Esta pasta contém subpastas fora da sua permissão. Peça a um administrador para revisar a exclusão.",403,"SEM_PERMISSAO_SUBARVORE");
+    }
+    if (categoria.drivePastaId === provider.pastaRaizId) throw new AppError("A raiz do acervo e protegida",403,"RAIZ_PROTEGIDA");
+    return repository.solicitarExclusaoPasta(categoria,usuario.id);
+  }
+
+  async function decidirExclusaoPasta(usuario, idInformado, corpo) {
+    if (!usuario || usuario.papel !== "admin") throw new AppError("Somente administradores podem analisar solicitações.",403,"SEM_PERMISSAO");
+    if (!corpo || Object.keys(corpo).some(chave=>chave!=="decisao") || !["aprovar","recusar"].includes(corpo.decisao)) throw new AppError("Escolha aprovar ou recusar.",400,"DADOS_INVALIDOS");
+    const id=inteiroPositivo(idInformado,"Solicitação");
+    const pedido=await repository.buscarSolicitacaoExclusao(id);
+    if (!pedido) throw new AppError("Solicitação não encontrada.",404,"SOLICITACAO_NAO_ENCONTRADA");
+    if (pedido.estado!=="pendente") throw new AppError("Esta solicitação já foi analisada.",409,"SOLICITACAO_JA_DECIDIDA");
+    if (corpo.decisao==="recusar") return repository.recusarExclusaoPasta(id,usuario.id);
+    const categoria=await repository.buscarCategoria(pedido.categoria_id);
+    if (!categoria || !categoria.ativo || categoria.drivePastaId!==pedido.drive_pasta_id || categoria.nome!==pedido.pasta_nome || categoria.categoriaPaiId!==(pedido.categoria_pai_id===null?null:Number(pedido.categoria_pai_id))) throw new AppError("A pasta mudou desde a solicitação. Recuse este pedido e peça uma nova solicitação.",409,"SOLICITACAO_DESATUALIZADA");
+    if (!pedido.ativo || pedido.papel!=="professor" || !await repository.professorPodeExcluirSubarvore(Number(pedido.solicitante_id),categoria.id)) throw new AppError("O professor não tem mais permissão sobre toda a pasta. Recuse a solicitação e revise os acessos.",403,"SEM_PERMISSAO_SUBARVORE");
+    return excluirPasta(usuario,categoria.id,id);
+  }
+
+  async function excluirPasta(usuario, idInformado, solicitacaoId) {
+    if (!usuario || usuario.papel !== "admin") throw new AppError("A exclusão de pastas precisa de aprovação de um administrador.",403,"SEM_PERMISSAO");
     const categoria = await exigirCategoria(usuario,inteiroPositivo(idInformado,"Pasta"));
     if (categoria.drivePastaId === provider.pastaRaizId) throw new AppError("A raiz do acervo e protegida",403,"RAIZ_PROTEGIDA");
     const refreshToken = await token();
     await exigirPastaDoAcervo(refreshToken,categoria.drivePastaId);
-    const detalhes = {categoriaId:categoria.id,driveFileId:categoria.drivePastaId};
+    const detalhes = {categoriaId:categoria.id,driveFileId:categoria.drivePastaId,solicitacaoId:solicitacaoId || null};
     const operacao = await iniciarOperacaoDrive("pasta_lixeira",usuario.id,null,detalhes);
     try {
       await executarGoogle(function enviar() { return provider.alterarLixeira(refreshToken,categoria.drivePastaId,true); });
@@ -221,7 +245,7 @@ function criarGestaoMateriaisService(dependencias) {
       await deixarOperacaoPendente(operacao,"reconciliacao_pendente",erro,detalhes);
       throw erro;
     }
-    try { return await repository.excluirPastaComConteudo(categoria,usuario.id,operacao); }
+    try { return await repository.excluirPastaComConteudo(categoria,usuario.id,operacao,solicitacaoId); }
     catch (erro) {
       return tratarFalhaDepoisDoDrive(operacao,erro,detalhes,function restaurarPasta() { return provider.alterarLixeira(refreshToken,categoria.drivePastaId,false); });
     }
@@ -628,6 +652,9 @@ function criarGestaoMateriaisService(dependencias) {
       return executarComTravaDeOperacao(function executar() { return excluirDefinitivamente(usuario, id, corpo); });
     },
     listarPastas: listarPastas,
+    listarSolicitacoesExclusao: usuario => { exigirPapelDeGestao(usuario); return repository.listarSolicitacoesExclusao(usuario); },
+    solicitarExclusaoPasta: (usuario,id) => executarComTravaDeOperacao(()=>solicitarExclusaoPasta(usuario,id)),
+    decidirExclusaoPasta: (usuario,id,corpo) => executarComTravaDeOperacao(()=>decidirExclusaoPasta(usuario,id,corpo)),
     vincularPasta: function vincularComTrava(usuario,id) { return executarComTravaDeOperacao(() => vincularPasta(usuario,id)); },
     excluirPasta: function excluirPastaComTrava(usuario,id) { return executarComTravaDeOperacao(function executar() { return excluirPasta(usuario,id); }); },
     criarPasta: function criarPastaComTrava(usuario,corpo) { return executarComTravaDeOperacao(function executar() { return criarPasta(usuario,corpo); }); },

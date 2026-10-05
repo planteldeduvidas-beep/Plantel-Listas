@@ -198,7 +198,7 @@ test("admin exclui pasta vazia aninhada com auditoria e journal; demais papeis p
   const id=criada.body.id;
   for(const papel of ["professor","aluno"]){
     const pessoa=await autenticar(papel);
-    assert.equal((await pessoa.agente.delete("/api/gestao-materiais/pastas/"+id).set("X-CSRF-Token",pessoa.csrf)).status,403);
+    assert.equal((await pessoa.agente.delete("/api/gestao-materiais/pastas/"+(papel==="professor"?pastaProibida:id)).set("X-CSRF-Token",pessoa.csrf)).status,403);
   }
   assert.equal((await admin.agente.delete("/api/gestao-materiais/pastas/"+id)).status,403);
   const excluida=await admin.agente.delete("/api/gestao-materiais/pastas/"+id).set("X-CSRF-Token",admin.csrf);
@@ -212,6 +212,62 @@ test("admin exclui pasta vazia aninhada com auditoria e journal; demais papeis p
   assert.equal(journal[0].fase,"concluida");
   const listagem=await admin.agente.get("/api/acervo?categoriaId="+pastaB);
   assert.equal(listagem.body.pastas.some(pasta=>pasta.id===id),false);
+});
+
+test("professor solicita; admin aprova uma vez com auditoria sem afetar pastas externas", async()=>{
+  const professor=await autenticar("professor");
+  const semCsrf=await professor.agente.delete("/api/gestao-materiais/pastas/"+pastaA);
+  assert.equal(semCsrf.status,403);
+  assert.equal((await professor.agente.delete("/api/gestao-materiais/pastas/"+pastaA).set("X-CSRF-Token",professor.csrf)).status,403);
+  const url="/api/gestao-materiais/pastas/"+pastaA+"/solicitar-exclusao";
+  assert.equal((await professor.agente.post(url)).status,403);
+  const pedido=await professor.agente.post(url).set("X-CSRF-Token",professor.csrf).send({});
+  assert.equal(pedido.status,201,JSON.stringify(pedido.body));
+  await professor.agente.post(url).set("X-CSRF-Token",professor.csrf).send({});
+  const pedidos=await professor.agente.get("/api/gestao-materiais/solicitacoes-exclusao");
+  assert.equal(pedidos.body.length,1);
+  const [[antes]]=await pool.execute("SELECT disponivel FROM materiais WHERE id=?",[materialId]);
+  assert.equal(Number(antes.disponivel),1);
+  assert.equal(itensDrive.get("driveAreaA").trashed,false);
+  const decidir="/api/gestao-materiais/solicitacoes-exclusao/"+pedido.body.id+"/decidir";
+  assert.equal((await professor.agente.post(decidir).set("X-CSRF-Token",professor.csrf).send({decisao:"aprovar"})).status,403);
+  const admin=await autenticar("admin");
+  assert.equal((await admin.agente.get("/api/gestao-materiais/solicitacoes-exclusao")).body.length,1);
+  const resposta=await admin.agente.post(decidir).set("X-CSRF-Token",admin.csrf).send({decisao:"aprovar"});
+  assert.equal(resposta.status,200,JSON.stringify(resposta.body));
+  assert.equal((await admin.agente.post(decidir).set("X-CSRF-Token",admin.csrf).send({decisao:"aprovar"})).status,409);
+  const [[material]]=await pool.execute("SELECT disponivel FROM materiais WHERE id=?",[materialId]);
+  assert.equal(Number(material.disponivel),0);
+  const [[outra]]=await pool.execute("SELECT ativo FROM categorias WHERE id=?",[pastaProibida]);
+  assert.equal(Number(outra.ativo),1);
+  const [[auditoria]]=await pool.execute("SELECT COUNT(*) n FROM auditoria_geral WHERE acao='pasta_exclusao_aprovada' AND ator_usuario_id=?",[usuarios.admin.id]);
+  assert.equal(Number(auditoria.n),1);
+});
+
+test("pedidos negam pasta externa, aluno e aprovacao com permissao revogada; recusa preserva pasta",async()=>{
+  const professor=await autenticar("professor"),admin=await autenticar("admin"),aluno=await autenticar("aluno");
+  const pedir=id=>professor.agente.post("/api/gestao-materiais/pastas/"+id+"/solicitar-exclusao").set("X-CSRF-Token",professor.csrf).send({});
+  assert.equal((await pedir(pastaProibida)).status,403);
+  assert.equal((await aluno.agente.get("/api/gestao-materiais/solicitacoes-exclusao")).status,403);
+  const r=await pedir(pastaA);assert.equal(r.status,201);
+  await pool.execute("UPDATE permissoes_professor_categoria SET revogada_em=CURRENT_TIMESTAMP WHERE professor_id=?",[usuarios.professor.id]);
+  const decidir=decisao=>admin.agente.post("/api/gestao-materiais/solicitacoes-exclusao/"+r.body.id+"/decidir").set("X-CSRF-Token",admin.csrf).send({decisao});
+  assert.equal((await decidir("aprovar")).status,403);
+  assert.equal((await decidir("recusar")).status,200);
+  assert.equal(itensDrive.get("driveAreaA").trashed,false);
+  const [[pasta]]=await pool.execute("SELECT ativo FROM categorias WHERE id=?",[pastaA]);assert.equal(Number(pasta.ativo),1);
+});
+
+test("pedido por disciplina nao alcanca subpasta de outra disciplina",async()=>{
+  const professor=await autenticar("professor");
+  await pool.execute("UPDATE permissoes_professor_categoria SET revogada_em=CURRENT_TIMESTAMP WHERE professor_id=?",[usuarios.professor.id]);
+  const [d1]=await pool.execute("INSERT INTO disciplinas(nome) VALUES ('Permitida')");
+  const [d2]=await pool.execute("INSERT INTO disciplinas(nome) VALUES ('Restrita')");
+  await pool.execute("INSERT INTO professor_disciplinas(professor_id,disciplina_id,concedida_por_usuario_id) VALUES (?,?,?)",[usuarios.professor.id,d1.insertId,usuarios.admin.id]);
+  await pool.execute("UPDATE categorias SET disciplina_estado='definida',disciplina_id=? WHERE id=?",[d1.insertId,pastaA]);
+  await pool.execute("UPDATE categorias SET disciplina_estado='definida',disciplina_id=? WHERE id=?",[d2.insertId,pastaB]);
+  const r=await professor.agente.post("/api/gestao-materiais/pastas/"+pastaA+"/solicitar-exclusao").set("X-CSRF-Token",professor.csrf).send({});
+  assert.equal(r.status,403);assert.equal(r.body.erro.codigo,"SEM_PERMISSAO_SUBARVORE");
 });
 
 test("exclusao de pasta preenchida retira descendentes e leitura direta sem afetar pai ou irma",async function(){

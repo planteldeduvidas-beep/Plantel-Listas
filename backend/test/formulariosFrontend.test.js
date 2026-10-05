@@ -20,5 +20,5 @@ test("formularios preservam a referencia do elemento durante operacoes assincron
 
   assert.match(biblioteca, /const elementoFormulario = evento\.currentTarget/);
   assert.match(biblioteca, /const enviado = await executar\(/);
-  assert.match(biblioteca, /if \(enviado\) \{[\s\S]*?elementoFormulario\.reset\(\)[\s\S]*?definirMostrarEnvio\(false\)/);
+  assert.match(biblioteca, /if \(enviado \|\| materialConfirmado\) \{[\s\S]*?elementoFormulario\.reset\(\)[\s\S]*?definirMostrarEnvio\(false\)/);
 });

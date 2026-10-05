@@ -73,6 +73,7 @@ test("exclusao de pasta protege papeis, raiz e escopo",async function () {
     let escritas=0;
     const dependencias=criarDependencias({repository:{
       buscarCategoria:async()=>({...categoria(10),drivePastaId:cenario==="raiz"?"driveRaiz":"drivePasta10"}),
+      professorPodeAcessarCategoria:async()=>false,
       pastaPossuiConteudo:async()=>cenario==="local"
     },provider:{pastaPossuiFilhos:async()=>cenario==="remoto",verificarDescendenteDaRaiz:async()=>cenario!=="fora",alterarLixeira:async()=>{escritas++;}}});
     await assert.rejects(dependencias.service.excluirPasta({id:2,papel:["professor","aluno"].includes(cenario)?cenario:"admin"},10));
@@ -169,6 +170,21 @@ test("remove upload temporario e apaga arquivo novo quando o MySQL falha", async
   await assert.rejects(dependencias.service.adicionar({ id: 2, papel: "admin" }, { categoriaId: "10" }, { path: caminho, size: conteudo.length, originalname: "novo.pdf", mimetype: "application/pdf" }), /falha banco/);
   assert.deepEqual(dependencias.chamadas, ["criar", "excluir"]);
   await assert.rejects(fs.stat(caminho), function removido(erro) { return erro.code === "ENOENT"; });
+});
+
+test("professor solicita somente subarvore integralmente autorizada sem alterar Drive", async () => {
+  for (const permitido of [true, false]) {
+    let gravacoes=0;
+    const {service}=criarDependencias({repository:{
+      professorPodeAcessarCategoria:async()=>true,
+      professorPodeExcluirSubarvore:async()=>permitido,
+      solicitarExclusaoPasta:async()=>({pendente:true})
+    },provider:{alterarLixeira:async()=>{gravacoes++;}}});
+    if (permitido) assert.equal((await service.solicitarExclusaoPasta({id:2,papel:"professor"},10)).pendente,true);
+    else await assert.rejects(service.solicitarExclusaoPasta({id:2,papel:"professor"},10), erro=>erro.codigo==="SEM_PERMISSAO_SUBARVORE");
+    await assert.rejects(service.excluirPasta({id:2,papel:"professor"},10), erro=>erro.statusCode===403);
+    assert.equal(gravacoes,0);
+  }
 });
 
 test("commit de resultado desconhecido nao dispara compensacao externa",async function(){

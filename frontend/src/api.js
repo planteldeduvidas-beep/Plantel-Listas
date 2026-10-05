@@ -285,6 +285,10 @@ export function excluirPastaNoDrive(id) {
   return requisitar("/gestao-materiais/pastas/" + id, { method:"DELETE" });
 }
 
+export function solicitarExclusaoPasta(id) { return requisitar("/gestao-materiais/pastas/"+id+"/solicitar-exclusao",{method:"POST",body:"{}"}); }
+export function listarSolicitacoesExclusao() { return requisitar("/gestao-materiais/solicitacoes-exclusao",{method:"GET"}); }
+export function decidirExclusaoPasta(id,decisao) { return requisitar("/gestao-materiais/solicitacoes-exclusao/"+id+"/decidir",{method:"POST",body:JSON.stringify({decisao})}); }
+
 function adicionarMaterial(formulario) {
   return requisitar("/gestao-materiais", { method: "POST", body: formulario });
 }

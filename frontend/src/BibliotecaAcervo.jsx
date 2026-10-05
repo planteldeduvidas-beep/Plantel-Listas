@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
+import { criarFila, enviarFila, LIMITE_ARQUIVOS } from "./filaUploads.js";
+import { solicitarExclusaoPasta, listarSolicitacoesExclusao, decidirExclusaoPasta } from "./api.js";
 import {lerUpload,salvarUpload,prepararEnvio,executarEnvio,cancelarEnvio} from "./uploadRetomavel.js";
 import {
   consultarAcervo, obterUrlDoMaterial, classificarPasta,
@@ -43,7 +45,20 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   const [progressoUpload,definirProgressoUpload] = useState(null);
   const [arquivoRetomada,definirArquivoRetomada] = useState(null);
   const enviandoRef = useRef(false);
+  const pendenteRef = useRef(envioPendente);
+  const filaRef = useRef(false);
+  const [fila, definirFila] = useState([]);
+  const [quantidadeArquivos, definirQuantidadeArquivos] = useState(0);
+  const [processandoFila, definirProcessandoFila] = useState(false);
   const [lixeira, definirLixeira] = useState([]);
+  const [solicitacoes, definirSolicitacoes] = useState([]);
+  const [pedidoParaAprovar, definirPedidoParaAprovar] = useState(null);
+
+  async function carregarSolicitacoes() { definirSolicitacoes(await listarSolicitacoesExclusao()); }
+  async function decidirPedido(pedido,decisao) {
+    const ok=await executar(()=>decidirExclusaoPasta(pedido.id,decisao),decisao==="aprovar"?"Solicitação aprovada. Pasta e conteúdo enviados à lixeira do Drive.":"Solicitação recusada. Nenhum arquivo foi alterado.");
+    if(ok) { definirPedidoParaAprovar(null); await carregarSolicitacoes().catch(erro=>aoErro(mensagemHumana(erro))); }
+  }
   const [mostrarEnvio, definirMostrarEnvio] = useState(false);
   const [mostrarNovaPasta, definirMostrarNovaPasta] = useState(false);
   const [nomeNovaPasta, definirNomeNovaPasta] = useState("");
@@ -61,6 +76,7 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
 
   useEffect(function carregarGestao() {
     carregarLixeira().catch(function falhou(falha) { aoErro(falha.message); });
+    carregarSolicitacoes().catch(falha=>aoErro(mensagemHumana(falha)));
   }, []);
   useEffect(function sugerirPastaAtual() {
     definirPastaEnvioId(function manterEscolhaAnterior(atual) {
@@ -88,27 +104,48 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   async function enviar(evento) {
     evento.preventDefault();
     const elementoFormulario = evento.currentTarget;
-    return realizarEnvio(new FormData(elementoFormulario),elementoFormulario);
+    if (filaRef.current || enviandoRef.current) return;
+    if (pendenteRef.current) { aoErro("Retome ou cancele o envio pendente antes de iniciar outra seleção."); return; }
+    try {
+      const novaFila = criarFila(new FormData(elementoFormulario));
+      definirFila(novaFila);
+      await continuarFila(novaFila);
+    } catch (erro) { aoErro(mensagemHumana(erro)); }
   }
-  async function realizarEnvio(formulario,elementoFormulario) {
+  async function continuarFila(itens = fila) {
+    if (filaRef.current) return;
+    filaRef.current = true; definirProcessandoFila(true);
+    try {
+      const concluida = await enviarFila(itens, dados => realizarEnvio(dados, null, true), definirFila);
+      if (concluida) { definirMostrarEnvio(false); definirQuantidadeArquivos(0); aoMensagem(`${itens.length} arquivo(s) adicionado(s).`); }
+      else aoMensagem("Fila interrompida. Os arquivos concluídos não serão reenviados. Use Continuar fila para tentar novamente.");
+    } finally { filaRef.current = false; definirProcessandoFila(false); }
+  }
+  async function realizarEnvio(formulario,elementoFormulario,parteDaFila = false) {
     if (enviandoRef.current) return;
     enviandoRef.current = true;
+    let materialConfirmado = false;
     const enviado = await executar(async function adicionar() {
       const arquivo = formulario.get("arquivo");
       // Arquivos muito pequenos mantem a compatibilidade do multipart existente.
-      if (arquivo.size < 16 && !envioPendente) return adicionarMaterial(formulario);
-      const pendente = await prepararEnvio(formulario,envioPendente);
+      if (arquivo.size < 16 && !pendenteRef.current) { await adicionarMaterial(formulario); materialConfirmado = true; return; }
+      const pendente = await prepararEnvio(formulario,pendenteRef.current);
+      pendenteRef.current = pendente;
       definirEnvioPendente(pendente); salvarUpload(usuario.id,pendente);
       await executarEnvio(arquivo,pendente,definirProgressoUpload);
+      materialConfirmado = true;
       definirEnvioPendente(null); salvarUpload(usuario.id,null);
+      pendenteRef.current = null;
       definirProgressoUpload(null);
     }, "Material adicionado.");
     enviandoRef.current = false;
-    if (enviado) {
+    if (enviado || materialConfirmado) {
       if (elementoFormulario) elementoFormulario.reset();
       definirArquivoRetomada(null);
-      definirMostrarEnvio(false);
+      if (!parteDaFila) definirMostrarEnvio(false);
     }
+    // Falha ao atualizar a listagem nao pode reenviar um arquivo ja confirmado.
+    return enviado || materialConfirmado;
   }
 
   async function criarPasta(evento) {
@@ -141,11 +178,14 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
   }
 
   return <section className="painel-gestao-materiais">
+    <details className="lixeira-materiais"><summary>Solicitações de exclusão de pastas ({solicitacoes.filter(item=>item.estado==="pendente").length})</summary><p>{usuario.papel==="admin"?"Qualquer administrador pode analisar. Aprovar envia a pasta inteira, seus arquivos e subpastas à lixeira do Drive.":"Seus pedidos aparecem aqui. Até um administrador aprovar, a pasta permanece disponível."}</p><button type="button" disabled={ocupado || processandoFila} onClick={()=>carregarSolicitacoes().catch(erro=>aoErro(mensagemHumana(erro)))}>Atualizar solicitações</button>{!solicitacoes.length && <p>Nenhuma solicitação encontrada.</p>}{solicitacoes.map(item=><article key={item.id}><div><strong>{item.nome}</strong><small>{item.solicitante} · {{pendente:"Aguardando análise",aprovada:"Aprovada",recusada:"Recusada"}[item.estado]}</small></div>{usuario.papel==="admin" && item.estado==="pendente" && <div>{item.categoriaId && <a href={criarUrlDaNavegacao(window.location.pathname,"acervo",item.categoriaId)}>Ver pasta</a>}<button type="button" disabled={ocupado || processandoFila} onClick={()=>definirPedidoParaAprovar(item)}>Analisar exclusão</button><button type="button" disabled={ocupado || processandoFila} onClick={()=>decidirPedido(item,"recusar")}>Recusar</button></div>}</article>)}</details>
+    {pedidoParaAprovar && <Modal titulo="Aprovar exclusão da pasta?" aoFechar={()=>{if(!ocupado)definirPedidoParaAprovar(null);}}><p>Solicitação de <strong>{pedidoParaAprovar.solicitante}</strong> para a pasta <strong>{pedidoParaAprovar.nome}</strong>.</p><p>Todos os arquivos e subpastas também irão para a lixeira do Google Drive. Confira o conteúdo em Ver pasta antes de aprovar. Para recuperar, um responsável precisa restaurar no Drive e sincronizar.</p><div className="acoes-formulario"><button type="button" className="perigo" disabled={ocupado} onClick={()=>decidirPedido(pedidoParaAprovar,"aprovar")}>{ocupado?"Processando...":"Aprovar e enviar à lixeira"}</button><button type="button" disabled={ocupado} onClick={()=>definirPedidoParaAprovar(null)}>Cancelar</button></div></Modal>}
+    {!!fila.length && <div className="progresso-upload" aria-live="polite"><strong>Fila de envio — {fila.filter(item => item.estado === "concluido").length} de {fila.length} concluídos</strong><ul>{fila.map((item, indice) => <li key={indice}>{item.nome}: {{ aguardando: "aguardando", enviando: "enviando", concluido: "concluído", interrompido: "interrompido" }[item.estado]}</li>)}</ul><p>Até {LIMITE_ARQUIVOS} arquivos, um por vez, na mesma pasta. Mantenha esta tela aberta. Ao fechar ou atualizar, será necessário selecionar novamente os arquivos ainda não enviados; o envio atual pode ser retomado.</p>{!processandoFila && fila.some(item => item.estado !== "concluido") && <button type="button" disabled={ocupado} onClick={() => continuarFila()}>Continuar fila</button>}</div>}
     {(envioPendente || progressoUpload) && <div className="progresso-upload" role="status" aria-live="polite">
       <strong>{ocupado ? (progressoUpload?.estado === "finalizando" ? "Confirmando material na biblioteca…" : "Enviando arquivo…") : "Envio pendente"}</strong>
       {progressoUpload && <><progress aria-label="Progresso confirmado do envio" max={progressoUpload.tamanho} value={progressoUpload.recebido} /><span>{Math.floor(100*progressoUpload.recebido/progressoUpload.tamanho)}% · {tamanhoAmigavel(progressoUpload.recebido)} de {tamanhoAmigavel(progressoUpload.tamanho)}</span></>}
       <p>{ocupado ? "Mantenha esta tela aberta. Se a conexão cair, será possível retomar." : "Selecione abaixo o mesmo arquivo e toque em Retomar envio. A pasta e os dados do envio original serão mantidos."}</p>
-      {envioPendente && !ocupado && <>
+      {envioPendente && !ocupado && !fila.some(item => item.estado !== "concluido") && <>
         <span>Arquivo original: {envioPendente.selecao?.nome}</span>
         <label>Arquivo original para retomar<input type="file" accept="application/pdf,video/mp4,video/webm,.m4v" onChange={e => definirArquivoRetomada(e.target.files[0] || null)} /></label>
         <button type="button" disabled={!arquivoRetomada} onClick={() => {const dados=new FormData();dados.set("arquivo",arquivoRetomada);void realizarEnvio(dados,null);}}>Retomar envio</button>
@@ -153,9 +193,10 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
       {envioPendente && <button type="button" disabled={ocupado} onClick={() => executar(async () => {
         try { await cancelarEnvio(envioPendente.id); } catch (e) { if (e.codigo !== "UPLOAD_NAO_ENCONTRADO") throw e; }
         definirEnvioPendente(null); definirProgressoUpload(null); salvarUpload(usuario.id,null);
+        pendenteRef.current = null; definirFila([]);
       },"Envio cancelado.")}>Cancelar envio pendente</button>}
     </div>}
-    <div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais da biblioteca."}</p></div><div className="acoes-gestao-pastas"><button type="button" className="botao-secundario" onClick={function alternar() { definirMostrarNovaPasta(!mostrarNovaPasta); }}><Icone nome={mostrarNovaPasta ? "fechar" : "mais"} />{mostrarNovaPasta ? "Cancelar" : "Nova pasta"}</button><button type="button" className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div></div>
+<div className="cabecalho-gestao-materiais"><div><h3>Gerenciar materiais</h3><p>{usuario.papel === "professor" ? "Adicione e organize materiais nas pastas que você gerencia." : "Adicione e organize os materiais da biblioteca."}</p></div><div className="acoes-gestao-pastas"><button type="button" disabled={ocupado || processandoFila} className="botao-secundario" onClick={function alternar() { definirMostrarNovaPasta(!mostrarNovaPasta); }}><Icone nome={mostrarNovaPasta ? "fechar" : "mais"} />{mostrarNovaPasta ? "Cancelar" : "Nova pasta"}</button><button type="button" disabled={ocupado || processandoFila} className="botao-principal" onClick={function alternar() { definirMostrarEnvio(!mostrarEnvio); }}><Icone nome={mostrarEnvio ? "fechar" : "mais"} />{mostrarEnvio ? "Cancelar" : "Adicionar material"}</button></div></div>
     {mostrarNovaPasta && <form className="formulario-material" onSubmit={criarPasta}>
       <label>Nome da nova pasta<input required disabled={ocupado} maxLength="120" placeholder="Ex.: Aulas de revisão" value={nomeNovaPasta} onChange={evento => definirNomeNovaPasta(evento.target.value)} /></label>
       <label>Onde você quer criar a pasta?
@@ -173,7 +214,7 @@ function PainelGestaoMateriais({ usuario, filtros, categoriaAtual, pastas, aoAtu
       </p>
       <button type="submit" disabled={ocupado}>{ocupado ? "Criando pasta..." : "Criar pasta"}</button>
     </form>}
-    {mostrarEnvio && <form className="formulario-material" onSubmit={enviar}><label>Arquivo PDF ou vídeo<input required type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><SeletorPasta rotulo="Adicionar na pasta" pastas={pastas} valor={pastaEnvioId} aoAlterar={definirPastaEnvioId} nome="categoriaId" obrigatorio /><label>Nome do material <small>(opcional; extensão automática)</small><input name="nome" placeholder="Usar o nome do arquivo" /></label><label>Disciplina <small>(opcional)</small><select name="disciplinaId" defaultValue=""><option value="">Não informar</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><label>Concurso <small>(opcional)</small><select name="concursoId" defaultValue=""><option value="">Não informar</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><button type="submit" disabled={ocupado}>{ocupado ? "Enviando..." : "Adicionar material"}</button></form>}
+{mostrarEnvio && <form className="formulario-material" onSubmit={enviar}><label>Arquivos PDF ou vídeo (até 10)<input required multiple disabled={ocupado || processandoFila || !!envioPendente} onChange={evento => definirQuantidadeArquivos(evento.target.files.length)} type="file" name="arquivo" accept="application/pdf,video/mp4,video/webm,.m4v" /></label><SeletorPasta rotulo="Adicionar na pasta" pastas={pastas} valor={pastaEnvioId} aoAlterar={definirPastaEnvioId} nome="categoriaId" obrigatorio /><label>Nome do material <small>(opcional; extensão automática)</small><input name="nome" disabled={quantidadeArquivos > 1 || ocupado || processandoFila} placeholder={quantidadeArquivos > 1 ? "Cada material usará o nome do seu arquivo" : "Usar o nome do arquivo"} /></label><label>Disciplina <small>(opcional)</small><select name="disciplinaId" defaultValue=""><option value="">Não informar</option>{filtros.disciplinas.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><label>Concurso <small>(opcional)</small><select name="concursoId" defaultValue=""><option value="">Não informar</option>{filtros.concursos.map(function opcao(item) { return <option key={item.id} value={item.id}>{item.nome}</option>; })}</select></label><button type="submit" disabled={ocupado || processandoFila || !!envioPendente}>{processandoFila || ocupado ? "Enviando..." : "Adicionar materiais"}</button></form>}
     {usuario.papel === "admin" && <details className="lixeira-materiais"><summary><span><Icone nome="historico" /> Lixeira</span><span className="contador">{lixeira.length}</span></summary>{!lixeira.length && <Vazio titulo="A lixeira está vazia" texto="Os materiais enviados para cá aparecerão nesta lista." />}{lixeira.map(function itemLixeira(item) { return <article key={item.id}><div><strong>{item.nome}</strong><small>{item.pasta ? "Pasta anterior: " + item.pasta : "Pasta anterior indisponível"}</small>{item.exclusaoPendente && <small>Exclusão aguardando conclusão</small>}</div><div><button type="button" className="secundario" disabled={ocupado || item.exclusaoPendente} onClick={function restaurarItem() { restaurar(item); }}>Restaurar</button><button type="button" className="perigo" disabled={ocupado} onClick={function excluirItem() { definirMaterialParaExcluir(item); definirTextoExclusao(""); }}>{item.exclusaoPendente ? "Finalizar exclusão" : "Excluir definitivamente"}</button></div></article>; })}</details>}
     {materialParaExcluir && <Modal titulo="Excluir este arquivo definitivamente?" aoFechar={function fechar() { definirMaterialParaExcluir(null); }}><form onSubmit={excluir}><p>Essa ação não poderá ser desfeita. Digite <strong>EXCLUIR</strong> para confirmar.</p><label>Confirmação<input value={textoExclusao} onChange={function mudar(evento) { definirTextoExclusao(evento.target.value); }} autoFocus autoComplete="off" /></label><div className="acoes-formulario"><button type="submit" className="perigo" disabled={ocupado || textoExclusao !== "EXCLUIR"}>{ocupado ? "Excluindo..." : "Excluir definitivamente"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirMaterialParaExcluir(null); }}>Cancelar</button></div></form></Modal>}
   </section>;
@@ -264,8 +305,8 @@ function Pasta({ pasta, aoAbrir, usuario, filtros, aoClassificar, podeRenomear, 
     definirEditando(false);
   }
   return <article className="item-pasta">
-    {usuario.papel === "admin" && <div className="gestao-pasta"><button type="button" className="acao-texto" onClick={function confirmar() { definirConfirmandoExclusao(true); }}>Excluir pasta</button></div>}
-    {confirmandoExclusao && <Modal titulo="Excluir pasta e todo o conteúdo?" aoFechar={function fechar() { if (!excluindo) definirConfirmandoExclusao(false); }}><p>A pasta <strong>{pasta.nome}</strong>, todos os arquivos e todas as subpastas serão enviados à lixeira do Google Drive e deixarão de aparecer na biblioteca.</p><p>Para recuperar, restaure a pasta no Google Drive e aguarde a sincronização.</p><div className="acoes-formulario"><button type="button" className="perigo" disabled={excluindo} onClick={async function excluir() { definirExcluindo(true); try { await aoExcluir(pasta.id); definirConfirmandoExclusao(false); } finally { definirExcluindo(false); } }}>{excluindo ? "Excluindo..." : "Excluir pasta e conteúdo"}</button><button type="button" className="botao-secundario" disabled={excluindo} onClick={function cancelar() { definirConfirmandoExclusao(false); }}>Cancelar</button></div></Modal>}
+{(usuario.papel === "admin" || (usuario.papel === "professor" && podeRenomear)) && <div className="gestao-pasta"><button type="button" className="acao-texto" onClick={function confirmar() { definirConfirmandoExclusao(true); }}>{usuario.papel === "professor" ? "Solicitar exclusão" : "Excluir pasta"}</button></div>}
+    {confirmandoExclusao && <Modal titulo={usuario.papel === "professor" ? "Solicitar exclusão desta pasta?" : "Excluir pasta e todo o conteúdo?"} aoFechar={function fechar() { if (!excluindo) definirConfirmandoExclusao(false); }}>{usuario.papel === "professor" && <p>Este pedido não exclui nada agora. Um administrador deverá analisar e aprovar.</p>}<p>{usuario.papel === "professor" ? "Se aprovada, a pasta " : "A pasta "}<strong>{pasta.nome}</strong>, todos os arquivos e todas as subpastas serão enviados à lixeira do Google Drive e deixarão de aparecer na biblioteca.</p><p>Para recuperar, restaure a pasta no Google Drive e aguarde a sincronização.</p><div className="acoes-formulario"><button type="button" className="perigo" disabled={excluindo} onClick={async function excluir() { definirExcluindo(true); try { if (await aoExcluir(pasta.id)) definirConfirmandoExclusao(false); } finally { definirExcluindo(false); } }}>{excluindo ? "Processando..." : usuario.papel === "professor" ? "Enviar solicitação ao administrador" : "Excluir pasta e conteúdo"}</button><button type="button" className="botao-secundario" disabled={excluindo} onClick={function cancelar() { definirConfirmandoExclusao(false); }}>Cancelar</button></div></Modal>}
     <button type="button" className="abrir-pasta" onClick={function abrir() { aoAbrir(pasta.id); }}><span className="icone-item" aria-hidden="true"><Icone nome="pasta" tamanho={24} /></span><span><strong>{pasta.nome}</strong><small>{resultadoDeBusca ? pasta.caminho : resumoPasta(pasta)}</small></span><Icone nome="chevron" /></button>
     {(pasta.disciplina || pasta.concurso) && <div className="etiquetas">{pasta.disciplina && <span>{pasta.disciplina.nome}</span>}{pasta.concurso && <span>{pasta.concurso.nome}</span>}</div>}
     {podeRenomear && <div className="gestao-pasta">{!renomeando ? <button type="button" className="acao-texto" onClick={function abrirRenomeacao() { definirNomeNovo(pasta.nome); definirRenomeando(true); }}>Renomear pasta</button> : <form onSubmit={async function salvarNome(evento) { evento.preventDefault(); const sucesso=await aoRenomear(pasta.id,nomeNovo); if(sucesso)definirRenomeando(false); }}><label>Novo nome<input required maxLength="120" value={nomeNovo} onChange={function mudar(evento) { definirNomeNovo(evento.target.value); }} /></label><button type="submit">Salvar</button><button type="button" className="secundario" onClick={function cancelar() { definirRenomeando(false); }}>Cancelar</button></form>}</div>}
@@ -356,7 +397,7 @@ function BibliotecaAcervo({ usuario, aoMensagem }) {
   }
   async function excluirPasta(id) {
     definirErro("");
-    try { await excluirPastaNoDrive(id); aoMensagem("Pasta enviada à lixeira do Google Drive."); await recarregarTudo(); return true; }
+    try { if(usuario.papel==="professor") { await solicitarExclusaoPasta(id); aoMensagem("Solicitação enviada. A pasta permanece disponível até um administrador aprovar. Use Atualizar solicitações para acompanhar."); } else { await excluirPastaNoDrive(id); aoMensagem("Pasta enviada à lixeira do Google Drive."); } await recarregarTudo(); return true; }
     catch (falha) { definirErro(mensagemHumana(falha)); return false; }
   }
   function alternar(id) { definirErro(""); definirSelecionadas(function atualizar(atuais) { return atuais.includes(id) ? atuais.filter(function remover(item) { return item !== id; }) : atuais.concat(id); }); }

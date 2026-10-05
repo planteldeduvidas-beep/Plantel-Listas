@@ -20,6 +20,9 @@ function criarGestaoMateriaisRoutes(dependencias){
   router.post("/pastas/:categoriaId/vincular-drive",dependencias.autorizarAdmin,protegerContraCsrf,dependencias.controller.vincularPasta);
   router.patch("/pastas/:categoriaId/nome",protegerContraCsrf,dependencias.controller.renomearPasta);
   router.delete("/pastas/:categoriaId",dependencias.autorizarAdmin,protegerContraCsrf,dependencias.controller.excluirPasta);
+  router.get("/solicitacoes-exclusao",dependencias.controller.listarSolicitacoesExclusao);
+  router.post("/pastas/:categoriaId/solicitar-exclusao",protegerContraCsrf,dependencias.controller.solicitarExclusaoPasta);
+  router.post("/solicitacoes-exclusao/:solicitacaoId/decidir",dependencias.autorizarAdmin,protegerContraCsrf,dependencias.controller.decidirExclusaoPasta);
   router.post("/",protegerContraCsrf,dependencias.rateLimiter,upload,dependencias.controller.adicionar);
   router.patch("/:materialId",protegerContraCsrf,dependencias.controller.editar);
   router.patch("/:materialId/mover",protegerContraCsrf,dependencias.controller.mover);
