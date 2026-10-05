@@ -27,7 +27,7 @@ async function csrf(agente) { return (await agente.get("/api/autenticacao/csrf")
 async function cadastrar(email) {
   const agente = request.agent(app);
   const token = await csrf(agente);
-  return agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token", token).send({ nome: "Conta QA", email, senha });
+  return agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token", token).send({ nome: "Conta QA", email, senha,aceiteTermos:{aceito:true,...require('../../shared/documentosLegais.json')} });
 }
 async function admin() {
   const agente = request.agent(app), token = await csrf(agente);

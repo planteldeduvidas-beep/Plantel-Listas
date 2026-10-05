@@ -1,0 +1,9 @@
+.aceite-termos { display:flex !important; align-items:flex-start; gap:12px; line-height:1.55; margin:16px 0; font-size:.92rem; }
+.aceite-termos input[type="checkbox"] { flex:0 0 20px; width:20px !important; height:20px; margin:3px 0 0; padding:0; accent-color:var(--cor-primaria,#0a665b); }
+.aceite-termos span { min-width:0; }
+.aceite-termos a { text-decoration:underline; text-underline-offset:3px; }
+.modal.modal-termos-aluno { width:min(560px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow-y:auto; }
+.modal-termos-aluno p { line-height:1.6; }
+.acoes-termos { display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; margin-top:20px; }
+.acoes-termos button { min-height:44px; }
+@media(max-width:480px) { .acoes-termos button { flex:1 1 100%; } }

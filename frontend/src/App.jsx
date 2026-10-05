@@ -8,6 +8,7 @@ import {
   redefinirSenha
 } from "./api.js";
 import PainelAcervo from "./PainelAcervo.jsx";
+import {CaixaAceiteTermos,aceiteAtual} from './TermosAluno.jsx';
 import AvisoEmail from "./AvisoEmail.jsx";
 import { ConfirmacaoEmail } from "./EmailConta.jsx";
 import { AguardarConfirmacaoCadastro, ConfirmacaoCadastro } from "./CadastroEmail.jsx";
@@ -44,6 +45,7 @@ function Aplicacao() {
   const [tela, definirTela] = useState(tokenRecuperacao ? "redefinir" : "login");
   const [email, definirEmail] = useState("");
   const [nome, definirNome] = useState("");
+  const [termosAceitos, definirTermosAceitos] = useState(false);
   const [senha, definirSenha] = useState("");
   const [mensagem, definirMensagem] = useState("");
   const [erro, definirErro] = useState("");
@@ -137,11 +139,12 @@ function Aplicacao() {
     evento.preventDefault();
     prepararOperacao();
     try {
-      const dados = await cadastrar(nome, email, senha);
+      const dados = await cadastrar(nome, email, senha, aceiteAtual(termosAceitos));
       definirMensagem(dados.mensagem || "Cadastro concluído. Agora entre com sua conta.");
       definirTela(dados.confirmacaoPendente ? "confirmarCadastro" : "login");
       definirSenha("");
       definirNome("");
+      definirTermosAceitos(false);
     } catch (falha) {
       mostrarErroDaApi(falha);
     } finally {
@@ -196,6 +199,7 @@ function Aplicacao() {
   }
 
   function trocarTela(novaTela) {
+    definirTermosAceitos(false);
     definirTela(novaTela);
     definirMensagem("");
     definirErro("");
@@ -288,6 +292,7 @@ function Aplicacao() {
             </label>
           )}
 
+          {tela === 'cadastro' && <CaixaAceiteTermos marcado={termosAceitos} aoAlterar={definirTermosAceitos} />}
           {mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}
           {erro && <Alerta tipo="erro">{erro}</Alerta>}
           <button type="submit" className="botao-principal botao-largo" disabled={processando}>

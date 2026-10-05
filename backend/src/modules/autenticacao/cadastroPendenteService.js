@@ -16,7 +16,12 @@ function criarCadastroPendenteService({repository,usuarioRepository,emailProvide
     return {mensagem:"Enviamos o link. Confira a caixa de entrada, Spam ou Lixo eletrônico e Promoções. O link vale por 1 hora; apenas o mais recente funciona."};
   }
   async function cadastrar(corpo) {
-    const dados=validarCadastro(corpo), p=await repository.criar(dados,await criarHashDaSenha(dados.senha));
+    exigirObjeto(corpo);
+    const {aceiteTermos,...cadastro}=corpo;
+    const dados=validarCadastro(cadastro);
+    require('./termosService').validarAceite(aceiteTermos);
+    dados.aceiteTermos=aceiteTermos;
+    const p=await repository.criar(dados,await criarHashDaSenha(dados.senha));
     let confirmacaoEmailEnviada=false;
     try {await enviar(p,p.email);confirmacaoEmailEnviada=true;} catch(e) { if(e.codigo!=="ENVIO_EMAIL_INDISPONIVEL" && e.code!=="ENVIO_EMAIL_INDISPONIVEL") throw e; }
     return {confirmacaoPendente:true,confirmacaoEmailEnviada,mensagem:confirmacaoEmailEnviada?"Cadastro pendente salvo. Confirme seu e-mail antes de entrar. Confira também Spam ou Lixo eletrônico e Promoções.":"Cadastro pendente salvo. Não conseguimos enviar o e-mail agora. Aguarde um minuto e reenvie o link."};

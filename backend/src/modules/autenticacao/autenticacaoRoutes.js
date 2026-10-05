@@ -30,6 +30,8 @@ function criarAutenticacaoRoutes(dependencias) {
   );
   router.post("/logout", autenticar, protegerContraCsrf, controller.sair);
   router.get("/me", autenticar, controller.obterUsuarioAtual);
+  router.get('/termos', autenticar, controller.obterTermos);
+  router.post('/termos/aceitar', autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.aceitarTermos);
   router.post("/email/solicitar", autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.solicitarConfirmacaoEmail);
   router.post("/email/confirmar", autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.confirmarEmail);
   router.post(

@@ -1,5 +1,7 @@
 const API_CONFIGURADA = import.meta.env?.VITE_API_URL || "/api";
 const API_BASE = import.meta.env?.DEV ? "/api" : API_CONFIGURADA;
+export function obterTermosAluno() { return requisitar('/autenticacao/termos'); }
+export function aceitarTermosAluno(aceite) { return requisitar('/autenticacao/termos/aceitar',{method:'POST',body:JSON.stringify(aceite)}); }
 
 export function reenviarConfirmacaoCadastro(emailAtual, email, senha) {
   return requisitar("/autenticacao/cadastro/email/solicitar", { method: "POST", body: JSON.stringify({ emailAtual, email, senha }) });
@@ -99,10 +101,10 @@ async function requisitar(caminho, opcoesInformadas, csrfRenovado = false) {
   return dados;
 }
 
-function cadastrar(nome, email, senha) {
+function cadastrar(nome, email, senha, aceiteTermos) {
   return requisitar("/autenticacao/cadastro", {
     method: "POST",
-    body: JSON.stringify({ nome: nome, email: email, senha: senha })
+    body: JSON.stringify({ nome: nome, email: email, senha: senha, aceiteTermos })
   });
 }
 

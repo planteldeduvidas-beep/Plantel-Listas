@@ -1,4 +1,5 @@
 const test = require("node:test");
+const aceiteTermos = {aceito:true,...require('../../shared/documentosLegais.json')};
 const assert = require("node:assert/strict");
 const pino = require("pino");
 const request = require("supertest");
@@ -76,7 +77,7 @@ async function obterCsrf(agente) {
 
 async function cadastrar(agente, email, senha, camposAdicionais) {
   const csrf = await obterCsrf(agente);
-  const corpo = Object.assign({ nome: "Aluno Teste", email: email, senha: senha }, camposAdicionais || {});
+  const corpo = Object.assign({ nome: "Aluno Teste", email: email, senha: senha, aceiteTermos }, camposAdicionais || {});
   const resposta = await agente
     .post("/api/autenticacao/cadastro")
     .set("X-CSRF-Token", csrf)
@@ -132,11 +133,32 @@ async function liberarCooldown(email) {
   await pool.execute("UPDATE cadastros_publicos_pendentes SET enviado_em=DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL 2 MINUTE) WHERE email=?",[email]);
 }
 
+test("cadastro exige aceite explicito da versao atual e transfere a data original ao confirmar", async () => {
+  const agente=request.agent(aplicacao), csrf=await obterCsrf(agente);
+  const dados={nome:'Aluno Termos',email:'termos@example.com',senha:'Senha-forte-123'};
+  for(const aceite of [undefined,{...aceiteTermos,aceito:false},{...aceiteTermos,aceito:'true'}]) {
+    const r=await agente.post('/api/autenticacao/cadastro').set('X-CSRF-Token',csrf).send({...dados,aceiteTermos:aceite});
+    assert.equal(r.status,400); assert.equal(r.body.erro.codigo,'ACEITE_TERMOS_OBRIGATORIO');
+  }
+  assert.equal((await agente.post('/api/autenticacao/cadastro').set('X-CSRF-Token',csrf).send({...dados,aceiteTermos:{...aceiteTermos,termos:'antigo'}})).status,409);
+  const [[antes]]=await pool.execute('SELECT COUNT(*) n FROM cadastros_publicos_pendentes WHERE email=?',[dados.email]);
+  assert.equal(antes.n,0);
+  assert.equal((await agente.post('/api/autenticacao/cadastro').set('X-CSRF-Token',csrf).send({...dados,aceiteTermos})).status,201);
+  const [[pendente]]=await pool.execute('SELECT termos_aceitos_em FROM cadastros_publicos_pendentes WHERE email=?',[dados.email]);
+  assert.ok(pendente.termos_aceitos_em);
+  assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,200);
+  const [[aceite]]=await pool.execute('SELECT a.* FROM aceites_termos_alunos a JOIN usuarios u ON u.id=a.usuario_id WHERE u.email=?',[dados.email]);
+  assert.equal(aceite.aceito_em.getTime(),pendente.termos_aceitos_em.getTime());
+  assert.equal(aceite.termos_versao,aceiteTermos.termos); assert.equal(aceite.origem,'cadastro');
+  assert.equal((await entrar(agente,dados.email,dados.senha)).status,200);
+  assert.equal((await agente.get('/api/autenticacao/termos')).body.pendente,false);
+});
+
 test("novo cadastro exige confirmacao antes do login e falha SMTP preserva reenvio", async () => {
   const agente = request.agent(aplicacao);
   const csrf = await obterCsrf(agente);
   const cadastro = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token", csrf)
-    .send({nome:"Aluno novo",email:"cadastro-confirmacao@outlook.com",senha:"Senha-forte-123"});
+    .send({nome:"Aluno novo",email:"cadastro-confirmacao@outlook.com",senha:"Senha-forte-123",aceiteTermos});
   assert.equal(cadastro.status, 201);
   assert.equal(cadastro.body.confirmacaoEmailEnviada, true);
   assert.match(cadastro.body.mensagem, /Spam ou Lixo eletrônico/);
@@ -155,7 +177,7 @@ test("novo cadastro exige confirmacao antes do login e falha SMTP preserva reenv
   const enviar = emailProvider.enviarConfirmacaoEmail;
   emailProvider.enviarConfirmacaoEmail = async () => { throw new Error("SMTP indisponivel"); };
   const semEnvio = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf)
-    .send({nome:"Aluno preservado",email:"cadastro-preservado@proton.me",senha:"Senha-forte-123"});
+    .send({nome:"Aluno preservado",email:"cadastro-preservado@proton.me",senha:"Senha-forte-123",aceiteTermos});
   emailProvider.enviarConfirmacaoEmail = enviar;
   assert.equal(semEnvio.status,201);
   assert.equal(semEnvio.body.confirmacaoEmailEnviada,false);
@@ -171,7 +193,7 @@ test("cadastro pendente corrige email ao confirmar, exige senha e rejeita expira
   const agente = request.agent(aplicacao);
   const email = "cadastro-errado@example.com", novo = "cadastro-correto@gmail.com";
   const csrf = await obterCsrf(agente);
-  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Novo",email,senha:"Senha-forte-123"})).status,201);
+  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Novo",email,senha:"Senha-forte-123",aceiteTermos})).status,201);
   const antigo = tokenEmailMaisRecente();
   assert.equal((await reenviarCadastro(agente,email,novo,"Senha-incorreta-123")).status,401);
   await liberarCooldown(email);
@@ -200,7 +222,7 @@ test("cadastro pendente corrige email ao confirmar, exige senha e rejeita expira
 test("recuperar senha nao libera cadastro pendente e token de conta existente nao confirma cadastro publico", async () => {
   const agente = request.agent(aplicacao), email = "aguardando-confirmacao@outlook.com";
   const csrf = await obterCsrf(agente);
-  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Pendente",email,senha:"Senha-forte-123"})).status,201);
+  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Pendente",email,senha:"Senha-forte-123",aceiteTermos})).status,201);
   const antigo = tokenEmailMaisRecente();
   emailProvider.limpar();
   await solicitarRecuperacao(agente,email);
@@ -250,7 +272,7 @@ test("pendencia do fluxo anterior confirma sem recriar ou modificar a identidade
 test("reenvio nao toma email existente e confirmacao publica exige CSRF", async () => {
   const agente = request.agent(aplicacao);
   await cadastrar(agente,"ocupado@example.com","Senha-forte-123");
-  await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",await obterCsrf(agente)).send({nome:"Aluno Pendente",email:"pendente@example.com",senha:"Senha-forte-123"});
+  await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",await obterCsrf(agente)).send({nome:"Aluno Pendente",email:"pendente@example.com",senha:"Senha-forte-123",aceiteTermos});
   assert.equal((await reenviarCadastro(agente,"pendente@example.com","ocupado@example.com")).status,409);
   assert.equal((await agente.post("/api/autenticacao/cadastro/email/confirmar").send({token:tokenEmailMaisRecente()})).status,403);
   assert.equal((await entrar(agente,"pendente@example.com","Senha-forte-123")).status,403);
@@ -675,7 +697,7 @@ test("cookie de sessao usa Secure em producao", async function testarCookieProdu
     .post("/api/autenticacao/cadastro")
     .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)
     .set("X-CSRF-Token", tokenCsrf)
-    .send({ nome: "Conta Segura", email: "secure@gmail.com", senha: "Senha-forte-123" });
+    .send({ nome: "Conta Segura", email: "secure@gmail.com", senha: "Senha-forte-123",aceiteTermos });
   assert.equal((await request(aplicacao).post("/api/autenticacao/cadastro/email/confirmar")
     .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)
     .set("X-CSRF-Token", tokenCsrf).send({token:tokenEmailMaisRecente()})).status,200);

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import {AvisoTermosAluno} from './TermosAluno.jsx';
 import {
   listarEstruturaPublica,
   vincularPastaAoDrive,
@@ -191,6 +192,8 @@ function FormularioCatalogo({ titulo, singular, registros, api, aoAtualizar, aoE
 }
 
 function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
+  const [termosResolvidos,definirTermosResolvidos]=useState(usuario.papel!=='aluno');
+  const liberarBoasVindas=useCallback(()=>definirTermosResolvidos(true),[]);
   const [emailAberto, definirEmailAberto] = useState(false);
   const areaInicial = obterAreaInicial(usuario.papel);
   const [estrutura, definirEstrutura] = useState({ categorias: [], disciplinas: [], concursos: [] });
@@ -724,7 +727,8 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
             {!professores.length && <p className="estado-vazio">Nenhum professor ativo encontrado.</p>}
           </section>}
       </section>
-      {boasVindasAlunoAberta && usuario.papel === "aluno" && (
+      <AvisoTermosAluno key={usuario.id} usuario={usuario} aoLiberar={liberarBoasVindas} />
+      {termosResolvidos && boasVindasAlunoAberta && usuario.papel === "aluno" && (
         <Modal
           titulo={"Bem-vindo, " + String(usuario.nome || "aluno").trim().split(/\s+/)[0] + "!"}
           descricao="Sua biblioteca de estudos está pronta."

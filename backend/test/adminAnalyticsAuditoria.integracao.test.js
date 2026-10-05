@@ -62,6 +62,33 @@ test.beforeEach(async function preparar() {
 
 test.after(async function encerrar() { await limpar(); await pool.end(); });
 
+test("aceite de alunos existentes preserva acesso, isola papeis e e idempotente e transacional", async () => {
+  const id=await usuario('aluno-termos@example.com','aluno');
+  await usuario('prof-termos@example.com','professor'); await usuario('admin-termos@example.com','admin');
+  const aluno=await sessao('aluno-termos@example.com');
+  const aceite={aceito:true,...require('../../shared/documentosLegais.json')};
+  const rota='/api/autenticacao/termos';
+  assert.equal((await request(aplicacao).get(rota)).status,401);
+  assert.equal((await aluno.agente.get(rota)).body.pendente,true);
+  assert.equal((await aluno.agente.get('/api/autenticacao/me')).status,200);
+  assert.equal((await aluno.agente.post(rota+'/aceitar').send(aceite)).status,403);
+  for(const email of ['prof-termos@example.com','admin-termos@example.com']) {
+    const equipe=await sessao(email);
+    assert.deepEqual((await equipe.agente.get(rota)).body,{aplicavel:false});
+    assert.equal((await equipe.agente.post(rota+'/aceitar').set('X-CSRF-Token',equipe.csrf).send(aceite)).status,403);
+  }
+  const falho=require('../src/modules/autenticacao/termosService').criarTermosService(pool,{registrar:async()=>{throw Error('falha QA');}});
+  await assert.rejects(falho.aceitar({id,papel:'aluno'},aceite),/falha QA/);
+  assert.equal((await aluno.agente.get(rota)).body.pendente,true);
+  for(let i=0;i<2;i++) assert.equal((await aluno.agente.post(rota+'/aceitar').set('X-CSRF-Token',aluno.csrf).send(aceite)).status,200);
+  const [[r]]=await pool.execute('SELECT COUNT(*) n FROM aceites_termos_alunos WHERE usuario_id=?',[id]);
+  assert.equal(r.n,1);
+  const [[aud]]=await pool.execute("SELECT COUNT(*) n FROM auditoria_geral WHERE ator_usuario_id=? AND acao='termos_aceitos'",[id]);
+  assert.equal(aud.n,1);
+  const outraSessao=await sessao('aluno-termos@example.com');
+  assert.equal((await outraSessao.agente.get(rota)).body.pendente,false);
+});
+
 test("detalhes e acoes administrativas usam usuario certo, preservam historico e exigem admin", async () => {
   const adminId = await usuario("admin-detalhes@example.com","admin");
   const alunoId = await usuario("aluno-detalhes@escola.edu.br","aluno");
@@ -110,7 +137,7 @@ test("cadastros publicos pendentes nao sao usuarios nem metricas; confirmacao co
   // O agente conserva a sessao persistida no banco, mesmo com app novo.
   const agente = request.agent(aplicacao);
   const token = (await agente.get("/api/autenticacao/csrf")).body.csrfToken;
-  const r = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",token).send({nome:"Pessoa Pendente",email:"pendente@instituto.edu.br",senha});
+  const r = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",token).send({nome:"Pessoa Pendente",email:"pendente@instituto.edu.br",senha,aceiteTermos:{aceito:true,...require('../../shared/documentosLegais.json')}});
   assert.equal(r.status,201);
   assert.equal(Object.hasOwn(r.body,"usuario"),false);
   const [[conta]] = await pool.execute("SELECT COUNT(*) n FROM usuarios WHERE email='pendente@instituto.edu.br'");

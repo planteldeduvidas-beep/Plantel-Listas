@@ -212,7 +212,7 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   aplicacao.use("/api/uploads",criarUploadRetomavelRoutes({service:uploadRetomavelService,autenticar,limitarInicio:rateLimiters.upload}));
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
-    controller: criarAutenticacaoController(serviceAutenticacao, configuracao, emailContaService),
+    controller: criarAutenticacaoController(serviceAutenticacao, configuracao, emailContaService, require('./modules/autenticacao/termosService').criarTermosService(pool,auditoriaRepository)),
     autenticar: autenticar,
     rateLimiters: rateLimiters
   }));
