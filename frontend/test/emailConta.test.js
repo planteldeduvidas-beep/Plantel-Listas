@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
+import { readFileSync } from 'node:fs';
+
+test('cadastro pendente vai para confirmacao e logout continua voltando para login', () => {
+  const app = readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
+  const cadastro = app.slice(app.indexOf('async function enviarCadastro'),app.indexOf('async function enviarRecuperacao'));
+  assert.match(cadastro,/definirTela\(dados.confirmacaoPendente \? "confirmarCadastro" : "login"\)/);
+  const logout = app.slice(app.indexOf('async function encerrarSessao'),app.indexOf('function trocarTela'));
+  assert.match(logout,/definirTela\("login"\)/);
+  assert.equal(logout.includes('dados.confirmacaoPendente'),false);
+  const navegacao = readFileSync(new URL('../src/navegacao.js',import.meta.url),'utf8');
+  assert.match(navegacao,/parametros.delete\("cadastroEmail"\)/);
+});
 
 test('lembrete e informativo, aparece somente quando indicado e mantem acao de atualizacao', async () => {
   const vite = await createServer({configFile:false,optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false},appType:'custom'});
@@ -15,6 +27,22 @@ test('lembrete e informativo, aparece somente quando indicado e mantem acao de a
       assert.equal(html.includes('disabled'),false);
       assert.equal(renderToStaticMarkup(React.createElement(LembreteEmailConta,{usuario:{papel,emailPrecisaRevisao:false}})),'');
     }
+  } finally { await vite.close(); }
+});
+
+test('novo cadastro explica bloqueio, reenvio, correcao e confirmacao sem login', async () => {
+  const vite = await createServer({configFile:false,optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false},appType:'custom'});
+  try {
+    const { AguardarConfirmacaoCadastro, ConfirmacaoCadastro } = await vite.ssrLoadModule(new URL('../src/CadastroEmail.jsx',import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1'));
+    const espera = renderToStaticMarkup(React.createElement(AguardarConfirmacaoCadastro,{emailAtual:'aluno@example.com',mensagemInicial:'Link enviado',aoVoltar:()=>{}}));
+    assert.match(espera,/Confirme seu e-mail para entrar/);
+    assert.match(espera,/Reenviar link de confirmação/);
+    assert.match(espera,/Seu e-mail só muda quando você confirmar/);
+    assert.match(espera,/Senha do cadastro/);
+    assert.match(espera,/Spam/);
+    const confirmacao = renderToStaticMarkup(React.createElement(ConfirmacaoCadastro,{token:'token',aoVoltar:()=>{}}));
+    assert.match(confirmacao,/Confirmar e-mail/);
+    assert.equal(confirmacao.includes('type="password"'),false);
   } finally { await vite.close(); }
 });
 

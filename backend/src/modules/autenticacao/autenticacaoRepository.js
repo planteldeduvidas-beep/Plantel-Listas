@@ -12,10 +12,10 @@ function criarAutenticacaoRepository(pool) {
     try{
       await conexao.beginTransaction();
       const [usuarios]=await conexao.execute(
-        "SELECT senha_hash,versao_sessao,ativo FROM usuarios WHERE id=? LIMIT 1 FOR UPDATE",
+        "SELECT senha_hash,versao_sessao,ativo,EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=usuarios.id) AS pendente FROM usuarios WHERE id=? LIMIT 1 FOR UPDATE",
         [usuarioId]
       );
-      if(!usuarios[0]||Number(usuarios[0].ativo)!==1||usuarios[0].senha_hash!==senhaHashObservada||Number(usuarios[0].versao_sessao)!==Number(versaoObservada)){
+      if(!usuarios[0]||Number(usuarios[0].pendente)||Number(usuarios[0].ativo)!==1||usuarios[0].senha_hash!==senhaHashObservada||Number(usuarios[0].versao_sessao)!==Number(versaoObservada)){
         await conexao.rollback();return false;
       }
       await conexao.execute("INSERT INTO sessoes (usuario_id,usuario_versao,token_hash,expira_em) VALUES (?,?,?,?)",[usuarioId,versaoObservada,tokenHash,expiraEm]);
@@ -31,7 +31,7 @@ function criarAutenticacaoRepository(pool) {
       + "FROM sessoes s INNER JOIN usuarios u ON u.id = s.usuario_id "
       + "WHERE s.token_hash = ? AND s.revogada_em IS NULL "
       + "AND s.usuario_versao=u.versao_sessao "
-      + "AND s.expira_em > CURRENT_TIMESTAMP(3) AND u.ativo = 1 LIMIT 1",
+      + "AND NOT EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=u.id) AND s.expira_em > CURRENT_TIMESTAMP(3) AND u.ativo = 1 LIMIT 1",
       [tokenHash]
     );
 

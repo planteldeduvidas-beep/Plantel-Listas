@@ -42,6 +42,7 @@ function limparParametrosTemporarios(caminho, pesquisa) {
   const parametros = new URLSearchParams(pesquisa || "");
   parametros.delete("tokenRecuperacao");
   parametros.delete("tokenEmail");
+  parametros.delete("cadastroEmail");
   parametros.delete("googleDrive");
   parametros.delete("oauthPopup");
   const restante = parametros.toString();

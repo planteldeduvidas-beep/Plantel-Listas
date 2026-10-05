@@ -175,7 +175,7 @@ export default function Tutorial({ papel, aoAbrir }) {
         <li>Site do Plantel abre a página institucional. Os cards Parceiros Plantel ficam mais abaixo no menu; toque em Conhecer para ver a oferta em outra aba.</li>
         <li>Quando terminar, procure sua conta na parte de baixo do menu e toque em Sair. No celular, deslize o menu para baixo se necessário.</li>
         <li>Para confirmar ou corrigir seu endereço, toque em Atualizar ou confirmar e-mail, perto da sua conta no menu. Informe o endereço e sua senha atual, abra o link enviado e confirme na mesma conta. Até concluir, o e-mail antigo continua válido. Confira também Spam ou Lixo eletrônico e Promoções, se houver, para mensagens de confirmação, recuperação de senha e suporte, em qualquer provedor.</li>
-        <li>Depois de criar uma conta, enviamos um link para confirmar seu e-mail. Entre com a conta que criou e abra o link recebido. A confirmação e os lembretes não bloqueiam seu acesso. Se o endereço estiver errado ou o link não chegar, use Atualizar ou confirmar e-mail para corrigir ou reenviar.</li>
+        <li>Em novos cadastros públicos, informe nome e pelo menos um sobrenome, e-mail e senha. Abra o link recebido e toque em Confirmar e-mail antes do primeiro acesso. Confira também Spam ou Lixo eletrônico. Se não chegar ou o endereço estiver errado, use a tela de confirmação para corrigir e reenviar com a senha do cadastro. Contas já existentes continuam entrando normalmente; os lembretes de e-mail não bloqueiam seu acesso.</li>
       </ol>
     </div>
     <h3 className="tutorial-secao-titulo">Escolha a parte que deseja aprender</h3>

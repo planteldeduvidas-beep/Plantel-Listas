@@ -10,6 +10,7 @@ import {
 import PainelAcervo from "./PainelAcervo.jsx";
 import AvisoEmail from "./AvisoEmail.jsx";
 import { ConfirmacaoEmail } from "./EmailConta.jsx";
+import { AguardarConfirmacaoCadastro, ConfirmacaoCadastro } from "./CadastroEmail.jsx";
 import PaginaInstitucional from "./PaginaInstitucional.jsx";
 import { Alerta, AlternadorTema, CampoSenha, Carregando, Icone, aplicarTema, lerTemaSalvo, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, limparParametrosTemporarios, obterDocumentoPublico } from "./navegacao.js";
@@ -20,6 +21,7 @@ function Aplicacao() {
     const parametros = new URLSearchParams(window.location.search);
     const token = parametros.get("tokenRecuperacao");
     const tokenEmail = parametros.get("tokenEmail");
+    const cadastroEmail = parametros.get("cadastroEmail") === "1";
     const retornoGoogleDrive = parametros.get("googleDrive");
     const retornoPopupOAuth = parametros.get("oauthPopup") === "1";
 
@@ -31,7 +33,7 @@ function Aplicacao() {
       );
     }
 
-    return { tokenRecuperacao: token, tokenEmail, googleDrive: retornoGoogleDrive, popupOAuth: retornoPopupOAuth };
+    return { tokenRecuperacao: token, tokenEmail, cadastroEmail, googleDrive: retornoGoogleDrive, popupOAuth: retornoPopupOAuth };
   });
   const tokenRecuperacao = retornoInicial.tokenRecuperacao;
   const [emailConcluido, definirEmailConcluido] = useState(false);
@@ -124,6 +126,7 @@ function Aplicacao() {
       definirUsuario(dados.usuario);
       definirSenha("");
     } catch (falha) {
+      if (falha.codigo === "EMAIL_NAO_CONFIRMADO") { definirTela("confirmarCadastro"); definirSenha(""); }
       mostrarErroDaApi(falha);
     } finally {
       concluirOperacao();
@@ -136,7 +139,7 @@ function Aplicacao() {
     try {
       const dados = await cadastrar(nome, email, senha);
       definirMensagem(dados.mensagem || "Cadastro concluído. Agora entre com sua conta.");
-      definirTela("login");
+      definirTela(dados.confirmacaoPendente ? "confirmarCadastro" : "login");
       definirSenha("");
       definirNome("");
     } catch (falha) {
@@ -203,6 +206,9 @@ function Aplicacao() {
     return <main className="pagina-autenticacao"><Carregando texto="Preparando seu acesso..." /></main>;
   }
 
+  if (retornoInicial.cadastroEmail && retornoInicial.tokenEmail && !emailConcluido) return <ConfirmacaoCadastro token={retornoInicial.tokenEmail} aoVoltar={endereco => { definirEmailConcluido(true); if (endereco) definirEmail(endereco); definirTela("login"); }} />;
+  if (!usuario && tela === "confirmarCadastro") return <AguardarConfirmacaoCadastro emailAtual={email} mensagemInicial={mensagem || erro} aoVoltar={() => trocarTela("login")} />;
+
   if (usuario && tela !== "redefinir") {
     if (retornoInicial.tokenEmail && !emailConcluido) return <ConfirmacaoEmail usuario={usuario} token={retornoInicial.tokenEmail} aoCancelar={() => definirEmailConcluido(true)} aoConcluir={dados => { definirUsuario(dados.usuario); definirEmailConcluido(true); }} />;
     return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} mostrarBoasVindas={entradaRecente} />;
@@ -237,16 +243,20 @@ function Aplicacao() {
         <form onSubmit={configuracaoDaTela.acao}>
           {tela === "cadastro" && (
             <label>
-              Nome
+              Nome e sobrenome
               <input
                 type="text"
                 autoComplete="name"
+                placeholder="Ex.: Ana Silva"
+                pattern={"\\s*\\S+(?:\\s+\\S+)+\\s*"}
+                title="Informe seu nome e pelo menos um sobrenome. Exemplo: Ana Silva."
                 minLength="2"
                 maxLength="120"
                 value={nome}
                 onChange={function atualizarNome(evento) { definirNome(evento.target.value); }}
                 required
               />
+              <small>Informe seu nome e pelo menos um sobrenome.</small>
             </label>
           )}
           {tela !== "redefinir" && (

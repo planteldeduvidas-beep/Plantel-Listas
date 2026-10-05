@@ -36,6 +36,8 @@ function criarAutenticacaoController(service, configuracao, emailContaService) {
   }
 
   return {
+    solicitarConfirmacaoCadastro: async (req, res) => res.status(200).json(await emailContaService.solicitarCadastro(req.body)),
+    confirmarCadastro: async (req, res) => res.status(200).json(await emailContaService.confirmarCadastro(req.body)),
     solicitarConfirmacaoEmail: async (req, res) => res.status(200).json(await emailContaService.solicitar(req.usuario, req.body)),
     confirmarEmail: async (req, res) => res.status(200).json(await emailContaService.confirmar(req.usuario, req.body)),
     cadastrar: cadastrar,

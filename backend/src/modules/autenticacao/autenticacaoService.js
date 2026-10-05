@@ -30,22 +30,23 @@ function criarAutenticacaoService(dependencias) {
   async function cadastrar(corpo) {
     const dados = validarCadastro(corpo);
     const senhaHash = await criarHashDaSenha(dados.senha);
-    const usuario = await usuarioRepository.criarAluno(dados.nome, dados.email, senhaHash);
+    const usuario = await usuarioRepository.criarAlunoComConfirmacao(dados.nome, dados.email, senhaHash);
     let confirmacaoEmailEnviada = false;
     try {
       await dependencias.emailContaService.enviarNoCadastro(usuario);
       confirmacaoEmailEnviada = true;
     } catch (erro) {
       // A conta ja existe: falha no email nao deve sugerir que o cadastro falhou,
-      // nem bloquear o acesso. O usuario pode entrar e reenviar pelo painel.
+      // nem perder o cadastro. A confirmacao pode ser reenviada sem login.
       dependencias.logger?.warn({ err: serializarErroSeguro(erro), usuarioId: usuario.id }, "Cadastro preservado; confirmacao de email pendente");
     }
     return {
       usuario: criarUsuarioPublico(usuario),
       confirmacaoEmailEnviada,
+      confirmacaoPendente: true,
       mensagem: confirmacaoEmailEnviada
-        ? "Conta criada. Enviamos um link de confirmação ao seu e-mail. Confira também Spam ou Lixo eletrônico e Promoções. Você já pode entrar; a confirmação não bloqueia seu acesso."
-        : "Conta criada. Não conseguimos enviar a confirmação agora, mas você já pode entrar. No menu, use Atualizar ou confirmar e-mail para conferir o endereço e enviar um novo link."
+        ? "Conta criada. Confirme seu e-mail pelo link enviado antes de entrar. Confira também Spam ou Lixo eletrônico e Promoções."
+        : "Conta criada, aguardando confirmação. Não conseguimos enviar o e-mail agora. Confira o endereço e solicite um novo link nesta tela."
     };
   }
 
@@ -65,6 +66,9 @@ function criarAutenticacaoService(dependencias) {
       );
     }
 
+    if (usuario.cadastroEmailPendente) {
+      throw new AppError("Confirme seu e-mail antes de entrar. Confira também Spam ou Lixo eletrônico; você pode reenviar o link ou corrigir o endereço.", 403, "EMAIL_NAO_CONFIRMADO");
+    }
     const token = gerarTokenAleatorio();
     const tokenHash = gerarHashDoToken(token);
     const expiraEm = adicionarHoras(

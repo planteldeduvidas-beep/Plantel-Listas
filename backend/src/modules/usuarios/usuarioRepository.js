@@ -15,6 +15,7 @@ function mapearUsuario(registro) {
     nome: registro.nome,
     email: registro.email,
     senhaHash: registro.senha_hash,
+    cadastroEmailPendente: Boolean(Number(registro.cadastro_email_pendente || 0)),
     versaoSessao: Number(registro.versao_sessao || 1),
     papel: registro.papel,
     ativo: registro.ativo === 1,
@@ -66,7 +67,7 @@ function criarUsuarioRepository(pool) {
   async function buscarPorEmail(email) {
     const [registros] = await pool.execute(
       "SELECT id, nome, email, senha_hash, versao_sessao, papel, ativo, criado_em, atualizado_em "
-      + "FROM usuarios WHERE email = ? LIMIT 1",
+      + ", EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=usuarios.id) AS cadastro_email_pendente FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
     return mapearUsuario(registros[0]);
@@ -76,18 +77,19 @@ function criarUsuarioRepository(pool) {
     const executor = executorInformado || pool;
     const [registros] = await executor.execute(
       "SELECT id, nome, email, senha_hash, versao_sessao, papel, ativo, criado_em, atualizado_em "
-      + "FROM usuarios WHERE id = ? LIMIT 1" + (bloquear ? " FOR UPDATE" : ""),
+      + ", EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=usuarios.id) AS cadastro_email_pendente FROM usuarios WHERE id = ? LIMIT 1" + (bloquear ? " FOR UPDATE" : ""),
       [usuarioId]
     );
     return mapearUsuario(registros[0]);
   }
 
-  async function criar(nome, email, senhaHash, papel, executorInformado) {
+  async function criar(nome, email, senhaHash, papel, executorInformado, aguardarConfirmacao = false) {
     return comEmailProtegido(email, null, executorInformado, async (executor, normalizado) => {
       const [resultado] = await executor.execute(
         "INSERT INTO usuarios (nome, email, senha_hash, papel) VALUES (?, ?, ?, ?)",
         [nome, normalizado, senhaHash, papel]
       );
+      if (aguardarConfirmacao) await executor.execute("INSERT INTO cadastros_email_pendentes(usuario_id) VALUES (?)", [resultado.insertId]);
       return buscarPorId(resultado.insertId, executor);
     });
   }
@@ -201,6 +203,7 @@ function criarUsuarioRepository(pool) {
     buscarPorEmail: buscarPorEmail,
     buscarPorId: buscarPorId,
     criarAluno: criarAluno,
+    criarAlunoComConfirmacao: (nome, email, senhaHash) => criar(nome, email, senhaHash, "aluno", undefined, true),
     criarAdmin: criarAdmin,
     criar: criar,
     contarAdmins: contarAdmins,

@@ -14,10 +14,10 @@ function criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository)
     } finally { conexao.release(); }
   }
 
-  async function criar(usuario, email, tokenHash, expiraEm) {
+  async function criar(usuario, email, tokenHash, expiraEm, cadastro = false) {
     return transacionar(async conexao => {
       const atual = await usuarioRepository.buscarPorId(usuario.id, conexao, true);
-      if (!atual?.ativo || atual.email !== usuario.email || atual.senhaHash !== usuario.senhaHash
+      if (!atual?.ativo || (cadastro && !atual.cadastroEmailPendente) || atual.email !== usuario.email || atual.senhaHash !== usuario.senhaHash
           || atual.versaoSessao !== usuario.versaoSessao) {
         throw new AppError("Sua conta mudou. Entre novamente e tente outra vez.", 409, "CONTA_ALTERADA");
       }
@@ -42,7 +42,7 @@ function criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository)
     return registros.length > 0;
   }
 
-  async function confirmar(usuarioId, tokenHash) {
+  async function confirmar(usuarioId, tokenHash, cadastro = false) {
     return transacionar(async conexao => {
       // Mesma ordem de locks da solicitacao: usuario, depois token.
       const usuario = await usuarioRepository.buscarPorId(usuarioId, conexao, true);
@@ -51,7 +51,7 @@ function criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository)
         [usuarioId, tokenHash]
       );
       const pedido = pedidos[0];
-      if (!usuario?.ativo || !pedido || pedido.email_anterior !== usuario.email
+      if (!usuario?.ativo || (cadastro && !usuario.cadastroEmailPendente) || !pedido || pedido.email_anterior !== usuario.email
           || Number(pedido.usuario_versao) !== usuario.versaoSessao) {
         throw new AppError("Este link expirou ou já foi usado. Solicite uma nova confirmação na sua conta.", 400, "CONFIRMACAO_EMAIL_INVALIDA");
       }
@@ -64,11 +64,16 @@ function criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository)
       await conexao.execute("UPDATE confirmacoes_email SET usada_em=CURRENT_TIMESTAMP(3) WHERE id=?", [pedido.id]);
       await conexao.execute("UPDATE lembretes_email SET resolvido_em=CURRENT_TIMESTAMP(3) WHERE usuario_id=? AND resolvido_em IS NULL", [usuarioId]);
       await auditoriaRepository.registrar({ atorUsuarioId: usuarioId, acao: alterado ? "email_atualizado" : "email_confirmado", entidade: "usuario", entidadeId: usuarioId, contexto: { emailAlterado: alterado } }, conexao);
+      if (cadastro) await conexao.execute("DELETE FROM cadastros_email_pendentes WHERE usuario_id=?", [usuarioId]);
       return usuarioRepository.buscarPorId(usuarioId, conexao);
     });
   }
 
-  return { criar, cancelar, confirmar, precisaRevisao };
+  async function buscarCadastroPorToken(tokenHash) {
+    const [registros] = await pool.execute("SELECT c.usuario_id FROM confirmacoes_email c INNER JOIN cadastros_email_pendentes p ON p.usuario_id=c.usuario_id WHERE c.token_hash=? AND c.usada_em IS NULL AND c.cancelada_em IS NULL AND c.expira_em>CURRENT_TIMESTAMP(3) LIMIT 1", [tokenHash]);
+    return registros[0]?.usuario_id;
+  }
+  return { criar, cancelar, confirmar, precisaRevisao, buscarCadastroPorToken };
 }
 
 module.exports = criarEmailContaRepository;

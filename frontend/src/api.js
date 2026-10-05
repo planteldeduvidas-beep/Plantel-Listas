@@ -1,6 +1,13 @@
 const API_CONFIGURADA = import.meta.env?.VITE_API_URL || "/api";
 const API_BASE = import.meta.env?.DEV ? "/api" : API_CONFIGURADA;
 
+export function reenviarConfirmacaoCadastro(emailAtual, email, senha) {
+  return requisitar("/autenticacao/cadastro/email/solicitar", { method: "POST", body: JSON.stringify({ emailAtual, email, senha }) });
+}
+export function confirmarCadastroEmail(token) {
+  return requisitar("/autenticacao/cadastro/email/confirmar", { method: "POST", body: JSON.stringify({ token }) });
+}
+
 export function solicitarConfirmacaoEmail(email, senha) {
   return requisitar("/autenticacao/email/solicitar", { method: "POST", body: JSON.stringify({ email, senha }) });
 }

@@ -13,6 +13,8 @@ function criarAutenticacaoRoutes(dependencias) {
 
   router.use(impedirCachePrivado);
   router.get("/csrf", emitirTokenCsrf);
+  router.post("/cadastro/email/solicitar", rateLimiters.recuperacao, protegerContraCsrf, controller.solicitarConfirmacaoCadastro);
+  router.post("/cadastro/email/confirmar", rateLimiters.recuperacao, protegerContraCsrf, controller.confirmarCadastro);
   router.post(
     "/cadastro",
     rateLimiters.cadastro,

@@ -82,6 +82,9 @@ async function cadastrar(agente, email, senha, camposAdicionais) {
     .send(corpo);
   // Estes cenarios exercitam outros envios. O envio automatico do cadastro e
   // validado em teste proprio abaixo, sem contaminar a contagem de recuperacao.
+  if (resposta.status === 201 && resposta.body.confirmacaoEmailEnviada) {
+    assert.equal((await confirmarCadastro(agente, tokenEmailMaisRecente())).status, 200);
+  }
   emailProvider.limpar();
   return resposta;
 }
@@ -114,7 +117,16 @@ function tokenEmailMaisRecente() {
   return new URL(mensagens.at(-1).link).searchParams.get("tokenEmail");
 }
 
-test("cadastro envia confirmacao sem condicionar acesso e falha SMTP nao perde a conta", async () => {
+async function confirmarCadastro(agente, token) {
+  const csrf = await obterCsrf(agente);
+  return agente.post("/api/autenticacao/cadastro/email/confirmar").set("X-CSRF-Token", csrf).send({ token });
+}
+async function reenviarCadastro(agente, emailAtual, email = emailAtual, senha = "Senha-forte-123") {
+  const csrf = await obterCsrf(agente);
+  return agente.post("/api/autenticacao/cadastro/email/solicitar").set("X-CSRF-Token", csrf).send({ emailAtual, email, senha });
+}
+
+test("novo cadastro exige confirmacao antes do login e falha SMTP preserva reenvio", async () => {
   const agente = request.agent(aplicacao);
   const csrf = await obterCsrf(agente);
   const cadastro = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token", csrf)
@@ -122,13 +134,18 @@ test("cadastro envia confirmacao sem condicionar acesso e falha SMTP nao perde a
   assert.equal(cadastro.status, 201);
   assert.equal(cadastro.body.confirmacaoEmailEnviada, true);
   assert.match(cadastro.body.mensagem, /Spam ou Lixo eletrônico/);
-  assert.match(cadastro.body.mensagem, /não bloqueia/);
+  assert.equal(cadastro.body.confirmacaoPendente, true);
   assert.equal(emailProvider.obterMensagens().length, 1);
   assert.equal(emailProvider.obterMensagens()[0].destinatario, "cadastro-confirmacao@outlook.com");
   const token = tokenEmailMaisRecente();
+  const negado = await entrar(agente,"cadastro-confirmacao@outlook.com","Senha-forte-123");
+  assert.equal(negado.status,403);
+  assert.equal(negado.body.erro.codigo,"EMAIL_NAO_CONFIRMADO");
+  assert.equal(negado.headers["set-cookie"],undefined);
+  assert.equal((await agente.get("/api/autenticacao/me")).status,401);
+  assert.equal((await confirmarCadastro(agente,token)).status,200);
+  assert.equal((await confirmarCadastro(agente,token)).status,400);
   assert.equal((await entrar(agente,"cadastro-confirmacao@outlook.com","Senha-forte-123")).status,200);
-  assert.equal((await agente.get("/api/autenticacao/me")).status,200);
-  assert.equal((await confirmarEmail(agente,token)).status,200);
   const enviar = emailProvider.enviarConfirmacaoEmail;
   emailProvider.enviarConfirmacaoEmail = async () => { throw new Error("SMTP indisponivel"); };
   const semEnvio = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf)
@@ -136,10 +153,102 @@ test("cadastro envia confirmacao sem condicionar acesso e falha SMTP nao perde a
   emailProvider.enviarConfirmacaoEmail = enviar;
   assert.equal(semEnvio.status,201);
   assert.equal(semEnvio.body.confirmacaoEmailEnviada,false);
-  assert.match(semEnvio.body.mensagem,/você já pode entrar/);
+  assert.equal((await entrar(agente,"cadastro-preservado@proton.me","Senha-forte-123")).status,403);
+  assert.equal((await reenviarCadastro(agente,"cadastro-preservado@proton.me")).status,200);
+  assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,200);
   assert.equal((await entrar(agente,"cadastro-preservado@proton.me","Senha-forte-123")).status,200);
-  assert.equal((await solicitarEmail(agente,"cadastro-preservado@proton.me")).status,200);
-  assert.equal((await confirmarEmail(agente,tokenEmailMaisRecente())).status,200);
+});
+
+test("cadastro pendente corrige email ao confirmar, exige senha e rejeita expiracao", async () => {
+  const agente = request.agent(aplicacao);
+  const email = "cadastro-errado@example.com", novo = "cadastro-correto@gmail.com";
+  const csrf = await obterCsrf(agente);
+  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Novo",email,senha:"Senha-forte-123"})).status,201);
+  const antigo = tokenEmailMaisRecente();
+  assert.equal((await reenviarCadastro(agente,email,novo,"Senha-incorreta-123")).status,401);
+  assert.equal((await reenviarCadastro(agente,email,novo)).status,200);
+  const token = tokenEmailMaisRecente();
+  const repo = require("../src/modules/usuarios/usuarioRepository")(pool);
+  const usuario = await repo.buscarPorEmail(email);
+  assert.equal(usuario.cadastroEmailPendente,true);
+  assert.equal(await repo.buscarPorEmail(novo),null);
+  assert.equal((await confirmarCadastro(agente,antigo)).status,400);
+  assert.equal((await confirmarCadastro(agente,"x".repeat(43))).status,400);
+  await pool.execute("UPDATE confirmacoes_email SET expira_em=DATE_SUB(NOW(),INTERVAL 1 HOUR) WHERE token_hash=?",[gerarHashDoToken(token)]);
+  assert.equal((await confirmarCadastro(agente,token)).status,400);
+  assert.equal((await reenviarCadastro(agente,email,novo)).status,200);
+  const valido = tokenEmailMaisRecente();
+  const repoFalho = require("../src/modules/autenticacao/emailContaRepository")(pool,repo,{registrar:async()=>{throw new Error("Auditoria indisponivel");}});
+  await assert.rejects(repoFalho.confirmar(usuario.id,gerarHashDoToken(valido),true),/Auditoria indisponivel/);
+  assert.equal((await repo.buscarPorId(usuario.id)).cadastroEmailPendente,true);
+  assert.equal((await repo.buscarPorId(usuario.id)).email,email);
+  assert.equal((await entrar(agente,email,"Senha-forte-123")).status,403);
+  assert.equal((await confirmarCadastro(agente,valido)).status,200);
+  assert.equal((await repo.buscarPorId(usuario.id)).id,usuario.id);
+  assert.equal((await entrar(agente,novo,"Senha-forte-123")).status,200);
+  assert.equal((await confirmarCadastro(agente,valido)).status,400);
+});
+
+test("recuperar senha nao libera cadastro pendente e token de conta existente nao confirma cadastro publico", async () => {
+  const agente = request.agent(aplicacao), email = "aguardando-confirmacao@outlook.com";
+  const csrf = await obterCsrf(agente);
+  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Pendente",email,senha:"Senha-forte-123"})).status,201);
+  const antigo = tokenEmailMaisRecente();
+  emailProvider.limpar();
+  await solicitarRecuperacao(agente,email);
+  assert.equal((await agente.post("/api/autenticacao/recuperacao-senha/redefinir").set("X-CSRF-Token",await obterCsrf(agente)).send({token:extrairTokenDeRecuperacao(),novaSenha:"Senha-nova-456"})).status,200);
+  assert.equal((await entrar(agente,email,"Senha-nova-456")).status,403);
+  assert.equal((await confirmarCadastro(agente,antigo)).status,400);
+  assert.equal((await reenviarCadastro(agente,email,email,"Senha-nova-456")).status,200);
+  assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,200);
+  assert.equal((await entrar(agente,email,"Senha-nova-456")).status,200);
+  await solicitarEmail(agente,email,"Senha-nova-456");
+  assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,400);
+  assert.equal((await agente.get("/api/autenticacao/me")).status,200);
+});
+
+test("falha ao marcar novo cadastro pendente reverte criacao inteira", async () => {
+  const poolFalho = { getConnection: async () => {
+    const real = await pool.getConnection();
+    return { beginTransaction: () => real.beginTransaction(), commit: () => real.commit(), rollback: () => real.rollback(), release: () => real.release(),
+      execute: (sql, parametros) => {
+        if (sql.startsWith("INSERT INTO cadastros_email_pendentes")) throw new Error("Persistencia indisponivel");
+        return real.execute(sql,parametros);
+      } };
+  } };
+  const repo = require("../src/modules/usuarios/usuarioRepository")(poolFalho);
+  await assert.rejects(repo.criarAlunoComConfirmacao("Aluno Novo","rollback-pendente@example.com","hash-teste"),/Persistencia indisponivel/);
+  const [[contagem]] = await pool.execute("SELECT COUNT(*) AS total FROM usuarios WHERE email=?",["rollback-pendente@example.com"]);
+  assert.equal(Number(contagem.total),0);
+});
+
+test("reenvio nao toma email existente e confirmacao publica exige CSRF", async () => {
+  const agente = request.agent(aplicacao);
+  await cadastrar(agente,"ocupado@example.com","Senha-forte-123");
+  await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",await obterCsrf(agente)).send({nome:"Aluno Pendente",email:"pendente@example.com",senha:"Senha-forte-123"});
+  assert.equal((await reenviarCadastro(agente,"pendente@example.com","ocupado@example.com")).status,409);
+  assert.equal((await agente.post("/api/autenticacao/cadastro/email/confirmar").send({token:tokenEmailMaisRecente()})).status,403);
+  assert.equal((await entrar(agente,"pendente@example.com","Senha-forte-123")).status,403);
+  assert.equal((await entrar(agente,"ocupado@example.com","Senha-forte-123")).status,200);
+});
+
+test("cadastro rejeita nome sem sobrenome antes de gravar e preserva login de nomes antigos", async () => {
+  const agente = request.agent(aplicacao);
+  for (const nome of ["Ana", "Ana de", "Ana 123"]) {
+    const resposta = await cadastrar(agente,"nome-incompleto@outlook.com","Senha-forte-123",{nome});
+    assert.equal(resposta.status,400);
+    assert.equal(resposta.body.erro.codigo,"NOME_COMPLETO_OBRIGATORIO");
+    assert.match(resposta.body.erro.mensagem,/pelo menos um sobrenome/);
+  }
+  const [[total]] = await pool.execute("SELECT COUNT(*) AS total FROM usuarios WHERE email='nome-incompleto@outlook.com'");
+  assert.equal(Number(total.total),0);
+  const novo = await cadastrar(agente,"nome-completo@outlook.com","Senha-forte-123",{nome:"  João   da Silva  "});
+  assert.equal(novo.status,201);
+  assert.equal(novo.body.usuario.nome,"João da Silva");
+  const hash = await require("../src/modules/autenticacao/senha").criarHashDaSenha("Senha-forte-123");
+  await pool.execute("INSERT INTO usuarios(nome,email,senha_hash,papel) VALUES (?,?,?,?)",["Ana","nome-antigo@outlook.com",hash,"aluno"]);
+  assert.equal((await entrar(agente,"nome-antigo@outlook.com","Senha-forte-123")).status,200);
+  assert.equal((await agente.get("/api/autenticacao/me")).body.usuario.nome,"Ana");
 });
 
 test("lembrete apenas nas contas indicadas preserva login e sessao e desaparece ao confirmar", async () => {
@@ -391,7 +500,7 @@ test("falha de SMTP e auditoria revertem a troca sem perder acesso", async () =>
   emailProvider.enviarConfirmacaoEmail = async () => { throw new Error("SMTP indisponivel"); };
   assert.equal((await solicitarEmail(agente, "novo@gmail.com")).status, 503);
   emailProvider.enviarConfirmacaoEmail = enviar;
-  const [[cancelado]] = await pool.execute("SELECT cancelada_em FROM confirmacoes_email WHERE usuario_id=?", [criada.body.usuario.id]);
+  const [[cancelado]] = await pool.execute("SELECT cancelada_em FROM confirmacoes_email WHERE usuario_id=? ORDER BY id DESC LIMIT 1", [criada.body.usuario.id]);
   assert.ok(cancelado.cancelada_em);
   await solicitarEmail(agente, "novo@gmail.com");
   const token = tokenEmailMaisRecente();
@@ -542,6 +651,9 @@ test("cookie de sessao usa Secure em producao", async function testarCookieProdu
     .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)
     .set("X-CSRF-Token", tokenCsrf)
     .send({ nome: "Conta Segura", email: "secure@gmail.com", senha: "Senha-forte-123" });
+  assert.equal((await request(aplicacao).post("/api/autenticacao/cadastro/email/confirmar")
+    .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)
+    .set("X-CSRF-Token", tokenCsrf).send({token:tokenEmailMaisRecente()})).status,200);
   const resposta = await request(aplicacao)
     .post("/api/autenticacao/login")
     .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)

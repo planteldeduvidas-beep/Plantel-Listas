@@ -69,11 +69,21 @@ function validarCredenciais(corpo) {
   };
 }
 
+function validarNomeCadastro(nome) {
+  const normalizado = normalizarNome(nome);
+  const ligacoes = new Set(["da", "das", "de", "do", "dos", "e"]);
+  const partes = normalizado.split(" ").filter(parte => !ligacoes.has(parte.toLowerCase()));
+  if (partes.length < 2 || partes.some(parte => !/\p{L}/u.test(parte))) {
+    throw new AppError("Informe seu nome e pelo menos um sobrenome. Exemplo: Ana Silva.", 400, "NOME_COMPLETO_OBRIGATORIO");
+  }
+  return normalizado;
+}
+
 function validarCadastro(corpo) {
   exigirObjeto(corpo);
   validarCamposPermitidos(corpo, ["nome", "email", "senha"]);
   return {
-    nome: normalizarNome(corpo.nome),
+    nome: validarNomeCadastro(corpo.nome),
     email: normalizarEmail(corpo.email),
     senha: validarSenha(corpo.senha)
   };
@@ -105,6 +115,7 @@ module.exports = {
   validarCredenciais: validarCredenciais,
   validarCadastro: validarCadastro,
   normalizarNome: normalizarNome,
+  validarNomeCadastro: validarNomeCadastro,
   validarSolicitacaoDeRecuperacao: validarSolicitacaoDeRecuperacao,
   validarRedefinicaoDeSenha: validarRedefinicaoDeSenha,
   validarCamposPermitidos: validarCamposPermitidos,
