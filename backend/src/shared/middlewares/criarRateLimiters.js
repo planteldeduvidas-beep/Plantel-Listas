@@ -60,6 +60,7 @@ function criarRateLimiters(configuracao) {
       "LIMITE_SUPORTE",
       { keyGenerator: chaveUsuario }
     ),
+    emailConta: criarLimitador(janelaMs, 10, "LIMITE_EMAIL_CONTA", { keyGenerator: chaveUsuario }),
     upload: criarLimitador(janelaMs, configuracao.seguranca.limiteUpload,
       "LIMITE_UPLOAD", { keyGenerator: chaveUsuario }),
     consultaAcervo: rateLimit({

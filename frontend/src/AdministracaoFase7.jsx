@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import GraficoBarras from "./GraficoBarras.jsx";
+import GraficoComposicao from "./GraficoComposicao.jsx";
+import "./analytics.css";
 import {
   listarUsuarios, criarUsuario, editarUsuario, alterarPapelUsuario,
   alterarEstadoUsuario, iniciarRedefinicaoUsuario, obterAnalytics,
@@ -231,7 +233,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
           </section>
           <section><h3>Atividade dos alunos por mês</h3><p>Totais dos dias incluídos no período selecionado; meses nas pontas podem ser parciais. Não representa pessoas únicas.</p><ResumoMensal dados={analytics.evolucaoMensal} /></section>
           <section><h3>Alunos que navegaram por dia</h3><p>Cada aluno conta uma vez por dia. A mesma pessoa pode aparecer em vários dias.</p><div className="analytics-lista-rolavel"><GraficoBarras unidade="alunos" dados={analytics.evolucao.map(item => ({ nome: new Date(item.dia).toLocaleDateString("pt-BR", { timeZone: "UTC" }), quantidade: item.alunosAtivos }))} /></div></section>
-          <section><h3>Composição do acervo</h3><p>Materiais disponíveis atualmente, independentemente do período selecionado.</p><GraficoBarras unidade="materiais" dados={[{ nome: "PDFs", quantidade: analytics.resumo.pdfs }, { nome: "Vídeos", quantidade: analytics.resumo.videos }]} /></section>
+          <section><h3>Composição do acervo</h3><p>Materiais disponíveis atualmente, independentemente do período selecionado.</p><GraficoComposicao unidade="materiais" dados={[{ nome: "PDFs", quantidade: analytics.resumo.pdfs }, { nome: "Vídeos", quantidade: analytics.resumo.videos }]} /></section>
         </div>
         <div className="grade-admin grade-dados">
           <section><h3>Materiais mais usados pelos alunos</h3><p>Interações = aberturas + downloads, não pessoas únicas.</p><GraficoBarras unidade="interações" dados={analytics.materiaisMaisUsados.map(item => ({ nome: item.nome, quantidade: item.acessos, detalhe: item.visualizacoes + " aberturas · " + item.downloads + " downloads" }))} /></section>
@@ -240,7 +242,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
           <section><h3>Materiais por disciplina</h3><p>Distribuição atual do acervo, não atividade dos usuários.</p><GraficoBarras unidade="materiais" dados={analytics.materiaisPorDisciplina} /></section>
           <section><h3>Materiais por concurso</h3><p>Distribuição atual do acervo, não atividade dos usuários.</p><GraficoBarras unidade="materiais" dados={analytics.materiaisPorConcurso} /></section>
         </div>
-        <details className="analytics-legado"><summary>Operações de gestão da biblioteca — equipe</summary><p>Uploads, edições e demais operações administrativas. Não entram nos gráficos de uso dos alunos.</p><ul className="lista-simples">{analytics.atividadeDoAcervo.map(item => <li key={item.acao}><strong>{nomeAtividade(item.acao)}</strong><small>{item.quantidade} ocorrência(s)</small></li>)}</ul></details>
+        <details className="analytics-legado"><summary>Operações de gestão da biblioteca — equipe</summary><p>Uploads, edições e demais operações administrativas. Não entram nos gráficos de uso dos alunos.</p><GraficoBarras dados={analytics.atividadeDoAcervo.map(item => ({nome: nomeAtividade(item.acao), quantidade: item.quantidade}))} /></details>
       </section>}
 
       {area === "historico" && auditoria && <section className="bloco-admin painel-conteudo"><div className="cabecalho-bloco"><div><h2>Histórico de atividades</h2><p>Acompanhe ações importantes realizadas no sistema.</p></div></div><label className="filtro-historico">Mostrar<select value={acao} onChange={function mudar(evento) { definirAcao(evento.target.value); }}><option value="">Todas as atividades</option>{auditoria.acoes.map(function opcao(item) { return <option key={item} value={item}>{nomeAtividade(item)}</option>; })}</select></label><ul className="lista-historico">{auditoria.eventos.map(function evento(item) { return <li key={item.chave}><span className="icone-historico"><Icone nome="historico" /></span><span><strong>{nomeAtividade(item.acao)}</strong><small>{item.descricao} · por {item.ator}</small></span><time>{new Date(item.criadoEm).toLocaleString("pt-BR")}</time></li>; })}</ul>{!auditoria.eventos.length && <Vazio titulo="Nenhuma atividade encontrada" texto="Altere o filtro para consultar outros registros." />}</section>}

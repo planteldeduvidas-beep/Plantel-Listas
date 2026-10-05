@@ -28,6 +28,8 @@ function criarAutenticacaoRoutes(dependencias) {
   );
   router.post("/logout", autenticar, protegerContraCsrf, controller.sair);
   router.get("/me", autenticar, controller.obterUsuarioAtual);
+  router.post("/email/solicitar", autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.solicitarConfirmacaoEmail);
+  router.post("/email/confirmar", autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.confirmarEmail);
   router.post(
     "/recuperacao-senha/solicitar",
     rateLimiters.recuperacao,

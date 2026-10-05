@@ -20,6 +20,7 @@ import SeletorPasta from "./SeletorPasta.jsx";
 import AdministracaoFase7 from "./AdministracaoFase7.jsx";
 import MeuHistorico from "./MeuHistorico.jsx";
 import Suporte from "./Suporte.jsx";
+import { FormularioEmailConta, LembreteEmailConta } from "./EmailConta.jsx";
 import ParceirosSidebar from "./ParceirosSidebar.jsx";
 import ParceirosAdmin from "./ParceirosAdmin.jsx";
 import FaixaAvisos from "./FaixaAvisos.jsx";
@@ -190,6 +191,7 @@ function FormularioCatalogo({ titulo, singular, registros, api, aoAtualizar, aoE
 }
 
 function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
+  const [emailAberto, definirEmailAberto] = useState(false);
   const areaInicial = obterAreaInicial(usuario.papel);
   const [estrutura, definirEstrutura] = useState({ categorias: [], disciplinas: [], concursos: [] });
   const [categorias, definirCategorias] = useState([]);
@@ -589,6 +591,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /><ItemMenu area="parceiros" atual={areaAtual} icone="parceiros" texto="Parceiros" aoAbrir={navegar} /><ItemMenu area="avisos" atual={areaAtual} icone="historico" texto="Avisos" aoAbrir={navegar} /></>}
         </nav>
         <ParceirosSidebar versao={versaoParceiros} />
+        <button type="button" className="botao-email-conta botao-secundario" onClick={() => { definirMenuAberto(false); definirEmailAberto(true); }}>Atualizar ou confirmar e-mail</button>
         <div className="conta-lateral"><span className="avatar-usuario">{(usuario.nome || usuario.email).slice(0, 1).toUpperCase()}</span><span><strong>{usuario.nome || usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small><small className="email-conta-lateral">{usuario.email}</small></span><button type="button" className="botao-icone" aria-label="Sair" title="Sair" onClick={aoSair}><Icone nome="sair" /></button></div>
       </aside>
 
@@ -599,13 +602,15 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           <div className="controles-cabecalho"><time className="data-cabecalho" dateTime={new Date().toISOString().slice(0, 10)}>{new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(new Date())}</time><AlternadorTema /></div>
         </header>
         {areaAtual !== areaInicial && <button type="button" className="botao-voltar-navegacao voltar-area" onClick={voltarNaNavegacao}><Icone nome="voltar" tamanho={18} />Voltar</button>}
+        <LembreteEmailConta usuario={usuario} aoAtualizar={() => { definirMenuAberto(false); definirEmailAberto(true); }} />
         <section className="introducao-area"><div className="texto-introducao"><span>{informacaoDaArea.contexto}</span><h2>{informacaoDaArea.titulo}</h2><p>{informacaoDaArea.texto}</p></div><span className="codigo-area" aria-hidden="true">{informacaoDaArea.codigo}</span></section>
         {usuario.papel === "aluno" && areaAtual === "acervo" && <FaixaAvisos />}
         <div className="avisos-globais">{mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}{erro && <Alerta tipo="erro">{erro}</Alerta>}</div>
 
         {areaAtual === "acervo" && <BibliotecaAcervo usuario={usuario} aoMensagem={definirMensagem} />}
         {usuario.papel === "aluno" && areaAtual === "meuHistorico" && <MeuHistorico aoErro={mostrarErro} />}
-        {["aluno", "professor"].includes(usuario.papel) && areaAtual === "suporte" && <Suporte usuario={usuario} />}
+        {["aluno", "professor"].includes(usuario.papel) && areaAtual === "suporte" && <Suporte usuario={usuario} aoAtualizarEmail={() => definirEmailAberto(true)} />}
+        {emailAberto && <Modal titulo="Atualizar ou confirmar e-mail" classe="modal-email-conta" aoFechar={() => definirEmailAberto(false)}><FormularioEmailConta usuario={usuario} /></Modal>}
         {areaAtual === "tutorial" && <Tutorial papel={usuario.papel} aoAbrir={navegar} />}
 
         {usuario.papel === "professor" && areaAtual === "minhasPastas" && <section className="cartao-painel painel-conteudo"><div className="cabecalho-bloco"><div><h2>Pastas liberadas para você</h2><p>Você pode adicionar, editar e mover materiais somente nestas pastas.</p></div></div><ul className="lista-pastas-professor">{minhasPermissoes.map(function renderizar(item) { return <li key={item.id}><span className="icone-lista"><Icone nome="pasta" /></span><span><strong>{item.categoria.nome}</strong><small>Você pode gerenciar os materiais desta pasta.</small></span></li>; })}</ul>{!minhasPermissoes.length && <Vazio titulo="Nenhuma pasta liberada" texto="Quando um administrador liberar uma pasta, ela aparecerá aqui." />}</section>}

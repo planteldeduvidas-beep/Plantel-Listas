@@ -31,10 +31,10 @@ test("falha da auditoria desfaz criacao e edicao administrativa de usuario",asyn
   const usuarios=criarUsuarioRepository(pool);
   const service=criarUsuarioService({usuarioRepository:usuarios,autenticacaoRepository:criarAutenticacaoRepository(pool),logger:logger,auditoriaRepository:{registrar:async function(){throw new Error("FALHA_AUDITORIA_TESTE");}},autenticacaoService:{}});
   const admin={id:Number(adminR.insertId),papel:"admin"};
-  await assert.rejects(service.criarUsuario(admin,{nome:"Nova pessoa",email:"nova-auditoria@example.com",senha:"Senha-segura-nova",papel:"professor"}),/FALHA_AUDITORIA_TESTE/);
-  const[criados]=await pool.execute("SELECT id FROM usuarios WHERE email='nova-auditoria@example.com'");
+  await assert.rejects(service.criarUsuario(admin,{nome:"Nova pessoa",email:"nova-auditoria@gmail.com",senha:"Senha-segura-nova",papel:"professor"}),/FALHA_AUDITORIA_TESTE/);
+  const[criados]=await pool.execute("SELECT id FROM usuarios WHERE email='nova-auditoria@gmail.com'");
   assert.equal(criados.length,0);
-  await assert.rejects(service.editarUsuario(admin,Number(alunoR.insertId),{nome:"Nome alterado",email:"alterado-auditoria@example.com"}),/FALHA_AUDITORIA_TESTE/);
+  await assert.rejects(service.editarUsuario(admin,Number(alunoR.insertId),{nome:"Nome alterado",email:"alterado-auditoria@gmail.com"}),/FALHA_AUDITORIA_TESTE/);
   const[originais]=await pool.execute("SELECT nome,email FROM usuarios WHERE id=?",[alunoR.insertId]);
   assert.equal(originais[0].nome,"Aluno");
   assert.equal(originais[0].email,"aluno-auditoria@example.com");

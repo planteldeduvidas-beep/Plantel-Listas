@@ -5,7 +5,10 @@ import { obterDuvidasSuporte } from '../src/duvidasSuporte.js';
 
 test('aviso de spam permanece na recuperação antes e depois do envio', () => {
   const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
-  assert.match(app, /tela === "recuperar" && <p className="aviso-recuperacao-email" role="note">Confira também a pasta <strong>Spam ou Lixo eletrônico/);
+  assert.match(app, /tela === "recuperar" \|\| tela === "cadastro"/);
+  const aviso = readFileSync(new URL('../src/AvisoEmail.jsx', import.meta.url), 'utf8');
+  assert.match(aviso, /Spam ou Lixo eletrônico/);
+  assert.match(aviso, /qualquer provedor/);
 });
 
 test('aluno recebe histórico, sem orientações de gestão', () => {
@@ -24,7 +27,7 @@ test('professor e admin recebem apenas as perguntas de seu papel', () => {
 test('papel desconhecido recebe somente dúvidas comuns, incluindo feedback', () => {
   for (const papel of [undefined, 'desconhecido', 'constructor']) {
     const duvidas = obterDuvidasSuporte(papel);
-    assert.equal(duvidas.length, 6);
+    assert.equal(duvidas.length, 7);
     assert.match(JSON.stringify(duvidas), /sugestões, opiniões ou elogios/);
   }
 });

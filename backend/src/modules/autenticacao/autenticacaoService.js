@@ -16,6 +16,7 @@ const {
   verificarSenhaSemEnumerar
 } = require("./senha");
 const criarUsuarioPublico = require("../usuarios/usuarioPublico");
+const { serializarErroSeguro } = require("../../shared/config/logger");
 
 const MENSAGEM_CREDENCIAIS_INVALIDAS = "Email ou senha invalidos";
 const MENSAGEM_RECUPERACAO_NEUTRA = "Se existir uma conta associada a este e-mail, enviaremos as instrucoes de recuperacao.";
@@ -30,7 +31,22 @@ function criarAutenticacaoService(dependencias) {
     const dados = validarCadastro(corpo);
     const senhaHash = await criarHashDaSenha(dados.senha);
     const usuario = await usuarioRepository.criarAluno(dados.nome, dados.email, senhaHash);
-    return criarUsuarioPublico(usuario);
+    let confirmacaoEmailEnviada = false;
+    try {
+      await dependencias.emailContaService.enviarNoCadastro(usuario);
+      confirmacaoEmailEnviada = true;
+    } catch (erro) {
+      // A conta ja existe: falha no email nao deve sugerir que o cadastro falhou,
+      // nem bloquear o acesso. O usuario pode entrar e reenviar pelo painel.
+      dependencias.logger?.warn({ err: serializarErroSeguro(erro), usuarioId: usuario.id }, "Cadastro preservado; confirmacao de email pendente");
+    }
+    return {
+      usuario: criarUsuarioPublico(usuario),
+      confirmacaoEmailEnviada,
+      mensagem: confirmacaoEmailEnviada
+        ? "Conta criada. Enviamos um link de confirmação ao seu e-mail. Confira também Spam ou Lixo eletrônico e Promoções. Você já pode entrar; a confirmação não bloqueia seu acesso."
+        : "Conta criada. Não conseguimos enviar a confirmação agora, mas você já pode entrar. No menu, use Atualizar ou confirmar e-mail para conferir o endereço e enviar um novo link."
+    };
   }
 
   async function entrar(corpo) {
@@ -89,8 +105,12 @@ function criarAutenticacaoService(dependencias) {
     const recuperacaoId = await autenticacaoRepository.criarRecuperacaoSenha(
       usuario.id,
       tokenHash,
-      expiraEm
+      expiraEm,
+      { email: usuario.email, versaoSessao: usuario.versaoSessao }
     );
+
+    // A conta pode ter mudado entre a leitura do email e a trava no banco.
+    if (!recuperacaoId) return { mensagem: MENSAGEM_RECUPERACAO_NEUTRA };
 
     try {
       await emailProvider.enviarRecuperacaoSenha({

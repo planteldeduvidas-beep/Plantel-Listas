@@ -1,6 +1,14 @@
 const API_CONFIGURADA = import.meta.env?.VITE_API_URL || "/api";
 const API_BASE = import.meta.env?.DEV ? "/api" : API_CONFIGURADA;
 
+export function solicitarConfirmacaoEmail(email, senha) {
+  return requisitar("/autenticacao/email/solicitar", { method: "POST", body: JSON.stringify({ email, senha }) });
+}
+
+export function confirmarEmail(token) {
+  return requisitar("/autenticacao/email/confirmar", { method: "POST", body: JSON.stringify({ token }) });
+}
+
 let tokenCsrfEmMemoria = null;
 
 async function lerResposta(resposta) {
@@ -45,7 +53,7 @@ async function obterTokenCsrf() {
   return tokenCsrfEmMemoria;
 }
 
-async function requisitar(caminho, opcoesInformadas) {
+async function requisitar(caminho, opcoesInformadas, csrfRenovado = false) {
   const opcoes = Object.assign({}, opcoesInformadas || {});
   opcoes.credentials = "include";
   opcoes.headers = Object.assign({}, opcoes.headers || {});
@@ -60,6 +68,14 @@ async function requisitar(caminho, opcoesInformadas) {
 
   const resposta = await fetch(API_BASE + caminho, opcoes);
   const dados = await lerResposta(resposta);
+
+  // CSRF e recusado antes da operacao protegida: apenas neste erro explicito
+  // podemos renovar e repetir uma vez, sem duplicar gravacoes ou uploads.
+  if (resposta.status === 403 && dados?.erro?.codigo === "CSRF_INVALIDO"
+      && opcoes.method && opcoes.method !== "GET" && !csrfRenovado) {
+    tokenCsrfEmMemoria = null;
+    return requisitar(caminho, opcoesInformadas, true);
+  }
 
   if (!resposta.ok) {
     const erro = new Error(

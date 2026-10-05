@@ -31,7 +31,7 @@ async function cadastrar(email) {
 }
 async function admin() {
   const agente = request.agent(app), token = await csrf(agente);
-  const r = await agente.post("/api/autenticacao/login").set("X-CSRF-Token", token).send({ email: "admin@example.invalid", senha });
+  const r = await agente.post("/api/autenticacao/login").set("X-CSRF-Token", token).send({ email: "admin@gmail.com", senha });
   assert.equal(r.status, 200);
   return { agente, token: await csrf(agente) };
 }
@@ -46,7 +46,7 @@ test.before(async () => {
   hash = await criarHashDaSenha(senha);
   await pool.query("ALTER TABLE usuarios DROP INDEX uq_usuarios_email");
   await pool.query("DROP TABLE usuarios_email_travas");
-  for (const email of ["Legado@example.invalid", "Legado@example.invalid", "  LEGADO@example.invalid  "]) {
+  for (const email of ["Legado@gmail.com", "Legado@gmail.com", "  LEGADO@gmail.com  "]) {
     await pool.execute("INSERT INTO usuarios(nome,email,senha_hash,papel,ativo) VALUES ('Historico',?,?,'professor',0)", [email, hash]);
   }
   [legadoAntes] = await pool.query("SELECT * FROM usuarios ORDER BY id");
@@ -54,7 +54,7 @@ test.before(async () => {
   await pool.query(await fs.readFile(path.resolve(__dirname, "../migrations/024_unicidade_email_novas_contas.sql"), "utf8"));
   const [depois] = await pool.query("SELECT * FROM usuarios ORDER BY id");
   assert.deepEqual(depois, legadoAntes);
-  await repo.criarAdmin("Admin QA", "admin@example.invalid", hash);
+  await repo.criarAdmin("Admin QA", "admin@gmail.com", hash);
   app = criarAplicacao(cfg, pino({ level: "silent" }), { pool, emailProvider: criarEmailProviderFake() });
 });
 
@@ -65,63 +65,63 @@ test.after(async () => {
 });
 
 test("cadastro publico bloqueia repeticao, maiusculas, espacos e legado inativo sem UNIQUE em usuarios", async () => {
-  assert.equal((await cadastrar("Teste@Plantel.com")).status, 201);
-  for (const email of ["teste@plantel.com", "TESTE@PLANTEL.COM", " teste@plantel.com ", "legado@example.invalid"]) {
+  assert.equal((await cadastrar("Teste@gmail.com")).status, 201);
+  for (const email of ["teste@gmail.com", "TESTE@gmail.com", " teste@gmail.com ", "legado@gmail.com"]) {
     const r = await cadastrar(email);
     assert.equal(r.status, 409);
     assert.equal(r.body.erro.codigo, "EMAIL_JA_CADASTRADO");
     assert.equal(r.body.erro.mensagem, "Já existe uma conta cadastrada com este e-mail.");
   }
-  assert.equal((await cadastrar("diferente@plantel.com")).status, 201);
+  assert.equal((await cadastrar("diferente@gmail.com")).status, 201);
   for (const email of ["pessoa@gmail.com", "pes.soa@gmail.com", "pessoa+alias@gmail.com"]) assert.equal((await cadastrar(email)).status, 201);
 });
 
 test("duas requisicoes simultaneas criam exatamente uma conta com email normalizado", async () => {
-  const resultados = await Promise.all([cadastrar("Concorrencia@plantel.com"), cadastrar(" concorrencia@plantel.com ")]);
+  const resultados = await Promise.all([cadastrar("Concorrencia@gmail.com"), cadastrar(" concorrencia@gmail.com ")]);
   assert.deepEqual(resultados.map(r => r.status).sort(), [201, 409]);
-  const [[r]] = await pool.query("SELECT COUNT(*) n FROM usuarios WHERE email='concorrencia@plantel.com'");
+  const [[r]] = await pool.query("SELECT COUNT(*) n FROM usuarios WHERE email='concorrencia@gmail.com'");
   assert.equal(r.n, 1);
 });
 
 test("admin e criacao interna de todos os papeis rejeitam email ocupado", async () => {
   const { agente, token } = await admin();
   for (const papel of ["aluno", "professor", "admin"]) {
-    const r = await agente.post("/api/usuarios").set("X-CSRF-Token", token).send({ nome: "Nova conta", email: " LEGADO@example.invalid ", senha, papel });
+    const r = await agente.post("/api/usuarios").set("X-CSRF-Token", token).send({ nome: "Nova conta", email: " LEGADO@gmail.com ", senha, papel });
     assert.equal(r.status, 409);
-    await assert.rejects(repo.criar("Nova conta", " LEGADO@example.invalid ", hash, papel), duplicado);
+    await assert.rejects(repo.criar("Nova conta", " LEGADO@gmail.com ", hash, papel), duplicado);
   }
-  await assert.rejects(repo.criarAdmin("Bootstrap", "Legado@example.invalid", hash), duplicado);
+  await assert.rejects(repo.criarAdmin("Bootstrap", "Legado@gmail.com", hash), duplicado);
 });
 
 test("edicao rejeita email ocupado; alteracao simultanea e cadastro nao duplicam", async () => {
-  const b = await repo.criarAluno("Editavel", "editavel@example.invalid", hash);
+  const b = await repo.criarAluno("Editavel", "editavel@gmail.com", hash);
   const { agente, token } = await admin();
-  const r = await agente.patch("/api/usuarios/" + b.id).set("X-CSRF-Token", token).send({ nome: "Outro nome", email: " LEGADO@example.invalid " });
+  const r = await agente.patch("/api/usuarios/" + b.id).set("X-CSRF-Token", token).send({ nome: "Outro nome", email: " LEGADO@gmail.com " });
   assert.equal(r.status, 409);
-  await assert.rejects(repo.atualizarEmail(b.id, "LEGADO@example.invalid"), duplicado);
-  assert.equal((await repo.buscarPorId(b.id)).email, "editavel@example.invalid");
+  await assert.rejects(repo.atualizarEmail(b.id, "LEGADO@gmail.com"), duplicado);
+  assert.equal((await repo.buscarPorId(b.id)).email, "editavel@gmail.com");
   const resultados = await Promise.allSettled([
-    repo.atualizarEmail(b.id, "destino@example.invalid"),
-    repo.criarAluno("Concorrente", " DESTINO@example.invalid ", hash)
+    repo.atualizarEmail(b.id, "destino@gmail.com"),
+    repo.criarAluno("Concorrente", " DESTINO@gmail.com ", hash)
   ]);
   assert.equal(resultados.filter(r => r.status === "fulfilled").length, 1);
   assert.ok(duplicado(resultados.find(r => r.status === "rejected").reason));
-  const [[contagem]] = await pool.query("SELECT COUNT(*) n FROM usuarios WHERE email='destino@example.invalid'");
+  const [[contagem]] = await pool.query("SELECT COUNT(*) n FROM usuarios WHERE email='destino@gmail.com'");
   assert.equal(contagem.n, 1);
 });
 
 test("rollback da auditoria libera email; transacao com snapshot anterior ve cadastro confirmado", async () => {
   await assert.rejects(repo.comTravaAdministrativa(async c => {
-    await repo.criar("Rollback", "rollback@example.invalid", hash, "professor", c);
+    await repo.criar("Rollback", "rollback@gmail.com", hash, "professor", c);
     throw new Error("auditoria simulada");
   }), /auditoria simulada/);
-  await repo.criarAluno("Depois", "rollback@example.invalid", hash);
+  await repo.criarAluno("Depois", "rollback@gmail.com", hash);
   const c = await pool.getConnection();
   try {
     await c.beginTransaction();
     await c.query("SELECT COUNT(*) FROM usuarios");
-    await repo.criarAluno("Snapshot", "snapshot@example.invalid", hash);
-    await assert.rejects(repo.criar("Snapshot antigo", "SNAPSHOT@example.invalid", hash, "aluno", c), duplicado);
+    await repo.criarAluno("Snapshot", "snapshot@gmail.com", hash);
+    await assert.rejects(repo.criar("Snapshot antigo", "SNAPSHOT@gmail.com", hash, "aluno", c), duplicado);
     await c.rollback();
   } finally { c.release(); }
 });

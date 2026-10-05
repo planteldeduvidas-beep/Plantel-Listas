@@ -2,8 +2,9 @@ import React, { useRef, useState } from "react";
 import { obterDuvidasSuporte } from "./duvidasSuporte.js";
 import { enviarSuporte } from "./api.js";
 import { Alerta, Icone, Modal, mensagemHumana } from "./ComponentesInterface.jsx";
+import AvisoEmail from "./AvisoEmail.jsx";
 
-function Suporte({ usuario }) {
+function Suporte({ usuario, aoAtualizarEmail }) {
   const campoAssunto = useRef(null);
   const chaveApresentacao = `plantel:suporte:apresentacao:${usuario.id}`;
   const [mostrarApresentacao, definirMostrarApresentacao] = useState(() => {
@@ -66,6 +67,9 @@ function Suporte({ usuario }) {
           <div><dt>Resposta em</dt><dd>{usuario.email}</dd></div>
           <div><dt>Canal</dt><dd>Atendimento por e-mail</dd></div>
         </dl>
+        <p>Este é o endereço correto? Se precisa corrigir ou trocar seu e-mail, confirme o novo endereço antes de enviar uma mensagem.</p>
+        <button type="button" className="botao-secundario" onClick={aoAtualizarEmail}>Atualizar meu e-mail</button>
+        <AvisoEmail />
         <small className="aviso-seguranca-suporte">Nunca envie senhas ou códigos de acesso na mensagem.</small>
       </aside>
       <form className="formulario-suporte" onSubmit={enviar}>

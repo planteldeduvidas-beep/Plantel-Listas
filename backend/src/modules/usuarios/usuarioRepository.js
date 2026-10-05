@@ -142,8 +142,8 @@ function criarUsuarioRepository(pool) {
     return resultado.affectedRows > 0;
   }
 
-  async function atualizarEmail(usuarioId, email) {
-    return comEmailProtegido(email, usuarioId, null, async (executor, normalizado) => {
+  async function atualizarEmail(usuarioId, email, executorInformado) {
+    return comEmailProtegido(email, usuarioId, executorInformado, async (executor, normalizado) => {
       const [resultado] = await executor.execute("UPDATE usuarios SET email=? WHERE id=?", [normalizado, usuarioId]);
       return resultado.affectedRows > 0;
     });

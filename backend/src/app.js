@@ -14,6 +14,8 @@ const criarDefesaService = require("./modules/seguranca/defesaService");
 const { criarEmailProviderNaoConfigurado } = require("./shared/providers/emailProvider");
 const criarUsuarioRepository = require("./modules/usuarios/usuarioRepository");
 const criarAutenticacaoRepository = require("./modules/autenticacao/autenticacaoRepository");
+const criarEmailContaRepository = require("./modules/autenticacao/emailContaRepository");
+const criarEmailContaService = require("./modules/autenticacao/emailContaService");
 const { criarAutenticacaoService } = require("./modules/autenticacao/autenticacaoService");
 const criarUsuarioService = require("./modules/usuarios/usuarioService");
 const criarAutenticacaoController = require("./modules/autenticacao/autenticacaoController");
@@ -116,13 +118,15 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     || criarEmailProviderNaoConfigurado(logger);
   const usuarioRepository = criarUsuarioRepository(pool);
   const autenticacaoRepository = criarAutenticacaoRepository(pool);
-  const serviceAutenticacao = criarAutenticacaoService({
-    usuarioRepository: usuarioRepository,
-    autenticacaoRepository: autenticacaoRepository,
-    emailProvider: emailProvider,
-    configuracao: configuracao
-  });
   const auditoriaRepository = criarAuditoriaRepository(pool);
+  const emailContaService = criarEmailContaService({
+    repository: criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository),
+    usuarioRepository, emailProvider, configuracao, logger
+  });
+  const serviceAutenticacao = criarAutenticacaoService({
+    usuarioRepository, autenticacaoRepository, emailProvider, configuracao,
+    emailContaService, logger
+  });
   const serviceUsuario = criarUsuarioService({
     usuarioRepository: usuarioRepository,
     autenticacaoRepository: autenticacaoRepository,
@@ -204,7 +208,7 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   aplicacao.use("/api/uploads",criarUploadRetomavelRoutes({service:uploadRetomavelService,autenticar,limitarInicio:rateLimiters.upload}));
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
-    controller: criarAutenticacaoController(serviceAutenticacao, configuracao),
+    controller: criarAutenticacaoController(serviceAutenticacao, configuracao, emailContaService),
     autenticar: autenticar,
     rateLimiters: rateLimiters
   }));

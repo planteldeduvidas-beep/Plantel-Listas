@@ -42,6 +42,8 @@ function criarUsuarioService(dependencias) {
     const id = validarUsuarioId(parametroId);
     const dados = validarEdicao(corpo);
     const usuario = await usuarioRepository.comTravaAdministrativa(async function editarComAuditoria(conexao) {
+      const atual = await usuarioRepository.buscarPorId(id, conexao);
+      if (!atual) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
       if (!await usuarioRepository.atualizarDados(id, dados.nome, dados.email, conexao)) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
       await registrar(usuarioAutenticado, "usuario_editado", id, { nomeAlterado: true, emailAlterado: true }, conexao);
       return usuarioRepository.buscarPorId(id, conexao);

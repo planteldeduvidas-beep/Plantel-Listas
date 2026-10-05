@@ -12,6 +12,7 @@ function criarEmailProviderNaoConfigurado(logger) {
   }
   return {
     enviarRecuperacaoSenha: informarPendencia,
+    enviarConfirmacaoEmail: informarPendencia,
     enviarAlertaSeguranca: informarPendencia,
     enviarSuporte: informarPendencia
   };
@@ -44,10 +45,24 @@ function criarEmailProviderSmtp(configuracao) {
   });
 
   return {
+    enviarConfirmacaoEmail: async function enviarConfirmacao(dados) {
+      await transportador.sendMail({
+        from: configuracao.remetente,
+        to: { address: dados.destinatario },
+        subject: "Confirme seu e-mail - Plantel Listas",
+        text: [
+          dados.alteracao ? "Voce solicitou a atualizacao do e-mail da sua conta." : "Confirme que voce tem acesso a este e-mail.",
+          "Abra o link abaixo e confirme na mesma conta do Plantel. O link vale por 1 hora:",
+          dados.link,
+          "Seu e-mail atual continua valido ate a confirmacao.",
+          "Se voce nao fez esta solicitacao, ignore esta mensagem. Nunca compartilhe este link."
+        ].join("\n")
+      });
+    },
     enviarRecuperacaoSenha: async function enviarRecuperacao(dados) {
       await transportador.sendMail({
         from: configuracao.remetente,
-        to: dados.destinatario,
+        to: { address: dados.destinatario },
         subject: "Redefinicao de senha - Plantel Listas",
         text: [
           "Recebemos uma solicitacao para redefinir sua senha.",
@@ -62,8 +77,8 @@ function criarEmailProviderSmtp(configuracao) {
     enviarSuporte: async function enviarSuporte(dados) {
       await transportador.sendMail({
         from: configuracao.remetente,
-        to: dados.destinatario,
-        replyTo: dados.email,
+        to: { address: dados.destinatario },
+        replyTo: { address: dados.email },
         subject: "[Suporte Plantel] " + dados.assunto,
         text: [
           "Nova mensagem enviada pelo Plantel Listas.",
@@ -99,6 +114,9 @@ function criarEmailProviderFake() {
   const mensagens = [];
 
   return {
+    enviarConfirmacaoEmail: async function armazenarConfirmacao(dados) {
+      mensagens.push(Object.assign({ tipo: "confirmacaoEmail" }, dados));
+    },
     enviarRecuperacaoSenha: async function armazenarMensagem(dados) {
       mensagens.push(Object.assign({ tipo: "recuperacao" }, dados));
     },

@@ -28,7 +28,7 @@ function compararTextosComTempoConstante(textoA, textoB) {
 }
 
 function validarAssinaturaDoToken(token, segredo) {
-  if (typeof token !== "string") {
+  if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}$/.test(token)) {
     return false;
   }
 
@@ -43,7 +43,11 @@ function validarAssinaturaDoToken(token, segredo) {
 
 function emitirTokenCsrf(req, res) {
   const configuracao = req.app.locals.configuracao;
-  const token = gerarTokenCsrf(configuracao.seguranca.csrfSecret);
+  const existente = req.cookies[configuracao.seguranca.nomeCookieCsrf];
+  // Abas do mesmo navegador compartilham o cookie. Renovar em toda consulta
+  // invalidava formularios abertos; reutilizar somente token autentico.
+  const token = validarAssinaturaDoToken(existente, configuracao.seguranca.csrfSecret)
+    ? existente : gerarTokenCsrf(configuracao.seguranca.csrfSecret);
   definirCookieCsrf(res, token, configuracao);
   res.status(200).json({ csrfToken: token });
 }

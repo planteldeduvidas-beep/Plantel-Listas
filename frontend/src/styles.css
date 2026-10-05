@@ -6854,7 +6854,7 @@ textarea {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
   bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 100;
+  z-index: 80; /* Abaixo dos formularios modais (90), sem cobrir suas acoes. */
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -7039,6 +7039,21 @@ textarea {
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.formulario-email-conta { display: grid; gap: 16px; min-width: 0; }
+.formulario-email-conta p { margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+.formulario-email-conta label { display: grid; gap: 8px; }
+.formulario-email-conta input { min-width: 0; width: 100%; }
+.formulario-email-conta .aviso-recuperacao-email { margin: 0; }
+.botao-email-conta { width: 100%; margin: 12px 0; white-space: normal; }
+.barra-lateral .botao-email-conta { color: #e0f4ee; border-color: rgb(224 244 238 / 30%); background: transparent; }
+.barra-lateral .botao-email-conta:hover { color: #fff; background: rgb(224 244 238 / 10%); }
+.lembrete-email-conta { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 20px; margin: 0 0 24px; border: 1px solid var(--cor-borda); border-radius: 14px; background: var(--cor-superficie); }
+.lembrete-email-conta > div { flex: 1 1 260px; min-width: 0; }
+.lembrete-email-conta p { margin: 8px 0 0; line-height: 1.6; color: var(--cor-texto-suave); }
+.lembrete-email-conta button { max-width: 100%; white-space: normal; }
+.modal-email-conta { display: flex; flex-direction: column; }
+.modal-email-conta .cabecalho-modal { flex-shrink: 0; }
+.modal-email-conta .conteudo-modal { flex: 1 1 auto; min-height: 0; }
 .analytics-escopo, .analytics-legado { margin: 20px 0; padding: 16px; border: 1px solid var(--cor-borda); border-radius: 12px; line-height: 1.6; background: var(--cor-superficie-suave); }
 .analytics-legado summary { cursor: pointer; font-weight: 700; }
 .analytics-barras { display: grid; gap: 18px; padding: 0; margin: 20px 0; list-style: none; min-width: 0; }

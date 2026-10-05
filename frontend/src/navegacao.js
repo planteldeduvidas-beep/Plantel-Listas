@@ -41,6 +41,7 @@ function criarUrlDaNavegacao(caminho, area, pasta) {
 function limparParametrosTemporarios(caminho, pesquisa) {
   const parametros = new URLSearchParams(pesquisa || "");
   parametros.delete("tokenRecuperacao");
+  parametros.delete("tokenEmail");
   parametros.delete("googleDrive");
   parametros.delete("oauthPopup");
   const restante = parametros.toString();

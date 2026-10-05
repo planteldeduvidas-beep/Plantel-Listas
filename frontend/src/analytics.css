@@ -1,0 +1,53 @@
+/* Escopo exclusivo do painel: cards independentes, sem herdar a grade sem gap. */
+.area-estatisticas .administracao-fase7 .grade-admin.grade-dados {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+  padding: 0;
+  margin: 24px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+.area-estatisticas .administracao-fase7 .grade-dados > section {
+  min-width: 0;
+  padding: clamp(20px, 2.4vw, 32px);
+  border: 1px solid var(--cor-borda);
+  border-radius: 18px;
+  background: var(--cor-superficie);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 3%);
+}
+.area-estatisticas .grade-dados h3 { margin: 0 0 10px; font-size: 1.08rem; line-height: 1.45; }
+.area-estatisticas .grade-dados p { color: var(--cor-texto-suave); line-height: 1.65; margin: 0 0 20px; font-size: .88rem; }
+.area-estatisticas .analytics-barras { gap: 22px; margin: 24px 0 0; }
+.area-estatisticas .analytics-barras li > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; }
+.area-estatisticas .analytics-barras li > div > span { line-height: 1.5; overflow-wrap: anywhere; }
+.area-estatisticas .analytics-barras strong { text-align: right; font-size: 1rem; line-height: 1.4; }
+.area-estatisticas .analytics-barras strong small { display: block; font-size: .72rem; }
+.area-estatisticas .analytics-barras li > small { display: block; margin-top: 8px; line-height: 1.5; }
+.area-estatisticas .analytics-trilho { height: 10px; margin: 10px 0 0; border-radius: 10px; background: color-mix(in srgb, var(--cor-texto) 7%, var(--cor-superficie)); }
+.area-estatisticas .analytics-trilho i { background: linear-gradient(90deg, #12695f, #289e8b); }
+.area-estatisticas .analytics-lista-rolavel { padding-right: 16px; scrollbar-gutter: stable; }
+.area-estatisticas .resumo-mensal-item { padding: 20px 0; border-bottom: 1px solid var(--cor-borda); }
+.area-estatisticas .resumo-mensal-item:last-child { border-bottom: 0; }
+.area-estatisticas .analytics-composicao { display: flex; align-items: center; flex-wrap: wrap; gap: 28px; padding: 16px 0; }
+.area-estatisticas .analytics-anel { flex: 0 0 164px; width: 164px; height: 164px; border-radius: 50%; display: grid; place-items: center; }
+.area-estatisticas .analytics-anel > div { width: 126px; height: 126px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--cor-superficie); }
+.area-estatisticas .analytics-anel strong { font-size: 1.65rem; font-variant-numeric: tabular-nums; }
+.area-estatisticas .analytics-anel span { font-size: .78rem; color: var(--cor-texto-suave); }
+.area-estatisticas .analytics-composicao ul { flex: 1 1 160px; list-style: none; padding: 0; margin: 0; display: grid; gap: 24px; min-width: 0; }
+.area-estatisticas .analytics-composicao li { display: grid; grid-template-columns: 10px minmax(0,1fr) auto; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
+.area-estatisticas .analytics-composicao li i { width: 10px; height: 10px; border-radius: 3px; }
+.area-estatisticas .analytics-composicao small { display: block; color: var(--cor-texto-suave); margin-top: 6px; font-size: .78rem; }
+@media (max-width: 1100px) {
+  .area-estatisticas .administracao-fase7 .grade-admin.grade-dados { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 480px) {
+  .area-estatisticas .administracao-fase7 .grade-admin.grade-dados { gap: 18px; }
+  .area-estatisticas .administracao-fase7 .grade-dados > section { padding: 20px 16px; border-radius: 14px; }
+  .area-estatisticas .analytics-composicao { justify-content: center; }
+  .area-estatisticas .analytics-barras li > div { gap: 12px; }
+}

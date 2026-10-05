@@ -72,13 +72,20 @@ function criarAutenticacaoRepository(pool) {
     );
   }
 
-  async function criarRecuperacaoSenha(usuarioId, tokenHash, expiraEm) {
+  async function criarRecuperacaoSenha(usuarioId, tokenHash, expiraEm, credencialObservada) {
     const conexao = await pool.getConnection();
     let aberta = false;
     try {
       await conexao.beginTransaction();
       aberta = true;
-      await conexao.execute("SELECT id FROM usuarios WHERE id = ? FOR UPDATE", [usuarioId]);
+      const [usuarios] = await conexao.execute("SELECT email,versao_sessao,ativo FROM usuarios WHERE id = ? FOR UPDATE", [usuarioId]);
+      const usuario = usuarios[0];
+      if (!usuario || Number(usuario.ativo) !== 1 || (credencialObservada
+          && (usuario.email !== credencialObservada.email || Number(usuario.versao_sessao) !== Number(credencialObservada.versaoSessao)))) {
+        await conexao.rollback();
+        aberta = false;
+        return null;
+      }
       await conexao.execute(
         "UPDATE recuperacoes_senha "
         + "SET usada_em = COALESCE(usada_em, CURRENT_TIMESTAMP(3)) "
@@ -114,6 +121,13 @@ function criarAutenticacaoRepository(pool) {
 
     try {
       await conexao.beginTransaction();
+      const [alvos] = await conexao.execute(
+        "SELECT usuario_id FROM recuperacoes_senha WHERE token_hash=? LIMIT 1", [tokenHash]
+      );
+      if (!alvos[0]) { await conexao.rollback(); return false; }
+      // Usuario primeiro, como emissao de recuperacao e confirmacao de email,
+      // para evitar inversao de locks entre estes fluxos concorrentes.
+      await conexao.execute("SELECT id FROM usuarios WHERE id=? FOR UPDATE", [alvos[0].usuario_id]);
       const [registros] = await conexao.execute(
         "SELECT id, usuario_id FROM recuperacoes_senha "
         + "WHERE token_hash = ? AND usada_em IS NULL "

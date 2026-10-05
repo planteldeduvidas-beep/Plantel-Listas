@@ -8,6 +8,8 @@ import {
   redefinirSenha
 } from "./api.js";
 import PainelAcervo from "./PainelAcervo.jsx";
+import AvisoEmail from "./AvisoEmail.jsx";
+import { ConfirmacaoEmail } from "./EmailConta.jsx";
 import PaginaInstitucional from "./PaginaInstitucional.jsx";
 import { Alerta, AlternadorTema, CampoSenha, Carregando, Icone, aplicarTema, lerTemaSalvo, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, limparParametrosTemporarios, obterDocumentoPublico } from "./navegacao.js";
@@ -17,10 +19,11 @@ function Aplicacao() {
   const [retornoInicial] = useState(function lerRetornoInicial() {
     const parametros = new URLSearchParams(window.location.search);
     const token = parametros.get("tokenRecuperacao");
+    const tokenEmail = parametros.get("tokenEmail");
     const retornoGoogleDrive = parametros.get("googleDrive");
     const retornoPopupOAuth = parametros.get("oauthPopup") === "1";
 
-    if (token || retornoGoogleDrive) {
+    if (token || tokenEmail || retornoGoogleDrive) {
       window.history.replaceState(
         window.history.state,
         "",
@@ -28,9 +31,10 @@ function Aplicacao() {
       );
     }
 
-    return { tokenRecuperacao: token, googleDrive: retornoGoogleDrive, popupOAuth: retornoPopupOAuth };
+    return { tokenRecuperacao: token, tokenEmail, googleDrive: retornoGoogleDrive, popupOAuth: retornoPopupOAuth };
   });
   const tokenRecuperacao = retornoInicial.tokenRecuperacao;
+  const [emailConcluido, definirEmailConcluido] = useState(false);
   const [usuario, definirUsuario] = useState(null);
   const [entradaRecente, definirEntradaRecente] = useState(false);
   const [carregando, definirCarregando] = useState(true);
@@ -54,6 +58,27 @@ function Aplicacao() {
   }, []);
 
   useEffect(function aplicarTemaInicial() { aplicarTema(temaInicial); }, [temaInicial]);
+
+  useEffect(function atualizarContaAoVoltar() {
+    if (!usuario) return;
+    let ativo = true;
+    async function atualizar() {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const dados = await obterUsuarioAtual();
+        if (ativo) definirUsuario(atual => atual?.id === dados.usuario.id ? dados.usuario : atual);
+      } catch (falha) {
+        if (ativo && falha.status === 401) {
+          definirUsuario(null);
+          definirTela(atual => atual === "redefinir" ? atual : "login");
+          definirMensagem("Sua sessão terminou. Entre novamente para continuar.");
+        }
+      }
+    }
+    window.addEventListener("focus", atualizar);
+    document.addEventListener("visibilitychange", atualizar);
+    return () => { ativo = false; window.removeEventListener("focus", atualizar); document.removeEventListener("visibilitychange", atualizar); };
+  }, [usuario?.id]);
 
   useEffect(function concluirOAuthEmJanelaSeparada() {
     if (!retornoInicial.googleDrive || !window.opener || window.opener.closed) {
@@ -109,8 +134,8 @@ function Aplicacao() {
     evento.preventDefault();
     prepararOperacao();
     try {
-      await cadastrar(nome, email, senha);
-      definirMensagem("Cadastro concluido. Agora entre com sua conta.");
+      const dados = await cadastrar(nome, email, senha);
+      definirMensagem(dados.mensagem || "Cadastro concluído. Agora entre com sua conta.");
       definirTela("login");
       definirSenha("");
       definirNome("");
@@ -178,7 +203,8 @@ function Aplicacao() {
     return <main className="pagina-autenticacao"><Carregando texto="Preparando seu acesso..." /></main>;
   }
 
-  if (usuario) {
+  if (usuario && tela !== "redefinir") {
+    if (retornoInicial.tokenEmail && !emailConcluido) return <ConfirmacaoEmail usuario={usuario} token={retornoInicial.tokenEmail} aoCancelar={() => definirEmailConcluido(true)} aoConcluir={dados => { definirUsuario(dados.usuario); definirEmailConcluido(true); }} />;
     return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} mostrarBoasVindas={entradaRecente} />;
   }
 
@@ -205,7 +231,8 @@ function Aplicacao() {
         <span className="marca">Acesso à biblioteca</span>
         <h1 id="titulo-principal">{configuracaoDaTela.titulo}</h1>
         <p className="descricao">{configuracaoDaTela.texto}</p>
-        {tela === "recuperar" && <p className="aviso-recuperacao-email" role="note">Confira também a pasta <strong>Spam ou Lixo eletrônico</strong>: as instruções de recuperação podem chegar lá. Se encontrar a mensagem do Plantel, marque como “Não é spam”.</p>}
+        {retornoInicial.tokenEmail && !emailConcluido && <p>Para confirmar seu e-mail, entre com a conta que solicitou o link. Se está trocando o endereço, use o e-mail antigo para entrar.</p>}
+        {(tela === "recuperar" || tela === "cadastro") && <AvisoEmail />}
 
         <form onSubmit={configuracaoDaTela.acao}>
           {tela === "cadastro" && (
@@ -228,10 +255,12 @@ function Aplicacao() {
               <input
                 type="email"
                 autoComplete="email"
+                placeholder={tela === "cadastro" ? "seunome@provedor.com" : undefined}
                 value={email}
                 onChange={function atualizarEmail(evento) { definirEmail(evento.target.value); }}
                 required
               />
+              {tela === "cadastro" && <small>Use um e-mail ao qual você tenha acesso. Gmail, Outlook, Hotmail e outros provedores são aceitos.</small>}
             </label>
           )}
           {exibirSenha && (

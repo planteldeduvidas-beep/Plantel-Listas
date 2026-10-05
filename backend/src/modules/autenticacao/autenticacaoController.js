@@ -3,16 +3,15 @@ const {
   limparCookieDeSessao
 } = require("../../shared/utils/cookies");
 
-function criarAutenticacaoController(service, configuracao) {
+function criarAutenticacaoController(service, configuracao, emailContaService) {
   async function cadastrar(req, res) {
-    const usuario = await service.cadastrar(req.body);
-    res.status(201).json({ usuario: usuario });
+    res.status(201).json(await service.cadastrar(req.body));
   }
 
   async function entrar(req, res) {
     const resultado = await service.entrar(req.body);
     definirCookieDeSessao(res, resultado.token, configuracao);
-    res.status(200).json({ usuario: resultado.usuario });
+    res.status(200).json({ usuario: await emailContaService.obterAviso(resultado.usuario) });
   }
 
   async function sair(req, res) {
@@ -21,8 +20,8 @@ function criarAutenticacaoController(service, configuracao) {
     res.status(204).send();
   }
 
-  function obterUsuarioAtual(req, res) {
-    res.status(200).json({ usuario: req.usuario });
+  async function obterUsuarioAtual(req, res) {
+    res.status(200).json({ usuario: await emailContaService.obterAviso(req.usuario) });
   }
 
   async function solicitarRecuperacao(req, res) {
@@ -37,6 +36,8 @@ function criarAutenticacaoController(service, configuracao) {
   }
 
   return {
+    solicitarConfirmacaoEmail: async (req, res) => res.status(200).json(await emailContaService.solicitar(req.usuario, req.body)),
+    confirmarEmail: async (req, res) => res.status(200).json(await emailContaService.confirmar(req.usuario, req.body)),
     cadastrar: cadastrar,
     entrar: entrar,
     sair: sair,
