@@ -55,7 +55,7 @@ function criarAnalyticsRepository(pool) {
     );
     const [usuarios] = await pool.execute(
       "SELECT COUNT(*) AS total,SUM(papel='aluno') AS alunos,SUM(papel='professor') AS professores,"
-      + "SUM(papel='admin') AS administradores,SUM(ativo=1) AS ativos FROM usuarios"
+      + "SUM(papel='admin') AS administradores,SUM(ativo=1) AS ativos FROM usuarios WHERE excluido_em IS NULL AND NOT EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=usuarios.id)"
     );
     return { materiais: materiais[0], usuarios: usuarios[0] };
   }

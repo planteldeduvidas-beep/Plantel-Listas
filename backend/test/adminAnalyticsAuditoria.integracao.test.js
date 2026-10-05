@@ -19,6 +19,7 @@ const senha = "Senha-admin-fase-7-123";
 let aplicacao;
 
 async function limpar() {
+  await pool.execute("DELETE FROM cadastros_publicos_pendentes");
   await pool.execute("DELETE FROM historico_materiais_usuario");
   await pool.execute("DELETE FROM analytics_resumo_diario");
   await pool.execute("DELETE FROM analytics_materiais_diario");
@@ -60,6 +61,91 @@ test.beforeEach(async function preparar() {
 });
 
 test.after(async function encerrar() { await limpar(); await pool.end(); });
+
+test("detalhes e acoes administrativas usam usuario certo, preservam historico e exigem admin", async () => {
+  const adminId = await usuario("admin-detalhes@example.com","admin");
+  const alunoId = await usuario("aluno-detalhes@escola.edu.br","aluno");
+  const professorId = await usuario("professor-detalhes@proton.me","professor");
+  const admin = await sessao("admin-detalhes@example.com");
+  const aluno = await sessao("aluno-detalhes@escola.edu.br");
+  const prefixo = "/api/usuarios/" + alunoId;
+  const dados = (await admin.agente.get(prefixo)).body.usuario;
+  assert.equal(dados.id,alunoId);
+  assert.ok(dados.ultimoLogin);
+  assert.ok(dados.inatividadeSegundos>=0);
+  assert.equal(dados.emailConfirmadoEm,null);
+  assert.equal(Object.hasOwn(dados,"senhaHash"),false);
+  const nunca = (await admin.agente.get("/api/usuarios/"+professorId)).body.usuario;
+  assert.equal(nunca.ultimoLogin,null);
+  assert.equal(nunca.inatividadeSegundos,null);
+  for (const rota of [prefixo,"/api/usuarios/"+professorId]) assert.equal((await aluno.agente.get(rota)).status,403);
+  for (const acao of ["regularizacao-email","verificacao-email","redefinicao-senha"]) {
+    assert.equal((await aluno.agente.post(prefixo+"/"+acao).set("X-CSRF-Token",aluno.csrf).send({})).status,403);
+    assert.equal((await admin.agente.post(prefixo+"/"+acao).set("X-CSRF-Token",admin.csrf).send({})).status,200);
+  }
+  assert.equal((await admin.agente.post(prefixo+"/verificacao-email").set("X-CSRF-Token",admin.csrf).send({})).status,429);
+  assert.equal((await aluno.agente.get("/api/autenticacao/me")).body.usuario.emailPrecisaRevisao,true);
+  assert.equal((await admin.agente.delete(prefixo).set("X-CSRF-Token",admin.csrf).send({})).status,400);
+  assert.equal((await aluno.agente.delete(prefixo).set("X-CSRF-Token",aluno.csrf).send({confirmar:true})).status,403);
+  assert.equal((await admin.agente.delete("/api/usuarios/"+adminId).set("X-CSRF-Token",admin.csrf).send({confirmar:true})).status,409);
+  assert.equal((await admin.agente.delete(prefixo).set("X-CSRF-Token",admin.csrf).send({confirmar:true})).status,200);
+  assert.equal((await aluno.agente.get("/api/autenticacao/me")).status,401);
+  assert.equal((await admin.agente.get(prefixo)).status,404);
+  assert.equal((await admin.agente.patch(prefixo+"/ativo").set("X-CSRF-Token",admin.csrf).send({ativo:true})).status,404);
+  const [[preservado]] = await pool.execute("SELECT excluido_em,email FROM usuarios WHERE id=?",[alunoId]);
+  assert.ok(preservado.excluido_em);
+  assert.equal(preservado.email,"aluno-detalhes@escola.edu.br");
+  const [[audit]] = await pool.execute("SELECT COUNT(*) AS n FROM auditoria_geral WHERE acao='usuario_excluido' AND entidade_id=?",[alunoId]);
+  assert.equal(Number(audit.n),1);
+  assert.equal((await admin.agente.get("/api/usuarios?busca=aluno-detalhes")).body.paginacao.total,0);
+  assert.equal((await admin.agente.get("/api/analytics?periodo=30")).body.resumo.alunos,0);
+  assert.equal((await admin.agente.get("/api/usuarios/"+professorId)).body.usuario.ativo,true);
+});
+
+test("cadastros publicos pendentes nao sao usuarios nem metricas; confirmacao concorrente cria somente um", async () => {
+  await usuario("admin-pendente@example.com","admin");
+  const admin = await sessao("admin-pendente@example.com");
+  const fake = criarEmailProviderFake();
+  aplicacao = criarAplicacao(configuracao,pino({level:"silent"}),{pool,emailProvider:fake});
+  // O agente conserva a sessao persistida no banco, mesmo com app novo.
+  const agente = request.agent(aplicacao);
+  const token = (await agente.get("/api/autenticacao/csrf")).body.csrfToken;
+  const r = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",token).send({nome:"Pessoa Pendente",email:"pendente@instituto.edu.br",senha});
+  assert.equal(r.status,201);
+  assert.equal(Object.hasOwn(r.body,"usuario"),false);
+  const [[conta]] = await pool.execute("SELECT COUNT(*) n FROM usuarios WHERE email='pendente@instituto.edu.br'");
+  assert.equal(Number(conta.n),0);
+  assert.equal((await admin.agente.get("/api/usuarios?busca=pendente@instituto.edu.br")).body.paginacao.total,0);
+  assert.equal((await admin.agente.get("/api/analytics?periodo=30")).body.resumo.alunos,0);
+  const confirmacao = new URL(fake.obterMensagens()[0].link).searchParams.get("tokenEmail");
+  const [[p]] = await pool.execute("SELECT token_hash,senha_hash FROM cadastros_publicos_pendentes WHERE email=?",["pendente@instituto.edu.br"]);
+  assert.notEqual(p.token_hash,confirmacao);
+  assert.match(p.senha_hash,/^\$argon2id/);
+  const respostas = await Promise.all([1,2].map(()=>agente.post("/api/autenticacao/cadastro/email/confirmar").set("X-CSRF-Token",token).send({token:confirmacao})));
+  assert.deepEqual(respostas.map(x=>x.status).sort(),[200,400]);
+  const lista = await admin.agente.get("/api/usuarios?busca=pendente@instituto.edu.br");
+  assert.equal(lista.body.paginacao.total,1);
+  const confirmado = (await admin.agente.get("/api/usuarios/"+lista.body.usuarios[0].id)).body.usuario;
+  assert.ok(confirmado.emailConfirmadoEm);
+  assert.equal((await admin.agente.get("/api/analytics?periodo=30")).body.resumo.alunos,1);
+  const [[pendentes]] = await pool.execute("SELECT COUNT(*) n FROM cadastros_publicos_pendentes");
+  assert.equal(Number(pendentes.n),0);
+});
+
+test("falha de auditoria desfaz exclusao e revogacao de sessao",async()=>{
+  const adminId=await usuario("admin-rollback@example.com","admin");
+  const alunoId=await usuario("aluno-rollback@example.com","aluno");
+  const aluno=await sessao("aluno-rollback@example.com");
+  const repo=require("../src/modules/usuarios/usuarioRepository")(pool);
+  const service=require("../src/modules/usuarios/usuarioService")({usuarioRepository:repo,
+    autenticacaoRepository:require("../src/modules/autenticacao/autenticacaoRepository")(pool),
+    auditoriaRepository:{registrar:async()=>{throw Error("Auditoria indisponivel");}}});
+  await assert.rejects(service.excluirUsuario({id:adminId},alunoId,{confirmar:true}),/Auditoria indisponivel/);
+  const atual=await repo.buscarPorId(alunoId);
+  assert.equal(atual.ativo,true);
+  assert.equal(atual.excluidoEm,null);
+  assert.equal((await aluno.agente.get("/api/autenticacao/me")).status,200);
+});
 
 test("admin cria, pesquisa e filtra usuarios sem expor campos internos", async function testarUsuarios() {
   const adminId = await usuario("admin-f7@example.com", "admin");

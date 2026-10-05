@@ -26,6 +26,10 @@ function criarUsuarioController(service) {
   }
 
   return {
+    detalhes: async (req,res) => res.json({usuario:await service.obterDetalhes(req.params.usuarioId)}),
+    excluir: async (req,res) => res.json(await service.excluirUsuario(req.usuario,req.params.usuarioId,req.body)),
+    regularizar: async (req,res) => res.json(await service.solicitarRegularizacao(req.usuario,req.params.usuarioId,req.body)),
+    verificar: async (req,res) => res.json(await service.enviarVerificacao(req.usuario,req.params.usuarioId,req.body)),
     listar: listar,
     criar: criar,
     editar: editar,

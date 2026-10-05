@@ -14,12 +14,16 @@ function criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository)
     } finally { conexao.release(); }
   }
 
-  async function criar(usuario, email, tokenHash, expiraEm, cadastro = false) {
+  async function criar(usuario, email, tokenHash, expiraEm, cadastro = false, cooldown = false) {
     return transacionar(async conexao => {
       const atual = await usuarioRepository.buscarPorId(usuario.id, conexao, true);
       if (!atual?.ativo || (cadastro && !atual.cadastroEmailPendente) || atual.email !== usuario.email || atual.senhaHash !== usuario.senhaHash
           || atual.versaoSessao !== usuario.versaoSessao) {
         throw new AppError("Sua conta mudou. Entre novamente e tente outra vez.", 409, "CONTA_ALTERADA");
+      }
+      if (cooldown) {
+        const [[envio]] = await conexao.execute("SELECT TIMESTAMPDIFF(SECOND,MAX(criado_em),CURRENT_TIMESTAMP(3)) AS segundos FROM confirmacoes_email WHERE usuario_id=?",[usuario.id]);
+        if (envio.segundos !== null && Number(envio.segundos)<60) throw new AppError("Aguarde um minuto antes de reenviar a verificação",429,"CONFIRMACAO_COOLDOWN");
       }
       await conexao.execute("UPDATE confirmacoes_email SET cancelada_em=CURRENT_TIMESTAMP(3) WHERE usuario_id=? AND usada_em IS NULL AND cancelada_em IS NULL", [usuario.id]);
       const [resultado] = await conexao.execute(
@@ -62,6 +66,7 @@ function criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository)
         await conexao.execute("UPDATE recuperacoes_senha SET usada_em=COALESCE(usada_em,CURRENT_TIMESTAMP(3)) WHERE usuario_id=? AND usada_em IS NULL", [usuarioId]);
       }
       await conexao.execute("UPDATE confirmacoes_email SET usada_em=CURRENT_TIMESTAMP(3) WHERE id=?", [pedido.id]);
+      await conexao.execute("UPDATE usuarios SET email_confirmado_em=CURRENT_TIMESTAMP(3) WHERE id=?",[usuarioId]);
       await conexao.execute("UPDATE lembretes_email SET resolvido_em=CURRENT_TIMESTAMP(3) WHERE usuario_id=? AND resolvido_em IS NULL", [usuarioId]);
       await auditoriaRepository.registrar({ atorUsuarioId: usuarioId, acao: alterado ? "email_atualizado" : "email_confirmado", entidade: "usuario", entidadeId: usuarioId, contexto: { emailAlterado: alterado } }, conexao);
       if (cadastro) await conexao.execute("DELETE FROM cadastros_email_pendentes WHERE usuario_id=?", [usuarioId]);

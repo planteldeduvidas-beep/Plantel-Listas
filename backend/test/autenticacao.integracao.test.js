@@ -44,6 +44,7 @@ async function limparCategorias() {
 }
 
 async function limparBanco() {
+  await pool.execute("DELETE FROM cadastros_publicos_pendentes");
   await pool.execute("DELETE FROM permissoes_professor_categoria");
   await pool.execute("DELETE FROM materiais");
   await limparCategorias();
@@ -84,6 +85,8 @@ async function cadastrar(agente, email, senha, camposAdicionais) {
   // validado em teste proprio abaixo, sem contaminar a contagem de recuperacao.
   if (resposta.status === 201 && resposta.body.confirmacaoEmailEnviada) {
     assert.equal((await confirmarCadastro(agente, tokenEmailMaisRecente())).status, 200);
+    const u = await require("../src/modules/usuarios/usuarioRepository")(pool).buscarPorEmail(corpo.email.trim().toLowerCase());
+    resposta.body.usuario = require("../src/modules/usuarios/usuarioPublico")(u);
   }
   emailProvider.limpar();
   return resposta;
@@ -125,6 +128,9 @@ async function reenviarCadastro(agente, emailAtual, email = emailAtual, senha = 
   const csrf = await obterCsrf(agente);
   return agente.post("/api/autenticacao/cadastro/email/solicitar").set("X-CSRF-Token", csrf).send({ emailAtual, email, senha });
 }
+async function liberarCooldown(email) {
+  await pool.execute("UPDATE cadastros_publicos_pendentes SET enviado_em=DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL 2 MINUTE) WHERE email=?",[email]);
+}
 
 test("novo cadastro exige confirmacao antes do login e falha SMTP preserva reenvio", async () => {
   const agente = request.agent(aplicacao);
@@ -154,6 +160,8 @@ test("novo cadastro exige confirmacao antes do login e falha SMTP preserva reenv
   assert.equal(semEnvio.status,201);
   assert.equal(semEnvio.body.confirmacaoEmailEnviada,false);
   assert.equal((await entrar(agente,"cadastro-preservado@proton.me","Senha-forte-123")).status,403);
+  assert.equal((await reenviarCadastro(agente,"cadastro-preservado@proton.me")).status,429);
+  await liberarCooldown("cadastro-preservado@proton.me");
   assert.equal((await reenviarCadastro(agente,"cadastro-preservado@proton.me")).status,200);
   assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,200);
   assert.equal((await entrar(agente,"cadastro-preservado@proton.me","Senha-forte-123")).status,200);
@@ -166,25 +174,25 @@ test("cadastro pendente corrige email ao confirmar, exige senha e rejeita expira
   assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Novo",email,senha:"Senha-forte-123"})).status,201);
   const antigo = tokenEmailMaisRecente();
   assert.equal((await reenviarCadastro(agente,email,novo,"Senha-incorreta-123")).status,401);
+  await liberarCooldown(email);
   assert.equal((await reenviarCadastro(agente,email,novo)).status,200);
   const token = tokenEmailMaisRecente();
   const repo = require("../src/modules/usuarios/usuarioRepository")(pool);
-  const usuario = await repo.buscarPorEmail(email);
-  assert.equal(usuario.cadastroEmailPendente,true);
+  assert.equal(await repo.buscarPorEmail(email),null);
   assert.equal(await repo.buscarPorEmail(novo),null);
   assert.equal((await confirmarCadastro(agente,antigo)).status,400);
   assert.equal((await confirmarCadastro(agente,"x".repeat(43))).status,400);
-  await pool.execute("UPDATE confirmacoes_email SET expira_em=DATE_SUB(NOW(),INTERVAL 1 HOUR) WHERE token_hash=?",[gerarHashDoToken(token)]);
+  await pool.execute("UPDATE cadastros_publicos_pendentes SET expira_em=DATE_SUB(NOW(),INTERVAL 1 HOUR) WHERE token_hash=?",[gerarHashDoToken(token)]);
   assert.equal((await confirmarCadastro(agente,token)).status,400);
+  await liberarCooldown(email);
   assert.equal((await reenviarCadastro(agente,email,novo)).status,200);
   const valido = tokenEmailMaisRecente();
-  const repoFalho = require("../src/modules/autenticacao/emailContaRepository")(pool,repo,{registrar:async()=>{throw new Error("Auditoria indisponivel");}});
-  await assert.rejects(repoFalho.confirmar(usuario.id,gerarHashDoToken(valido),true),/Auditoria indisponivel/);
-  assert.equal((await repo.buscarPorId(usuario.id)).cadastroEmailPendente,true);
-  assert.equal((await repo.buscarPorId(usuario.id)).email,email);
+  const repoFalho = require("../src/modules/autenticacao/cadastroPendenteRepository")(pool,repo,{registrar:async()=>{throw new Error("Auditoria indisponivel");}});
+  await assert.rejects(repoFalho.confirmar(gerarHashDoToken(valido)),/Auditoria indisponivel/);
+  assert.equal(await repo.buscarPorEmail(novo),null);
   assert.equal((await entrar(agente,email,"Senha-forte-123")).status,403);
   assert.equal((await confirmarCadastro(agente,valido)).status,200);
-  assert.equal((await repo.buscarPorId(usuario.id)).id,usuario.id);
+  assert.ok((await repo.buscarPorEmail(novo)).id);
   assert.equal((await entrar(agente,novo,"Senha-forte-123")).status,200);
   assert.equal((await confirmarCadastro(agente,valido)).status,400);
 });
@@ -196,11 +204,11 @@ test("recuperar senha nao libera cadastro pendente e token de conta existente na
   const antigo = tokenEmailMaisRecente();
   emailProvider.limpar();
   await solicitarRecuperacao(agente,email);
+  assert.equal(emailProvider.obterMensagens().length,0);
+  assert.equal((await entrar(agente,email,"Senha-forte-123")).status,403);
+  assert.equal((await confirmarCadastro(agente,antigo)).status,200);
+  await solicitarRecuperacao(agente,email);
   assert.equal((await agente.post("/api/autenticacao/recuperacao-senha/redefinir").set("X-CSRF-Token",await obterCsrf(agente)).send({token:extrairTokenDeRecuperacao(),novaSenha:"Senha-nova-456"})).status,200);
-  assert.equal((await entrar(agente,email,"Senha-nova-456")).status,403);
-  assert.equal((await confirmarCadastro(agente,antigo)).status,400);
-  assert.equal((await reenviarCadastro(agente,email,email,"Senha-nova-456")).status,200);
-  assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,200);
   assert.equal((await entrar(agente,email,"Senha-nova-456")).status,200);
   await solicitarEmail(agente,email,"Senha-nova-456");
   assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,400);
@@ -220,6 +228,23 @@ test("falha ao marcar novo cadastro pendente reverte criacao inteira", async () 
   await assert.rejects(repo.criarAlunoComConfirmacao("Aluno Novo","rollback-pendente@example.com","hash-teste"),/Persistencia indisponivel/);
   const [[contagem]] = await pool.execute("SELECT COUNT(*) AS total FROM usuarios WHERE email=?",["rollback-pendente@example.com"]);
   assert.equal(Number(contagem.total),0);
+});
+
+test("pendencia do fluxo anterior confirma sem recriar ou modificar a identidade da conta",async()=>{
+  const repo=require("../src/modules/usuarios/usuarioRepository")(pool);
+  const hash=await require("../src/modules/autenticacao/senha").criarHashDaSenha("Senha-forte-123");
+  const antigo=await repo.criarAlunoComConfirmacao("Conta Anterior","pendencia-antiga@hotmail.com",hash);
+  const agente=request.agent(aplicacao);
+  assert.equal((await entrar(agente,antigo.email,"Senha-forte-123")).status,403);
+  assert.equal((await reenviarCadastro(agente,antigo.email)).status,200);
+  assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,200);
+  const atual=await repo.buscarPorId(antigo.id);
+  assert.equal(atual.id,antigo.id);
+  assert.equal(atual.senhaHash,hash);
+  assert.equal(atual.papel,"aluno");
+  assert.equal(atual.versaoSessao,antigo.versaoSessao);
+  assert.equal(atual.cadastroEmailPendente,false);
+  assert.equal((await entrar(agente,antigo.email,"Senha-forte-123")).status,200);
 });
 
 test("reenvio nao toma email existente e confirmacao publica exige CSRF", async () => {

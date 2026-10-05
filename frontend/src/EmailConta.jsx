@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { solicitarConfirmacaoEmail, confirmarEmail } from "./api.js";
 import { Alerta, CampoSenha, mensagemHumana } from "./ComponentesInterface.jsx";
 import AvisoEmail from "./AvisoEmail.jsx";
+import "./gestaoUsuarios.css";
 
 export function LembreteEmailConta({ usuario, aoAtualizar }) {
   if (!usuario.emailPrecisaRevisao) return null;
@@ -52,7 +53,7 @@ export function ConfirmacaoEmail({ usuario, token, aoConcluir, aoCancelar }) {
     catch (falha) { definirErro(mensagemHumana(falha)); }
     finally { definirOcupado(false); }
   }
-  return <main className="pagina-autenticacao"><section className="cartao-autenticacao">
+  return <main className="pagina-autenticacao confirmacao-centralizada"><section className="cartao-autenticacao">
     <h1>Confirme seu e-mail</h1>
     {resultado ? <><Alerta tipo="sucesso">{resultado.mensagem}</Alerta><p>Seu e-mail: <strong>{resultado.usuario.email}</strong></p><button type="button" onClick={() => aoConcluir(resultado)}>Voltar ao Plantel</button></> : <>
     <p>Você está na conta <strong>{usuario.email}</strong>. Se pediu a confirmação ou troca deste endereço, toque abaixo para concluir. A troca mantém seus materiais, histórico e permissões na mesma conta.</p>

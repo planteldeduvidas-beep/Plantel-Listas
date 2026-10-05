@@ -16,6 +16,8 @@ const criarUsuarioRepository = require("./modules/usuarios/usuarioRepository");
 const criarAutenticacaoRepository = require("./modules/autenticacao/autenticacaoRepository");
 const criarEmailContaRepository = require("./modules/autenticacao/emailContaRepository");
 const criarEmailContaService = require("./modules/autenticacao/emailContaService");
+const criarCadastroPendenteRepository = require("./modules/autenticacao/cadastroPendenteRepository");
+const criarCadastroPendenteService = require("./modules/autenticacao/cadastroPendenteService");
 const { criarAutenticacaoService } = require("./modules/autenticacao/autenticacaoService");
 const criarUsuarioService = require("./modules/usuarios/usuarioService");
 const criarAutenticacaoController = require("./modules/autenticacao/autenticacaoController");
@@ -119,20 +121,22 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   const usuarioRepository = criarUsuarioRepository(pool);
   const autenticacaoRepository = criarAutenticacaoRepository(pool);
   const auditoriaRepository = criarAuditoriaRepository(pool);
+  const cadastroPendenteService = criarCadastroPendenteService({repository:criarCadastroPendenteRepository(pool,usuarioRepository,auditoriaRepository),usuarioRepository,emailProvider,configuracao,logger});
   const emailContaService = criarEmailContaService({
     repository: criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository),
-    usuarioRepository, emailProvider, configuracao, logger
+    usuarioRepository, emailProvider, configuracao, logger, cadastroPendenteService
   });
   const serviceAutenticacao = criarAutenticacaoService({
     usuarioRepository, autenticacaoRepository, emailProvider, configuracao,
-    emailContaService, logger
+    emailContaService, cadastroPendenteService, logger
   });
   const serviceUsuario = criarUsuarioService({
     usuarioRepository: usuarioRepository,
     autenticacaoRepository: autenticacaoRepository,
     logger: logger,
     auditoriaRepository: auditoriaRepository,
-    autenticacaoService: serviceAutenticacao
+    autenticacaoService: serviceAutenticacao,
+    emailContaService
   });
   const autenticar = criarAutenticacaoMiddleware(
     autenticacaoRepository,
@@ -214,6 +218,7 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   }));
   aplicacao.use("/api/usuarios", criarUsuarioRoutes({
     controller: criarUsuarioController(serviceUsuario),
+    rateLimiters,
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
   }));

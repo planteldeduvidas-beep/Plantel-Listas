@@ -152,6 +152,10 @@ function editarUsuario(id, nome, email) { return requisitar("/usuarios/" + id, {
 function alterarPapelUsuario(id, papel) { return requisitar("/usuarios/" + id + "/papel", { method: "PATCH", body: JSON.stringify({ papel: papel }) }); }
 function alterarEstadoUsuario(id, ativo) { return requisitar("/usuarios/" + id + "/ativo", { method: "PATCH", body: JSON.stringify({ ativo: ativo }) }); }
 function iniciarRedefinicaoUsuario(id) { return requisitar("/usuarios/" + id + "/redefinicao-senha", { method: "POST", body: JSON.stringify({}) }); }
+function obterDetalhesUsuario(id) { return requisitar("/usuarios/" + id); }
+function excluirUsuario(id) { return requisitar("/usuarios/" + id, {method:"DELETE",body:JSON.stringify({confirmar:true})}); }
+function enviarVerificacaoUsuario(id) { return requisitar("/usuarios/" + id + "/verificacao-email",{method:"POST",body:JSON.stringify({})}); }
+function regularizarEmailUsuario(id) { return requisitar("/usuarios/" + id + "/regularizacao-email",{method:"POST",body:JSON.stringify({})}); }
 function salvarAcessosProfessor(id, categoriaIds, disciplinaIds) { return requisitar("/permissoes/professores/" + id, { method: "PUT", body: JSON.stringify({ categoriaIds: categoriaIds, disciplinaIds: disciplinaIds }) }); }
 function listarDisciplinasDosProfessores() { return requisitar("/permissoes/disciplinas", { method: "GET" }); }
 function obterAnalytics(periodo) { return requisitar("/analytics?periodo=" + periodo, { method: "GET" }); }
@@ -367,6 +371,7 @@ export {
   alterarPapelUsuario,
   alterarEstadoUsuario,
   iniciarRedefinicaoUsuario,
+  obterDetalhesUsuario, excluirUsuario, enviarVerificacaoUsuario, regularizarEmailUsuario,
   salvarAcessosProfessor,
   listarDisciplinasDosProfessores,
   obterAnalytics,

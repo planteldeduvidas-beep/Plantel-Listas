@@ -1,0 +1,24 @@
+.gatilho-menu-usuario { display:flex;align-items:center;gap:6px;min-height:42px;padding:8px 12px;border:1px solid var(--borda, #cfd8d5);border-radius:8px;background:var(--superficie, #fff);color:var(--texto, #143c34); }
+.menu-usuario-flutuante { position:fixed;z-index:1500;width:min(280px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow:auto;border:1px solid var(--cor-borda,#cfd8d5);border-radius:12px;background:var(--cor-superficie,#fff);color:var(--cor-texto,#143c34);box-shadow:0 12px 36px #0003;padding:6px; }
+.menu-usuario-flutuante button { display:block;width:100%;text-align:left;min-height:42px;padding:10px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:.9rem;box-shadow:none;margin:0; }
+.lista-usuarios .controles-usuario > select {min-width:160px;flex-shrink:0;white-space:nowrap;}
+.menu-usuario-flutuante button:hover:not(:disabled),.menu-usuario-flutuante button:focus-visible { background:#1483711c; }
+.menu-usuario-flutuante .perigo-texto { color:#c44040; }
+.menu-usuario-flutuante button:disabled { opacity:.45; }
+[data-tema="escuro"] .menu-usuario-flutuante,[data-tema="escuro"] .gatilho-menu-usuario { background:#142622;color:#e7f2ee;border-color:#36524a; }
+.paginacao-usuarios {display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:20px;}
+.detalhes-usuario {display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:24px 0;}
+.detalhes-usuario div {min-width:0;}
+.detalhes-usuario dt {font-size:.85rem;color:var(--cor-texto-suave,#526961);margin-bottom:6px;}
+.detalhes-usuario dd {margin:0;overflow-wrap:anywhere;}
+.pagina-autenticacao.confirmacao-centralizada {display:flex;justify-content:center;align-items:center;min-height:100dvh;padding:32px 20px;}
+.confirmacao-centralizada .cartao-autenticacao {width:100%;max-width:560px;min-width:0;margin:0;padding:32px;}
+.pagina-autenticacao.confirmacao-centralizada .cartao-autenticacao h1 {font-size:clamp(1.5rem,3vw,2rem);line-height:1.2;margin:0 0 18px;}
+.confirmacao-centralizada .aviso-confirmacao-curto {background:var(--cor-superficie-suave);border-radius:8px;padding:12px;font-size:.88rem;}
+.opcoes-confirmacao {margin:18px 0;}
+.opcoes-confirmacao summary {padding:12px 0;cursor:pointer;font-weight:600;color:var(--cor-primaria);}
+.confirmacao-centralizada p {overflow-wrap:anywhere;line-height:1.55;}
+.confirmacao-centralizada form {display:grid;gap:16px;margin:20px 0;}
+.confirmacao-centralizada button {min-height:44px;white-space:normal;}
+.confirmacao-centralizada .cartao-autenticacao > button {display:block;width:100%;margin:16px 0;}
+@media(max-width:600px){.detalhes-usuario{grid-template-columns:1fr;gap:14px}.gatilho-menu-usuario span{display:none}.pagina-autenticacao.confirmacao-centralizada{padding:20px 12px}.confirmacao-centralizada .cartao-autenticacao{padding:24px 18px}}

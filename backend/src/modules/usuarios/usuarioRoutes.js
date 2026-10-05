@@ -12,6 +12,10 @@ function criarUsuarioRoutes(dependencias) {
   router.use(autenticar);
   router.use(autorizarAdmin);
   router.get("/", controller.listar);
+  router.get("/:usuarioId", controller.detalhes);
+  router.delete("/:usuarioId", protegerContraCsrf, controller.excluir);
+  router.post("/:usuarioId/verificacao-email", dependencias.rateLimiters.emailConta, protegerContraCsrf, controller.verificar);
+  router.post("/:usuarioId/regularizacao-email", protegerContraCsrf, controller.regularizar);
   router.post("/", protegerContraCsrf, controller.criar);
   router.patch("/:usuarioId", protegerContraCsrf, controller.editar);
   router.patch(
@@ -19,7 +23,7 @@ function criarUsuarioRoutes(dependencias) {
     protegerContraCsrf,
     controller.alterarAtivo
   );
-  router.post("/:usuarioId/redefinicao-senha", protegerContraCsrf, controller.iniciarRedefinicao);
+  router.post("/:usuarioId/redefinicao-senha", dependencias.rateLimiters.emailConta, protegerContraCsrf, controller.iniciarRedefinicao);
   router.patch(
     "/:usuarioId/papel",
     protegerContraCsrf,

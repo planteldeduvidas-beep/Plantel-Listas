@@ -7,7 +7,6 @@ const {
 } = require("../../shared/utils/tokens");
 const {
   validarCredenciais,
-  validarCadastro,
   validarSolicitacaoDeRecuperacao,
   validarRedefinicaoDeSenha
 } = require("./autenticacaoValidator");
@@ -16,7 +15,6 @@ const {
   verificarSenhaSemEnumerar
 } = require("./senha");
 const criarUsuarioPublico = require("../usuarios/usuarioPublico");
-const { serializarErroSeguro } = require("../../shared/config/logger");
 
 const MENSAGEM_CREDENCIAIS_INVALIDAS = "Email ou senha invalidos";
 const MENSAGEM_RECUPERACAO_NEUTRA = "Se existir uma conta associada a este e-mail, enviaremos as instrucoes de recuperacao.";
@@ -28,37 +26,23 @@ function criarAutenticacaoService(dependencias) {
   const configuracao = dependencias.configuracao;
 
   async function cadastrar(corpo) {
-    const dados = validarCadastro(corpo);
-    const senhaHash = await criarHashDaSenha(dados.senha);
-    const usuario = await usuarioRepository.criarAlunoComConfirmacao(dados.nome, dados.email, senhaHash);
-    let confirmacaoEmailEnviada = false;
-    try {
-      await dependencias.emailContaService.enviarNoCadastro(usuario);
-      confirmacaoEmailEnviada = true;
-    } catch (erro) {
-      // A conta ja existe: falha no email nao deve sugerir que o cadastro falhou,
-      // nem perder o cadastro. A confirmacao pode ser reenviada sem login.
-      dependencias.logger?.warn({ err: serializarErroSeguro(erro), usuarioId: usuario.id }, "Cadastro preservado; confirmacao de email pendente");
-    }
-    return {
-      usuario: criarUsuarioPublico(usuario),
-      confirmacaoEmailEnviada,
-      confirmacaoPendente: true,
-      mensagem: confirmacaoEmailEnviada
-        ? "Conta criada. Confirme seu e-mail pelo link enviado antes de entrar. Confira também Spam ou Lixo eletrônico e Promoções."
-        : "Conta criada, aguardando confirmação. Não conseguimos enviar o e-mail agora. Confira o endereço e solicite um novo link nesta tela."
-    };
+    if (!dependencias.cadastroPendenteService) throw new AppError("Cadastro temporariamente indisponível",503,"CADASTRO_INDISPONIVEL");
+    return dependencias.cadastroPendenteService.cadastrar(corpo);
   }
 
   async function entrar(corpo) {
     const dados = validarCredenciais(corpo);
     const usuario = await usuarioRepository.buscarPorEmail(dados.email);
+    if (!usuario && dependencias.cadastroPendenteService) {
+      const pendente = await dependencias.cadastroPendenteService.buscar(dados.email);
+      if (await verificarSenhaSemEnumerar(pendente?.senhaHash,dados.senha)) throw new AppError("Confirme seu e-mail antes de entrar. Você pode reenviar o link.",403,"EMAIL_NAO_CONFIRMADO");
+    }
     const senhaCorreta = await verificarSenhaSemEnumerar(
       usuario ? usuario.senhaHash : null,
       dados.senha
     );
 
-    if (!usuario || !senhaCorreta || !usuario.ativo) {
+    if (!usuario || !senhaCorreta || !usuario.ativo || usuario.excluidoEm) {
       throw new AppError(
         MENSAGEM_CREDENCIAIS_INVALIDAS,
         401,

@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import MenuUsuario from "./MenuUsuario.jsx";
+import { createPortal } from "react-dom";
 import GraficoBarras from "./GraficoBarras.jsx";
 import GraficoComposicao from "./GraficoComposicao.jsx";
 import "./analytics.css";
@@ -6,6 +8,7 @@ import {
   listarUsuarios, criarUsuario, editarUsuario, alterarPapelUsuario,
   alterarEstadoUsuario, iniciarRedefinicaoUsuario, obterAnalytics,
   obterAuditoria, obterUrlRelatorio
+  , obterDetalhesUsuario, excluirUsuario, enviarVerificacaoUsuario, regularizarEmailUsuario
 } from "./api.js";
 import { CampoSenha, Esqueleto, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 
@@ -116,15 +119,35 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
   const [confirmacao, definirConfirmacao] = useState(null);
   const [emailEmEdicao, definirEmailEmEdicao] = useState("");
   const [nomeEmEdicao, definirNomeEmEdicao] = useState("");
+  const [detalhes, definirDetalhes] = useState(null);
+  const [todos, definirTodos] = useState(false);
+  const consultaAtual = useRef(0);
+  const filtrosAplicados = useRef({busca:"",papel:"",ativo:""});
 
-  async function carregarUsuarios() {
+  async function carregarUsuarios(pagina = 1, mostrarTodos = false, aplicarFiltros = false) {
+    const numeroConsulta = ++consultaAtual.current;
+    if (aplicarFiltros) filtrosAplicados.current = {busca,papel,ativo:estado};
+    definirTodos(mostrarTodos);
     definirCarregando(true);
     try {
-      const resultado = await listarUsuarios({ busca: busca, papel: papel, ativo: estado, pagina: 1, limite: 50 });
-      definirUsuarios(resultado.usuarios);
+      let resultado = await listarUsuarios({ ...filtrosAplicados.current, pagina, limite: 50 });
+      if (!mostrarTodos && pagina > resultado.paginacao.totalPaginas) {
+        resultado = await listarUsuarios({...filtrosAplicados.current,pagina:resultado.paginacao.totalPaginas,limite:50});
+      }
+      let itens = resultado.usuarios;
+      // Reutiliza a paginação do endpoint. Nunca pede uma consulta ilimitada.
+      if (mostrarTodos) {
+        for (let p=2;p<=resultado.paginacao.totalPaginas;p++) {
+          if (numeroConsulta !== consultaAtual.current) return;
+          const proxima = await listarUsuarios({...filtrosAplicados.current,pagina:p,limite:50});
+          itens = itens.concat(proxima.usuarios);
+        }
+      }
+      if (numeroConsulta !== consultaAtual.current) return;
+      definirUsuarios([...new Map(itens.map(item=>[item.id,item])).values()]);
       definirPaginacao(resultado.paginacao);
     } catch (erro) { aoErro(mensagemHumana(erro)); }
-    finally { definirCarregando(false); }
+    finally { if (numeroConsulta === consultaAtual.current) definirCarregando(false); }
   }
 
   async function carregarAnalytics() {
@@ -177,6 +200,31 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
     definirConfirmacao({ tipo: "senha", item: item, titulo: "Redefinir a senha?", texto: "Enviaremos as instruções para " + item.email + "." });
   }
 
+  async function escolherAcao(tipo,item) {
+    if (tipo === "dados") return mudarEmail(item);
+    if (tipo === "senha") return redefinir(item);
+    if (tipo === "estado") return alternar(item);
+    if (tipo === "detalhes") {
+      try { definirDetalhes((await obterDetalhesUsuario(item.id)).usuario); }
+      catch (erro) { aoErro(mensagemHumana(erro)); }
+      return;
+    }
+    const textos = {
+      verificar:["Enviar verificação de e-mail?","O usuário receberá um link para confirmar o endereço atual. Isso não bloqueia o acesso de contas existentes."],
+      regularizar:["Solicitar revisão do e-mail?","Mostraremos um aviso na conta para revisar o endereço. O acesso continuará normal."],
+      excluir:["Excluir esta conta?","O acesso será encerrado e a conta sairá da gestão e dos totais. Histórico e vínculos serão preservados; o e-mail continuará reservado."]
+    };
+    definirConfirmacao({tipo,item,titulo:textos[tipo][0],texto:textos[tipo][1]});
+  }
+
+  function dataDetalhe(data) { return data ? new Date(data).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"}) : "Sem registro"; }
+  function inatividade(segundos) {
+    if (segundos === null) return "Nunca acessou";
+    if (segundos < 3600) return Math.floor(segundos/60)+" minutos";
+    if (segundos < 86400) return Math.floor(segundos/3600)+" horas";
+    return Math.floor(segundos/86400)+" dias";
+  }
+
   async function confirmarAcao(evento) {
     evento.preventDefault();
     if (!confirmacao) return;
@@ -199,8 +247,12 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
         const resultado = await iniciarRedefinicaoUsuario(confirmacao.item.id);
         aoMensagem(resultado.mensagem);
       }
+      if (["excluir","verificar","regularizar"].includes(confirmacao.tipo)) {
+        const funcoes = {excluir:excluirUsuario,verificar:enviarVerificacaoUsuario,regularizar:regularizarEmailUsuario};
+        aoMensagem((await funcoes[confirmacao.tipo](confirmacao.item.id)).mensagem);
+      }
       definirConfirmacao(null);
-      await carregarUsuarios();
+      await carregarUsuarios(todos ? 1 : (paginacao?.pagina || 1),todos);
     } catch (erro) { aoErro(mensagemHumana(erro)); }
     finally { definirCarregando(false); }
   }
@@ -212,10 +264,10 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
       {area === "usuarios" && <section className="bloco-admin painel-conteudo">
         <div className="cabecalho-bloco"><div><h2>Contas cadastradas</h2><p>Busque uma pessoa ou ajuste seu acesso.</p></div><button type="button" className="botao-principal" onClick={function abrir() { definirNovoAberto(!novoAberto); }}><Icone nome={novoAberto ? "fechar" : "mais"} />{novoAberto ? "Fechar formulário" : "Novo usuário"}</button></div>
         {novoAberto && <form className="formulario-edicao" onSubmit={adicionar}><label>Nome e sobrenome<input name="nome" autoComplete="name" placeholder="Ex.: Ana Silva" pattern={"\\s*\\S+(?:\\s+\\S+)+\\s*"} title="Informe seu nome e pelo menos um sobrenome. Exemplo: Ana Silva." minLength="2" maxLength="120" required /><small>Informe seu nome e pelo menos um sobrenome.</small></label><label>E-mail<input name="email" type="email" required /></label><label>Senha temporária<CampoSenha name="senha" minLength="12" maxLength="128" autoComplete="new-password" required /></label><label>Tipo de usuário<select name="papel"><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select></label><button type="submit">Criar usuário</button></form>}
-        <form className="filtros-admin" onSubmit={function pesquisar(evento) { evento.preventDefault(); carregarUsuarios(); }}><label>Buscar<input type="search" value={busca} onChange={function mudar(evento) { definirBusca(evento.target.value); }} placeholder="Nome ou e-mail" /></label><label>Tipo<select value={papel} onChange={function mudar(evento) { definirPapel(evento.target.value); }}><option value="">Todos</option><option value="aluno">Alunos</option><option value="professor">Professores</option><option value="admin">Administradores</option></select></label><label>Conta<select value={estado} onChange={function mudar(evento) { definirEstado(evento.target.value); }}><option value="">Todas</option><option value="true">Liberadas</option><option value="false">Bloqueadas</option></select></label><button type="submit">Buscar</button></form>
-        <ul className="lista-administrativa lista-usuarios">{usuarios.map(function renderizar(item) { return <li key={item.id} className={item.ativo ? "" : "inativo"}><span className="identidade-usuario"><span className={"monograma-usuario " + item.papel}>{item.nome.slice(0, 1).toUpperCase()}</span><span><strong>{item.nome}</strong><small>{item.email}</small><small>{nomePapel(item.papel)} · <span className={item.ativo ? "estado-conta ativo" : "estado-conta"}>{item.ativo ? "Conta liberada" : "Conta bloqueada"}</span></small></span></span><div className="controles-usuario"><select aria-label={"Tipo de usuário de " + item.nome} value={item.papel} disabled={item.id === usuario.id} onChange={function mudar(evento) { mudarPapel(item, evento.target.value); }}><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select><details className="menu-acoes-usuario"><summary aria-label={"Mais opções para " + item.nome}><Icone nome="opcoes" /><span>Opções</span></summary><div><button type="button" onClick={function editar() { mudarEmail(item); }}>Editar dados</button><button type="button" onClick={function senha() { redefinir(item); }}>Redefinir senha</button><button type="button" className={item.ativo ? "perigo-texto" : ""} disabled={item.id === usuario.id} onClick={function estadoConta() { alternar(item); }}>{item.ativo ? "Bloquear conta" : "Liberar conta"}</button></div></details></div></li>; })}</ul>
+        <form className="filtros-admin" onSubmit={function pesquisar(evento) { evento.preventDefault(); carregarUsuarios(1,false,true); }}><label>Buscar<input type="search" value={busca} onChange={function mudar(evento) { definirBusca(evento.target.value); }} placeholder="Nome ou e-mail" /></label><label>Tipo<select value={papel} onChange={function mudar(evento) { definirPapel(evento.target.value); }}><option value="">Todos</option><option value="aluno">Alunos</option><option value="professor">Professores</option><option value="admin">Administradores</option></select></label><label>Conta<select value={estado} onChange={function mudar(evento) { definirEstado(evento.target.value); }}><option value="">Todas</option><option value="true">Liberadas</option><option value="false">Bloqueadas</option></select></label><button type="submit">Buscar</button></form>
+        <ul className="lista-administrativa lista-usuarios">{usuarios.map(function renderizar(item) { return <li key={item.id} className={item.ativo ? "" : "inativo"}><span className="identidade-usuario"><span className={"monograma-usuario " + item.papel}>{item.nome.slice(0, 1).toUpperCase()}</span><span><strong>{item.nome}</strong><small>{item.email}</small><small>{nomePapel(item.papel)} · <span className={item.ativo ? "estado-conta ativo" : "estado-conta"}>{item.ativo ? "Conta liberada" : "Conta bloqueada"}</span></small></span></span><div className="controles-usuario"><select aria-label={"Tipo de usuário de " + item.nome} value={item.papel} disabled={item.id === usuario.id} onChange={function mudar(evento) { mudarPapel(item, evento.target.value); }}><option value="aluno">Aluno</option><option value="professor">Professor</option><option value="admin">Administrador</option></select><MenuUsuario key={consultaAtual.current} item={item} proprio={item.id === usuario.id} aoAcao={escolherAcao} /></div></li>; })}</ul>
         {!usuarios.length && !carregando && <Vazio titulo="Nenhum usuário encontrado" texto="Tente outra busca ou altere os filtros." />}
-        {paginacao && <p className="texto-apoio">{paginacao.total} usuário(s) encontrado(s).</p>}
+        {paginacao && <div className="paginacao-usuarios"><span>{usuarios.length} de {paginacao.total} contas · {todos ? "Todas as páginas" : "Página " + paginacao.pagina + " de " + paginacao.totalPaginas}</span><button type="button" disabled={carregando || todos || paginacao.pagina<=1} onClick={()=>carregarUsuarios(paginacao.pagina-1)}>Anterior</button><button type="button" disabled={carregando || todos || paginacao.pagina>=paginacao.totalPaginas} onClick={()=>carregarUsuarios(paginacao.pagina+1)}>Próxima</button><button type="button" disabled={carregando} onClick={()=>carregarUsuarios(1,!todos)}>{todos?"Usar páginas":"Mostrar todos"}</button></div>}
       </section>}
 
       {area === "estatisticas" && analytics && <section className="bloco-admin painel-conteudo">
@@ -247,7 +299,12 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
 
       {area === "historico" && auditoria && <section className="bloco-admin painel-conteudo"><div className="cabecalho-bloco"><div><h2>Histórico de atividades</h2><p>Acompanhe ações importantes realizadas no sistema.</p></div></div><label className="filtro-historico">Mostrar<select value={acao} onChange={function mudar(evento) { definirAcao(evento.target.value); }}><option value="">Todas as atividades</option>{auditoria.acoes.map(function opcao(item) { return <option key={item} value={item}>{nomeAtividade(item)}</option>; })}</select></label><ul className="lista-historico">{auditoria.eventos.map(function evento(item) { return <li key={item.chave}><span className="icone-historico"><Icone nome="historico" /></span><span><strong>{nomeAtividade(item.acao)}</strong><small>{item.descricao} · por {item.ator}</small></span><time>{new Date(item.criadoEm).toLocaleString("pt-BR")}</time></li>; })}</ul>{!auditoria.eventos.length && <Vazio titulo="Nenhuma atividade encontrada" texto="Altere o filtro para consultar outros registros." />}</section>}
 
-      {confirmacao && <Modal titulo={confirmacao.titulo} aoFechar={function fechar() { definirConfirmacao(null); }}><form onSubmit={confirmarAcao}><p>{confirmacao.texto}</p>{confirmacao.tipo === "dados" && <><label>Nome<input value={nomeEmEdicao} minLength="2" maxLength="120" onChange={function mudar(evento) { definirNomeEmEdicao(evento.target.value); }} autoFocus required /></label><label>E-mail<input type="email" value={emailEmEdicao} onChange={function mudar(evento) { definirEmailEmEdicao(evento.target.value); }} required /></label></>}<div className="acoes-formulario"><button type="submit" className={confirmacao.tipo === "estado" && confirmacao.item.ativo ? "perigo" : "botao-principal"} disabled={carregando}>{carregando ? "Concluindo..." : "Confirmar"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirConfirmacao(null); }}>Cancelar</button></div></form></Modal>}
+      {confirmacao && createPortal(<Modal titulo={confirmacao.titulo} aoFechar={function fechar() { definirConfirmacao(null); }}><form onSubmit={confirmarAcao}><p><strong>{confirmacao.item.nome}</strong><br />{confirmacao.item.email}</p><p>{confirmacao.texto}</p>{confirmacao.tipo === "dados" && <><label>Nome<input value={nomeEmEdicao} minLength="2" maxLength="120" onChange={function mudar(evento) { definirNomeEmEdicao(evento.target.value); }} autoFocus required /></label><label>E-mail<input type="email" value={emailEmEdicao} onChange={function mudar(evento) { definirEmailEmEdicao(evento.target.value); }} required /></label></>}<div className="acoes-formulario"><button type="submit" className={(confirmacao.tipo === "excluir" || (confirmacao.tipo === "estado" && confirmacao.item.ativo)) ? "perigo" : "botao-principal"} disabled={carregando}>{carregando ? "Concluindo..." : "Confirmar"}</button><button type="button" className="botao-secundario" onClick={function fechar() { definirConfirmacao(null); }}>Cancelar</button></div></form></Modal>,document.body)}
+      {detalhes && createPortal(<Modal titulo={"Detalhes de " + detalhes.nome} aoFechar={()=>definirDetalhes(null)}><dl className="detalhes-usuario">
+        {[["Nome",detalhes.nome],["E-mail",detalhes.email],["Tipo",nomePapel(detalhes.papel)],["Status",detalhes.ativo?"Liberada":"Bloqueada"],
+          ["Criada em (Brasília)",dataDetalhe(detalhes.criadoEm)], ["Verificação de e-mail",detalhes.emailConfirmadoEm ? "Confirmado em " + dataDetalhe(detalhes.emailConfirmadoEm) : "Sem confirmação registrada; o acesso existente foi preservado"],
+          ["Último login (Brasília)",detalhes.ultimoLogin ? dataDetalhe(detalhes.ultimoLogin) : "Nunca acessou"],["Inatividade desde o login",inatividade(detalhes.inatividadeSegundos)]].map(([nome,valor])=><div key={nome}><dt>{nome}</dt><dd>{valor}</dd></div>)}
+        </dl><button type="button" onClick={()=>definirDetalhes(null)}>Fechar</button></Modal>,document.body)}
     </section>
   );
 }

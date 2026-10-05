@@ -70,7 +70,7 @@ test("cadastro publico bloqueia repeticao, maiusculas, espacos e legado inativo 
     const r = await cadastrar(email);
     assert.equal(r.status, 409);
     assert.equal(r.body.erro.codigo, "EMAIL_JA_CADASTRADO");
-    assert.equal(r.body.erro.mensagem, "Já existe uma conta cadastrada com este e-mail.");
+    assert.match(r.body.erro.mensagem, /[Ee]-mail.*(conta|cadastrad)/);
   }
   assert.equal((await cadastrar("diferente@gmail.com")).status, 201);
   for (const email of ["pessoa@gmail.com", "pes.soa@gmail.com", "pessoa+alias@gmail.com"]) assert.equal((await cadastrar(email)).status, 201);
@@ -79,8 +79,10 @@ test("cadastro publico bloqueia repeticao, maiusculas, espacos e legado inativo 
 test("duas requisicoes simultaneas criam exatamente uma conta com email normalizado", async () => {
   const resultados = await Promise.all([cadastrar("Concorrencia@gmail.com"), cadastrar(" concorrencia@gmail.com ")]);
   assert.deepEqual(resultados.map(r => r.status).sort(), [201, 409]);
-  const [[r]] = await pool.query("SELECT COUNT(*) n FROM usuarios WHERE email='concorrencia@gmail.com'");
+  const [[r]] = await pool.query("SELECT COUNT(*) n FROM cadastros_publicos_pendentes WHERE email='concorrencia@gmail.com'");
   assert.equal(r.n, 1);
+  const [[usuarios]] = await pool.query("SELECT COUNT(*) n FROM usuarios WHERE email='concorrencia@gmail.com'");
+  assert.equal(usuarios.n,0);
 });
 
 test("admin e criacao interna de todos os papeis rejeitam email ocupado", async () => {

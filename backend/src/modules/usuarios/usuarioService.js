@@ -16,6 +16,59 @@ function criarUsuarioService(dependencias) {
   const logger = dependencias.logger;
   const auditoriaRepository = dependencias.auditoriaRepository;
   const autenticacaoService = dependencias.autenticacaoService;
+  const emailContaService = dependencias.emailContaService;
+
+  async function exigirUsuario(id, conexao, trava = false) {
+    const atual = await usuarioRepository.buscarPorId(id, conexao, trava);
+    if (!atual || atual.excluidoEm || atual.cadastroEmailPendente) throw new AppError("Usuário não encontrado",404,"USUARIO_NAO_ENCONTRADO");
+    return atual;
+  }
+
+  async function obterDetalhes(parametroId) {
+    const atual = await usuarioRepository.obterDetalhes(validarUsuarioId(parametroId));
+    if (!atual) throw new AppError("Usuário não encontrado",404,"USUARIO_NAO_ENCONTRADO");
+    return { ...criarUsuarioPublico(atual), criadoEm: atual.criadoEm, ultimoLogin: atual.ultimoLogin,
+      emailConfirmadoEm: atual.emailConfirmadoEm,
+      inatividadeSegundos: atual.ultimoLogin ? Math.max(0,Math.floor((Date.now()-new Date(atual.ultimoLogin).getTime())/1000)) : null };
+  }
+
+  async function excluirUsuario(ator,parametroId,corpo) {
+    const id = validarUsuarioId(parametroId);
+    if (!corpo || corpo.confirmar !== true || Object.keys(corpo).some(k=>k!=="confirmar")) throw new AppError("Confirme explicitamente a exclusão da conta",400,"CONFIRMACAO_OBRIGATORIA");
+    if (id === ator.id) throw new AppError("Você não pode excluir sua própria conta",409,"AUTO_EXCLUSAO_NEGADA");
+    await usuarioRepository.comTravaAdministrativa(async c => {
+      const atual = await exigirUsuario(id,c,true);
+      if (atual.papel === "admin" && atual.ativo && await usuarioRepository.contarAdminsAtivos(c)<=1) throw new AppError("O último administrador ativo não pode ser excluído",409,"ULTIMO_ADMIN_ATIVO");
+      await usuarioRepository.excluirLogicamente(id,c);
+      await autenticacaoRepository.revogarSessoesDoUsuario(id,c);
+      if (atual.papel === "professor") await usuarioRepository.revogarPermissoesDoProfessor(id,ator.id,c);
+      await registrar(ator,"usuario_excluido",id,{exclusaoLogica:true},c);
+    });
+    return { mensagem:"Conta excluída da gestão e acesso encerrado. Histórico e vínculos foram preservados." };
+  }
+
+  async function solicitarRegularizacao(ator,parametroId,corpo) {
+    if (corpo && Object.keys(corpo).length) throw new AppError("Campos não permitidos",400,"CAMPOS_NAO_PERMITIDOS");
+    const id = validarUsuarioId(parametroId);
+    await usuarioRepository.comTravaAdministrativa(async c => {
+      const atual = await exigirUsuario(id,c,true);
+      await usuarioRepository.regularizarEmail(atual,c);
+      await registrar(ator,"regularizacao_email_solicitada",id,{},c);
+    });
+    return {mensagem:"A conta verá um aviso para revisar o e-mail. O acesso não foi bloqueado."};
+  }
+
+  async function enviarVerificacao(ator,parametroId,corpo) {
+    if (corpo && Object.keys(corpo).length) throw new AppError("Campos não permitidos",400,"CAMPOS_NAO_PERMITIDOS");
+    const id = validarUsuarioId(parametroId);
+    const atual = await exigirUsuario(id);
+    if (!atual.ativo) throw new AppError("Libere a conta antes de enviar a verificação",409,"CONTA_BLOQUEADA");
+    const detalhes = await obterDetalhes(id);
+    if (detalhes.emailConfirmadoEm) throw new AppError("O endereço atual já foi confirmado",409,"EMAIL_JA_CONFIRMADO");
+    const resultado = await emailContaService.enviarVerificacaoAdministrativa(atual);
+    await registrar(ator,"verificacao_email_enviada",id,{});
+    return resultado;
+  }
 
   async function listarUsuarios(query) {
     const filtros = validarConsulta(query || {});
@@ -42,7 +95,7 @@ function criarUsuarioService(dependencias) {
     const id = validarUsuarioId(parametroId);
     const dados = validarEdicao(corpo);
     const usuario = await usuarioRepository.comTravaAdministrativa(async function editarComAuditoria(conexao) {
-      const atual = await usuarioRepository.buscarPorId(id, conexao);
+      const atual = await exigirUsuario(id, conexao);
       if (!atual) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
       if (!await usuarioRepository.atualizarDados(id, dados.nome, dados.email, conexao)) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
       await registrar(usuarioAutenticado, "usuario_editado", id, { nomeAlterado: true, emailAlterado: true }, conexao);
@@ -64,7 +117,7 @@ function criarUsuarioService(dependencias) {
     }
 
     await usuarioRepository.comTravaAdministrativa(async function alterarComSeguranca(conexao) {
-      const atual = await usuarioRepository.buscarPorId(usuarioId,conexao,true);
+      const atual = await exigirUsuario(usuarioId,conexao,true);
       if (!atual) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
       if (atual.papel === "admin" && atual.ativo && !dados.ativo && await usuarioRepository.contarAdminsAtivos(conexao) <= 1) {
         throw new AppError("O ultimo administrador ativo nao pode ser bloqueado", 409, "ULTIMO_ADMIN_ATIVO");
@@ -95,7 +148,7 @@ function criarUsuarioService(dependencias) {
 
     let atual;
     await usuarioRepository.comTravaAdministrativa(async function alterarComSeguranca(conexao) {
-      atual = await usuarioRepository.buscarPorId(usuarioId,conexao,true);
+      atual = await exigirUsuario(usuarioId,conexao,true);
       if (!atual) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
       if (atual.papel === "admin" && atual.ativo && dados.papel !== "admin" && await usuarioRepository.contarAdminsAtivos(conexao) <= 1) {
         throw new AppError("O ultimo administrador ativo deve permanecer administrador", 409, "ULTIMO_ADMIN_ATIVO");
@@ -117,7 +170,7 @@ function criarUsuarioService(dependencias) {
   async function iniciarRedefinicao(usuarioAutenticado, parametroId, corpo) {
     if (corpo && Object.keys(corpo).length) throw new AppError("Campos nao permitidos", 400, "CAMPOS_NAO_PERMITIDOS");
     const id = validarUsuarioId(parametroId);
-    const usuario = await usuarioRepository.buscarPorId(id);
+    const usuario = await exigirUsuario(id);
     if (!usuario) throw new AppError("Usuario nao encontrado", 404, "USUARIO_NAO_ENCONTRADO");
     await autenticacaoService.solicitarRecuperacao({ email: usuario.email });
     await registrar(usuarioAutenticado, "redefinicao_administrativa_iniciada", id, {});
@@ -125,6 +178,7 @@ function criarUsuarioService(dependencias) {
   }
 
   return {
+    obterDetalhes, excluirUsuario, solicitarRegularizacao, enviarVerificacao,
     listarUsuarios: listarUsuarios,
     criarUsuario: criarUsuario,
     editarUsuario: editarUsuario,

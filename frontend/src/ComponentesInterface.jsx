@@ -64,6 +64,9 @@ function mensagemHumana(falhaOuMensagem) {
   }
 
   if (codigo?.startsWith("UPLOAD_")) return mensagem;
+  if (codigo === "ENVIO_EMAIL_INDISPONIVEL") {
+    return "Não conseguimos enviar o e-mail agora. O cadastro ou endereço atual foi preservado. Aguarde um minuto e tente reenviar. Confira também Spam ou Lixo eletrônico.";
+  }
 
   if (codigo === "API_INDISPONIVEL" || status >= 500) {
     return "O sistema está temporariamente indisponível. Tente novamente em instantes.";

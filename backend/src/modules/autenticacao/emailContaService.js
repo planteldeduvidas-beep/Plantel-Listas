@@ -5,7 +5,7 @@ const { gerarTokenAleatorio, gerarHashDoToken, adicionarMinutos } = require("../
 const criarUsuarioPublico = require("../usuarios/usuarioPublico");
 const { serializarErroSeguro } = require("../../shared/config/logger");
 
-function criarEmailContaService({ repository, usuarioRepository, emailProvider, configuracao, logger }) {
+function criarEmailContaService({ repository, usuarioRepository, emailProvider, configuracao, logger, cadastroPendenteService }) {
   async function obterAviso(usuario) {
     try {
       return { ...usuario, emailPrecisaRevisao: await repository.precisaRevisao(usuario.id, usuario.email) };
@@ -32,9 +32,9 @@ function criarEmailContaService({ repository, usuarioRepository, emailProvider, 
     return enviar(usuario, email);
   }
 
-  async function enviar(usuario, email, cadastro = false) {
+  async function enviar(usuario, email, cadastro = false, cooldown = false) {
     const token = gerarTokenAleatorio();
-    const id = await repository.criar(usuario, email, gerarHashDoToken(token), adicionarMinutos(new Date(), 60), cadastro);
+    const id = await repository.criar(usuario, email, gerarHashDoToken(token), adicionarMinutos(new Date(), 60), cadastro, cooldown);
     try {
       await emailProvider.enviarConfirmacaoEmail({ destinatario: email, alteracao: email !== usuario.email,
         link: configuracao.frontendUrl + "/?tokenEmail=" + encodeURIComponent(token) + (cadastro ? "&cadastroEmail=1" : "") });
@@ -63,6 +63,7 @@ function criarEmailContaService({ repository, usuarioRepository, emailProvider, 
     const email = normalizarEmail(corpo.email || emailAtual);
     const senha = validarSenha(corpo.senha);
     const usuario = await usuarioRepository.buscarPorEmail(emailAtual);
+    if (!usuario && cadastroPendenteService) return cadastroPendenteService.solicitar(corpo);
     if (!await verificarSenhaSemEnumerar(usuario?.senhaHash, senha) || !usuario?.ativo) {
       throw new AppError("Confira o e-mail cadastrado e sua senha.", 401, "CREDENCIAIS_INVALIDAS");
     }
@@ -77,11 +78,12 @@ function criarEmailContaService({ repository, usuarioRepository, emailProvider, 
     if (typeof corpo.token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(corpo.token)) throw new AppError("Link inválido. Solicite um novo link de confirmação.", 400, "CONFIRMACAO_EMAIL_INVALIDA");
     const hash = gerarHashDoToken(corpo.token);
     const id = await repository.buscarCadastroPorToken(hash);
+    if (!id && cadastroPendenteService) return cadastroPendenteService.confirmar(corpo);
     if (!id) throw new AppError("Este link expirou ou já foi usado. Solicite um novo link.", 400, "CONFIRMACAO_EMAIL_INVALIDA");
     const usuario = await repository.confirmar(id, hash, true);
     return { email: usuario.email, mensagem: "E-mail confirmado! Agora você pode entrar com seu e-mail e senha." };
   }
-  return { solicitar, confirmar, obterAviso, solicitarCadastro, confirmarCadastro, enviarNoCadastro: usuario => enviar(usuario, usuario.email, true) };
+  return { solicitar, confirmar, obterAviso, solicitarCadastro, confirmarCadastro, enviarVerificacaoAdministrativa: usuario => enviar(usuario,usuario.email,false,true), enviarNoCadastro: usuario => enviar(usuario, usuario.email, true) };
 }
 
 module.exports = criarEmailContaService;

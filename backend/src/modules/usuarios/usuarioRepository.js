@@ -19,6 +19,7 @@ function mapearUsuario(registro) {
     versaoSessao: Number(registro.versao_sessao || 1),
     papel: registro.papel,
     ativo: registro.ativo === 1,
+    excluidoEm: registro.excluido_em,
     criadoEm: registro.criado_em,
     atualizadoEm: registro.atualizado_em
   };
@@ -66,7 +67,7 @@ function criarUsuarioRepository(pool) {
 
   async function buscarPorEmail(email) {
     const [registros] = await pool.execute(
-      "SELECT id, nome, email, senha_hash, versao_sessao, papel, ativo, criado_em, atualizado_em "
+      "SELECT id, nome, email, senha_hash, versao_sessao, papel, ativo, criado_em, atualizado_em, excluido_em "
       + ", EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=usuarios.id) AS cadastro_email_pendente FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
@@ -76,7 +77,7 @@ function criarUsuarioRepository(pool) {
   async function buscarPorId(usuarioId, executorInformado, bloquear) {
     const executor = executorInformado || pool;
     const [registros] = await executor.execute(
-      "SELECT id, nome, email, senha_hash, versao_sessao, papel, ativo, criado_em, atualizado_em "
+      "SELECT id, nome, email, senha_hash, versao_sessao, papel, ativo, criado_em, atualizado_em, excluido_em "
       + ", EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=usuarios.id) AS cadastro_email_pendente FROM usuarios WHERE id = ? LIMIT 1" + (bloquear ? " FOR UPDATE" : ""),
       [usuarioId]
     );
@@ -111,7 +112,7 @@ function criarUsuarioRepository(pool) {
   }
 
   async function listar(filtros) {
-    const condicoes = [];
+    const condicoes = ["excluido_em IS NULL", "NOT EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=usuarios.id)"];
     const parametros = [];
     if (filtros.busca) { condicoes.push("(nome LIKE ? OR email LIKE ?)"); parametros.push("%" + filtros.busca + "%", "%" + filtros.busca + "%"); }
     if (filtros.papel) { condicoes.push("papel=?"); parametros.push(filtros.papel); }
@@ -146,7 +147,7 @@ function criarUsuarioRepository(pool) {
 
   async function atualizarEmail(usuarioId, email, executorInformado) {
     return comEmailProtegido(email, usuarioId, executorInformado, async (executor, normalizado) => {
-      const [resultado] = await executor.execute("UPDATE usuarios SET email=? WHERE id=?", [normalizado, usuarioId]);
+      const [resultado] = await executor.execute("UPDATE usuarios SET email_confirmado_em=IF(email=?,email_confirmado_em,NULL),email=? WHERE id=?", [normalizado, normalizado, usuarioId]);
       return resultado.affectedRows > 0;
     });
   }
@@ -154,8 +155,8 @@ function criarUsuarioRepository(pool) {
   async function atualizarDados(usuarioId, nome, email, executorInformado) {
     return comEmailProtegido(email, usuarioId, executorInformado, async (executor, normalizado) => {
       const [resultado] = await executor.execute(
-        "UPDATE usuarios SET nome=?,email=? WHERE id=?",
-        [nome, normalizado, usuarioId]
+        "UPDATE usuarios SET email_confirmado_em=IF(email=?,email_confirmado_em,NULL),nome=?,email=? WHERE id=?",
+        [normalizado, nome, normalizado, usuarioId]
       );
       return resultado.affectedRows > 0;
     });
@@ -200,6 +201,20 @@ function criarUsuarioRepository(pool) {
   }
 
   return {
+    obterDetalhes: async id => {
+      const usuario = await buscarPorId(id);
+      if (!usuario || usuario.excluidoEm || usuario.cadastroEmailPendente) return null;
+      // Epoch evita interpretar TIMESTAMP com o timezone local do processo Node.
+      const [[dados]] = await pool.execute("SELECT UNIX_TIMESTAMP(u.criado_em)*1000 AS criado_ms, UNIX_TIMESTAMP((SELECT MAX(criado_em) FROM sessoes WHERE usuario_id=u.id))*1000 AS login_ms, UNIX_TIMESTAMP(COALESCE(u.email_confirmado_em,(SELECT MAX(usada_em) FROM confirmacoes_email WHERE usuario_id=u.id AND email_destino=u.email AND usada_em IS NOT NULL)))*1000 AS email_ms FROM usuarios u WHERE u.id=?",[id]);
+      const data = ms => ms === null ? null : new Date(Number(ms));
+      return {...usuario,criadoEm:data(dados.criado_ms),ultimoLogin:data(dados.login_ms),emailConfirmadoEm:data(dados.email_ms)};
+    },
+    excluirLogicamente: async (id,c) => {
+      await c.execute("UPDATE usuarios SET excluido_em=CURRENT_TIMESTAMP(3),ativo=0,versao_sessao=versao_sessao+1 WHERE id=?",[id]);
+      await c.execute("UPDATE recuperacoes_senha SET usada_em=COALESCE(usada_em,CURRENT_TIMESTAMP(3)) WHERE usuario_id=?",[id]);
+      await c.execute("UPDATE confirmacoes_email SET cancelada_em=COALESCE(cancelada_em,CURRENT_TIMESTAMP(3)) WHERE usuario_id=? AND usada_em IS NULL",[id]);
+    },
+    regularizarEmail: async (usuario,c) => c.execute("INSERT INTO lembretes_email(usuario_id,email_identificado) VALUES (?,?) ON DUPLICATE KEY UPDATE email_identificado=VALUES(email_identificado),resolvido_em=NULL",[usuario.id,usuario.email]),
     buscarPorEmail: buscarPorEmail,
     buscarPorId: buscarPorId,
     criarAluno: criarAluno,
