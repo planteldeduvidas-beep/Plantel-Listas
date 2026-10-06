@@ -3,7 +3,7 @@ const {
   limparCookieDeSessao
 } = require("../../shared/utils/cookies");
 
-function criarAutenticacaoController(service, configuracao, emailContaService, termosService) {
+function criarAutenticacaoController(service, configuracao, emailContaService, termosService, faixaEtariaService) {
   async function cadastrar(req, res) {
     res.status(201).json(await service.cadastrar(req.body));
   }
@@ -36,6 +36,10 @@ function criarAutenticacaoController(service, configuracao, emailContaService, t
   }
 
   return {
+    obterPerfil: async (req,res) => res.json(await faixaEtariaService.obterPerfil(req.usuario)),
+    atualizarPerfil: async (req,res) => res.json(await faixaEtariaService.atualizarPerfil(req.usuario,req.body)),
+    obterFaixaEtaria: async (req,res) => res.json(await faixaEtariaService.obter(req.usuario)),
+    atualizarFaixaEtaria: async (req,res) => res.json(await faixaEtariaService.atualizar(req.usuario,req.body)),
     obterTermos: async (req,res) => res.json(await termosService.obter(req.usuario)),
     aceitarTermos: async (req,res) => res.json(await termosService.aceitar(req.usuario,req.body)),
     solicitarConfirmacaoCadastro: async (req, res) => res.status(200).json(await emailContaService.solicitarCadastro(req.body)),

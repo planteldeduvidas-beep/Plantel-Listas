@@ -4,6 +4,7 @@ const impedirCachePrivado = require("../../shared/middlewares/impedirCachePrivad
 function criarHistoricoAlunoRoutes(dependencias) {
   const router = express.Router();
   router.use(impedirCachePrivado, dependencias.autenticar, dependencias.autorizarAluno);
+  router.use(dependencias.exigirFaixaEtaria);
   router.get("/", dependencias.controller.listar);
   return router;
 }

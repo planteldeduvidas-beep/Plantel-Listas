@@ -137,7 +137,7 @@ test("cadastros publicos pendentes nao sao usuarios nem metricas; confirmacao co
   // O agente conserva a sessao persistida no banco, mesmo com app novo.
   const agente = request.agent(aplicacao);
   const token = (await agente.get("/api/autenticacao/csrf")).body.csrfToken;
-  const r = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",token).send({nome:"Pessoa Pendente",email:"pendente@instituto.edu.br",senha,aceiteTermos:{aceito:true,...require('../../shared/documentosLegais.json')}});
+  const r = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",token).send({nome:"Pessoa Pendente",email:"pendente@instituto.edu.br",senha,faixaEtaria:'18_mais',aceiteTermos:{aceito:true,...require('../../shared/documentosLegais.json')}});
   assert.equal(r.status,201);
   assert.equal(Object.hasOwn(r.body,"usuario"),false);
   const [[conta]] = await pool.execute("SELECT COUNT(*) n FROM usuarios WHERE email='pendente@instituto.edu.br'");

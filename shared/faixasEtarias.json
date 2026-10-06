@@ -1,0 +1,5 @@
+[
+  { "valor": "menos_12", "rotulo": "Menos de 12 anos" },
+  { "valor": "12_17", "rotulo": "12 a 17 anos" },
+  { "valor": "18_mais", "rotulo": "18 anos ou mais" }
+]

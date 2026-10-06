@@ -6,6 +6,7 @@ function criarAcervoRoutes(dependencias) {
   const router = express.Router();
   router.use(impedirCachePrivado);
   router.use(dependencias.autenticar);
+  router.use(dependencias.exigirFaixaEtaria);
   router.get("/", dependencias.rateLimiterConsulta, dependencias.controller.consultar);
   router.get("/organizacao", dependencias.autorizarAdmin, dependencias.controller.obterOrganizacao);
   router.get("/materiais/:materialId/conteudo", dependencias.controller.visualizar);

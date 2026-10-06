@@ -9,7 +9,10 @@ const comuns = [
 ];
 
 const porPapel = {
-  aluno: [{ pergunta: "Onde vejo os materiais que já acessei?", resposta: "Abra Meu Histórico no menu. Ali aparecem os materiais que você abriu ou baixou. Use Abrir novamente para voltar a um deles. Materiais que deixaram de estar disponíveis podem não aparecer." }],
+  aluno: [
+    { pergunta: "Onde vejo os materiais que já acessei?", resposta: "Abra Meu Histórico no menu. Ali aparecem os materiais que você abriu ou baixou. Use Abrir novamente para voltar a um deles. Materiais que deixaram de estar disponíveis podem não aparecer." },
+    { pergunta: "Sou menor de idade ou responsável por um aluno. Como peço ajuda?", resposta: "Peça orientação a um responsável sobre o uso da plataforma. A faixa etária é declarada no cadastro ou, quando ausente, antes de continuar. Em Meu perfil você pode conferi-la. Se declarou menos de 18 anos e precisa corrigir, envie uma mensagem ao Suporte pedindo revisão da faixa etária; somente a equipe administrativa pode corrigir após analisar. Isso não exclui a conta nem altera o histórico. Para dúvidas de segurança ou privacidade, escreva para suporteplantellistas@gmail.com. Se não conseguir entrar, use Problemas com sua conta? na tela de login. Não envie senhas, códigos, documentos ou informações de saúde no primeiro contato. A equipe precisa verificar a legitimidade antes de compartilhar dados de uma conta; declarar a faixa etária, confirmar um e-mail ou marcar os Termos não comprova idade ou autorização de responsável." }
+  ],
   professor: [
     { pergunta: "Por que não consigo editar determinada pasta?", resposta: "Confira Pastas liberadas no menu. Você só pode gerenciar as pastas autorizadas para sua conta. Se faltar uma pasta, peça a liberação ao administrador. Conseguir visualizar um material não significa ter permissão para alterá-lo." },
     { pergunta: "Como envio um material para minha pasta?", resposta: "Na Biblioteca, entre em uma pasta liberada e toque em Adicionar material. Escolha um PDF ou vídeo e confira a pasta de destino. O nome é opcional: digite apenas o título, pois a extensão é adicionada automaticamente. Aguarde a confirmação antes de repetir o envio." }

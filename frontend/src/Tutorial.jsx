@@ -31,6 +31,15 @@ const GUIAS = Object.freeze({
           "Se relatar um problema com material, diga em qual pasta ou arquivo ele ocorreu e qual aviso apareceu.",
           "Toque em Enviar mensagem e aguarde a confirmação na tela. A resposta será enviada ao e-mail da sua conta."
         ], dica: "Nunca envie senha ou código de acesso na mensagem."
+      },
+      {
+        area: "meuPerfil", titulo: "Meu perfil", resumo: "Confira seus dados e atualize seu e-mail com segurança.",
+        passos: [
+          "No menu, toque em Meu perfil. Confira seu nome, e-mail, confirmação, faixa etária declarada e data da conta.",
+          "Para corrigir seu nome, altere o campo e toque em Salvar meus dados. Quem declarou menos de 18 anos precisa pedir revisão da faixa etária ao Suporte. Quem declarou 18 anos ou mais pode corrigir a faixa no perfil; se escolher uma faixa de menor, próximas correções também passam pelo Suporte. Seus estudos continuam disponíveis.",
+          "Se sua conta ainda não tiver faixa etária, uma pergunta aparece antes de abrir o painel. Escolha uma das três opções e toque em Continuar. Não pedimos data de nascimento nem documentos.",
+          "Para mudar ou confirmar seu e-mail, abra Atualizar ou confirmar meu e-mail, informe o endereço e sua senha atual e envie o link. Confira também spam e lixo eletrônico. Só após confirmar o link o endereço muda; até lá, use o e-mail antigo para entrar e recuperar a senha."
+        ], dica: "A faixa é uma declaração, não uma comprovação de idade. Não muda suas permissões nem apaga seu histórico."
       }
     ]
   },

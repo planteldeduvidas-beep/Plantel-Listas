@@ -1,5 +1,5 @@
 const AREAS_POR_PAPEL = {
-  aluno: ["acervo", "meuHistorico", "suporte", "tutorial"],
+  aluno: ["acervo", "meuHistorico", "meuPerfil", "suporte", "tutorial"],
   professor: ["acervo", "minhasPastas", "suporte", "tutorial"],
   admin: ["estatisticas", "acervo", "usuarios", "acessos", "organizacao", "historico", "drive", "parceiros", "avisos", "tutorial"]
 };

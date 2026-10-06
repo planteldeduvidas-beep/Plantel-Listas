@@ -1,0 +1,21 @@
+.faixa-etaria-aluno { margin-block: 1rem; min-width: 0; }
+.faixa-etaria-aluno form { max-width: 42rem; }
+.faixa-etaria-aluno p, .faixa-etaria-aluno small { overflow-wrap: anywhere; }
+.faixa-etaria-aluno select { width: 100%; min-width: 0; }
+.acoes-faixa-etaria { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.coleta-faixa-fundo { min-height: 100dvh; box-sizing: border-box; padding: 1.25rem; display: flex; align-items: center; justify-content: center; background: var(--cor-fundo, #eaf1ef); }
+.coleta-faixa-modal { width: 100%; max-width: 32rem; box-sizing: border-box; padding: clamp(1.25rem, 4vw, 2rem); background: var(--cor-superficie, #fff); color: var(--cor-texto, #142c29); border-radius: 1rem; box-shadow: 0 12px 40px #123c3020; }
+.coleta-faixa-modal h1 { font-size: 1.5rem; margin-top: 0; }
+.coleta-faixa-modal small { display: block; margin-top: .75rem; }
+.meu-perfil { padding: clamp(1rem, 3vw, 2rem); }
+.meu-perfil form { display: grid; gap: 1rem; }
+.meu-perfil input { width: 100%; box-sizing: border-box; }
+.resumo-meu-perfil { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.25rem; margin-block: 1.5rem; }
+.resumo-meu-perfil dt { font-size: .85rem; opacity: .8; }
+.resumo-meu-perfil dd { margin: .35rem 0 0; overflow-wrap: anywhere; }
+.email-no-perfil { margin-top: 1.5rem; border-top: 1px solid #718e8533; padding-top: 1rem; }
+.email-no-perfil summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 600px) {
+  .resumo-meu-perfil { grid-template-columns: minmax(0,1fr); }
+  .acoes-faixa-etaria > button { width: 100%; }
+}

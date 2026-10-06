@@ -101,10 +101,10 @@ async function requisitar(caminho, opcoesInformadas, csrfRenovado = false) {
   return dados;
 }
 
-function cadastrar(nome, email, senha, aceiteTermos) {
+function cadastrar(nome, email, senha, aceiteTermos, faixaEtaria) {
   return requisitar("/autenticacao/cadastro", {
     method: "POST",
-    body: JSON.stringify({ nome: nome, email: email, senha: senha, aceiteTermos })
+    body: JSON.stringify({ nome: nome, email: email, senha: senha, aceiteTermos, faixaEtaria })
   });
 }
 
@@ -169,6 +169,12 @@ function obterAuditoria(filtros) {
 function obterUrlRelatorio(periodo) { return API_BASE + "/analytics/relatorio.csv?periodo=" + periodo; }
 function enviarSuporte(assunto, mensagem) { return requisitar("/suporte", { method: "POST", body: JSON.stringify({ assunto: assunto, mensagem: mensagem }) }); }
 export function enviarAjudaConta(dados) { return requisitar("/suporte/conta", { method: "POST", body: JSON.stringify(dados) }); }
+export function obterFaixaEtaria() { return requisitar('/autenticacao/faixa-etaria', { method: 'GET' }); }
+export function obterPerfilAluno() { return requisitar('/autenticacao/perfil', { method: 'GET' }); }
+export function obterFaixaEtariaUsuario(id) { return requisitar('/usuarios/' + id + '/faixa-etaria'); }
+export function corrigirFaixaEtariaUsuario(id, faixaEtaria, justificativa) { return requisitar('/usuarios/' + id + '/faixa-etaria', { method: 'POST', body: JSON.stringify({ faixaEtaria, justificativa }) }); }
+export function atualizarPerfilAluno(nome, faixaEtaria) { return requisitar('/autenticacao/perfil', { method: 'POST', body: JSON.stringify({ nome, faixaEtaria }) }); }
+export function atualizarFaixaEtaria(faixaEtaria) { return requisitar('/autenticacao/faixa-etaria', { method: 'POST', body: JSON.stringify({ faixaEtaria }) }); }
 function obterMeuHistorico(pagina, limite) { return requisitar("/meu-historico?pagina=" + pagina + "&limite=" + limite, { method: "GET" }); }
 function listarParceiros() { return requisitar("/parceiros", { method: "GET" }); }
 function listarParceirosAdmin() { return requisitar("/parceiros/admin", { method: "GET" }); }

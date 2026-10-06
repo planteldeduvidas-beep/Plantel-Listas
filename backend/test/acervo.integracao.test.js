@@ -104,7 +104,7 @@ async function limpar() {
 
 async function criarUsuario(email, papel) {
   const [resultado] = await pool.execute(
-    "INSERT INTO usuarios (email,senha_hash,papel) VALUES (?,?,?)",
+    "INSERT INTO usuarios (email,senha_hash,papel,faixa_etaria_declarada) VALUES (?,?,?,'18_mais')",
     [email, await criarHashDaSenha("Senha-forte-fase-5"), papel]
   );
   return { id: Number(resultado.insertId), email: email, papel: papel };
@@ -330,7 +330,7 @@ test("meu historico registra uso do aluno, isola usuarios e oculta material indi
   const outroAluno = request.agent(aplicacao);
   const csrf = (await outroAluno.get("/api/autenticacao/csrf")).body.csrfToken;
   const [outro] = await pool.execute(
-    "INSERT INTO usuarios (nome,email,senha_hash,papel) VALUES (?,?,?,'aluno')",
+    "INSERT INTO usuarios (nome,email,senha_hash,papel,faixa_etaria_declarada) VALUES (?,?,?,'aluno','18_mais')",
     ["Outro Aluno", "outro-historico@example.com", await criarHashDaSenha("Senha-forte-fase-5")]
   );
   assert.ok(outro.insertId > 0);

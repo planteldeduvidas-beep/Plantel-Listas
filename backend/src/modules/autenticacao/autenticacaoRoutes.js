@@ -30,6 +30,10 @@ function criarAutenticacaoRoutes(dependencias) {
   );
   router.post("/logout", autenticar, protegerContraCsrf, controller.sair);
   router.get("/me", autenticar, controller.obterUsuarioAtual);
+  router.get('/faixa-etaria', autenticar, controller.obterFaixaEtaria);
+  router.get('/perfil', autenticar, controller.obterPerfil);
+  router.post('/perfil', autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.atualizarPerfil);
+  router.post('/faixa-etaria', autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.atualizarFaixaEtaria);
   router.get('/termos', autenticar, controller.obterTermos);
   router.post('/termos/aceitar', autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.aceitarTermos);
   router.post("/email/solicitar", autenticar, rateLimiters.emailConta, protegerContraCsrf, controller.solicitarConfirmacaoEmail);

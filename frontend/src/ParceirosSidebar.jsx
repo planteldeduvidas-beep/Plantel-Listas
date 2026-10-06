@@ -77,7 +77,7 @@ export default function ParceirosSidebar({ versao }) {
       <span className="parceiros-sidebar-rotulo">Parceiros Plantel</span>
       <div className="parceiros-sidebar-vitrine">
       <div className={"parceiros-sidebar-conteudo entrando-" + direcao} key={parceiro.id}>
-        <a className="parceiros-sidebar-imagem" href={parceiro.link} target="_blank" rel="noopener noreferrer" aria-label={"Conhecer " + parceiro.nome}>
+        <a className="parceiros-sidebar-imagem" href={parceiro.link} target="_blank" rel="noopener noreferrer" aria-label={"Conhecer " + parceiro.nome + " (site externo, abre em nova aba)"}>
           {parceiro.imagemUrl && !imagemFalhou
             ? <img src={parceiro.imagemUrl} alt={"Logo de " + parceiro.nome} onError={() => definirImagemFalhou(true)} />
             : <span aria-hidden="true">{parceiro.nome.slice(0, 1).toUpperCase()}</span>}
@@ -89,7 +89,7 @@ export default function ParceirosSidebar({ versao }) {
           {parceiro.cupom && <button type="button" onClick={copiarCupom} title="Copiar cupom">Cupom: {parceiro.cupom}</button>}
           {parceiro.desconto && <small>{parceiro.desconto}</small>}
         </div>}
-        <a className="parceiros-sidebar-link" href={parceiro.link} target="_blank" rel="noopener noreferrer">
+        <a className="parceiros-sidebar-link" href={parceiro.link} target="_blank" rel="noopener noreferrer" title="Site externo; abre em nova aba" aria-label={"Conhecer parceiro " + parceiro.nome + " (site externo, abre em nova aba)"}>
           Conhecer parceiro<span aria-hidden="true">↗</span>
         </a>
         </div>

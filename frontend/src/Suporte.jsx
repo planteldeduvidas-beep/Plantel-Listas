@@ -4,7 +4,7 @@ import { enviarSuporte } from "./api.js";
 import { Alerta, Icone, Modal, mensagemHumana } from "./ComponentesInterface.jsx";
 import AvisoEmail from "./AvisoEmail.jsx";
 
-function Suporte({ usuario, aoAtualizarEmail }) {
+function Suporte({ usuario, aoAtualizarEmail, aoAbrirPerfil }) {
   const campoAssunto = useRef(null);
   const chaveApresentacao = `plantel:suporte:apresentacao:${usuario.id}`;
   const [mostrarApresentacao, definirMostrarApresentacao] = useState(() => {
@@ -43,6 +43,7 @@ function Suporte({ usuario, aoAtualizarEmail }) {
   return (
     <section className="bloco-admin painel-conteudo painel-suporte">
       <section className="duvidas-suporte" aria-labelledby="titulo-duvidas-suporte">
+        {usuario.papel === 'aluno' && <button type="button" className="botao-secundario" onClick={aoAbrirPerfil}>Conferir meus dados em Meu perfil</button>}
         <h2 id="titulo-duvidas-suporte">Dúvidas frequentes</h2>
         <p>Toque em uma pergunta para ver a resposta. Para um passo a passo, consulte também Como usar no menu.</p>
         {obterDuvidasSuporte(usuario.papel).map(({ pergunta, resposta }) => (

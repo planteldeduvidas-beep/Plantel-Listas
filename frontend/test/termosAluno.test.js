@@ -12,6 +12,7 @@ test('aceite inicia desmarcado, exige escolha e oferece documentos em outra aba'
     assert.match(html,/type="checkbox"/);assert.match(html,/required/);assert.doesNotMatch(html,/checked=""/);
     assert.match(html,/href="\/termos" target="_blank"/);assert.match(html,/href="\/privacidade" target="_blank"/);
     assert.equal(aceiteAtual(false).aceito,false);
-    assert.equal(aceiteAtual(true).termos,'2026-09-21');
+    assert.equal(aceiteAtual(true).termos,'2026-10-06');
+    assert.equal(aceiteAtual(true).privacidade,'2026-10-06');
   } finally {await vite.close();}
 });

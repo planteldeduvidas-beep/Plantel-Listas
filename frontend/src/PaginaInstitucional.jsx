@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { AlternadorTema, aplicarTema, lerTemaSalvo } from "./ComponentesInterface.jsx";
+import versoesDocumentos from "../../shared/documentosLegais.json";
 
-const ATUALIZACAO = "21 de setembro de 2026";
+function dataDocumento(documento) {
+  const [ano, mes, dia] = versoesDocumentos[documento].split("-").map(Number);
+  return new Date(ano, mes - 1, dia).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+}
 
 function LinkGooglePolicy() {
   return (
@@ -27,7 +31,7 @@ function CabecalhoInstitucional({ titulo, resumo, documento }) {
         <span>Documento institucional</span>
         <h1>{titulo}</h1>
         <p>{resumo}</p>
-        <small>Última atualização: {ATUALIZACAO}</small>
+        <small>Última atualização: {dataDocumento(documento)}</small>
       </div>
     </header>
   );
@@ -72,6 +76,7 @@ function PoliticaPrivacidade() {
           <li>nome, e-mail e senha no cadastro e na administração da conta;</li>
           <li>assunto e mensagem enviados ao suporte, vinculados ao nome, e-mail e perfil da conta; no atendimento sem login, nome, identificação da conta e e-mail de contato informados pela própria pessoa, cuja identidade ainda não foi verificada;</li>
           <li>nova senha e token temporário quando há recuperação de acesso.</li>
+          <li>faixa etária declarada pelo aluno (menos de 12, 12 a 17 ou 18 anos ou mais) e data do registro, para orientar cuidados relativos à idade; não é uma idade verificada nem uma data de nascimento.</li>
         </ul>
         <p>As senhas são protegidas por mecanismos criptográficos adequados e não são armazenadas em texto puro.</p>
 
@@ -140,6 +145,13 @@ function PoliticaPrivacidade() {
         <h2>13. Contato</h2>
         <p>Solicitações relacionadas à privacidade e ao exercício de direitos deverão ser encaminhadas para <a href="mailto:suporteplantellistas@gmail.com">suporteplantellistas@gmail.com</a>.</p>
       </section>
+      <section>
+        <h2>14. Crianças, adolescentes e responsáveis</h2>
+        <p>A proteção dos dados de crianças e adolescentes também se aplica ao acesso gratuito aos materiais de estudo, independentemente de qualquer pagamento. O tratamento deve observar seu melhor interesse, a LGPD e as regras aplicáveis do Estatuto Digital da Criança e do Adolescente.</p>
+          <p>Aceitar os Termos ou confirmar um endereço de e-mail não comprova a idade nem a autorização de um responsável. No cadastro, solicitamos apenas a faixa etária declarada. Alunos existentes sem essa informação precisam declará-la antes de continuar usando a plataforma; isso não exclui a conta nem altera seu histórico. A declaração, sua data e sua origem ficam registradas e podem ser consultadas em Meu perfil. Quem declarou menos de 18 anos deve solicitar correção ao Suporte; um administrador revisa o pedido antes de corrigir. Quem declarou 18 anos ou mais pode corrigir no perfil, mas, se escolher uma faixa de menor, próximas correções também passam pela revisão. Alterações relevantes preservam faixa anterior, nova faixa, data e origem em auditoria restrita. Essa declaração não verifica a idade ou a responsabilidade parental. Quando o tratamento depender de consentimento do responsável, esse consentimento deve ser específico e verificável; a caixa de aceite do aluno não o substitui.</p>
+        <p>Alunos e responsáveis podem pedir esclarecimentos ou exercer direitos pelo contato de privacidade acima. Não envie senhas, códigos de acesso, documentos ou informações de saúde no primeiro contato. Antes de fornecer dados de uma conta a terceiros, inclusive a quem se apresente como responsável, será necessário verificar a legitimidade da solicitação de forma proporcional.</p>
+          <p>Para proteger menores, não criamos perfil publicitário comportamental nem selecionamos parceiros por idade, buscas, histórico ou cliques individuais. Essa proteção é aplicada também aos demais alunos. A declaração de menoridade não impede o acesso aos materiais de estudo. Histórico e buscas são utilizados nas funcionalidades de estudo e nas métricas internas descritas nesta Política. Parceiros Plantel e seus cupons podem ser exibidos de forma igual para os usuários; os links levam a serviços externos, sujeitos às suas próprias condições.</p>
+      </section>
     </>
   );
 }
@@ -171,6 +183,11 @@ function TermosUso() {
       <section><h2>12. Privacidade</h2><p>O tratamento de dados pessoais é explicado na <a href="/privacidade">Política de Privacidade</a>.</p></section>
       <section><h2>13. Alterações destes Termos</h2><p>Estes Termos poderão ser revisados para acompanhar mudanças no serviço ou nas regras aplicáveis. A data da versão vigente será exibida nesta página.</p></section>
       <section><h2>14. Contato</h2><p>Dúvidas sobre estes Termos deverão ser enviadas para <a href="mailto:suporteplantellistas@gmail.com">suporteplantellistas@gmail.com</a>.</p></section>
+      <section><h2>15. Alunos menores de idade</h2>
+        <p>O uso educacional por menores de idade deve respeitar as proteções legais aplicáveis e contar com a orientação de pais ou responsáveis, conforme a idade e a necessidade de acompanhamento. O aceite destes Termos pelo aluno não comprova sua idade nem substitui a participação ou autorização do responsável quando exigida por lei.</p>
+        <p>Esta atualização não cria uma proibição geral de estudo para menores nem encerra automaticamente contas existentes. Eventuais condições de contratação ou pagamento deverão ser apresentadas separadamente; uma declaração de idade em uma compra não resolve, por si só, as obrigações de proteção durante o uso da plataforma.</p>
+        <p>Para dúvidas sobre segurança, privacidade ou acompanhamento do aluno, o responsável pode entrar em contato com o Plantel pelo e-mail acima. Não compartilhe a senha do aluno: uma solicitação de atendimento não concede acesso automático à conta nem aos seus dados.</p>
+      </section>
     </>
   );
 }

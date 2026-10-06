@@ -36,6 +36,7 @@ export default function MenuUsuario({ item, proprio, aoAcao }) {
   const acoes = [["detalhes", "Detalhes"], ["dados", "Editar dados"], ["senha", "Enviar redefinição de senha"],
     ["verificar", "Enviar verificação de e-mail"], ["regularizar", "Solicitar revisão do e-mail"],
     ["estado", item.ativo ? "Bloquear conta" : "Desbloquear conta"], ["excluir", "Excluir conta"]];
+  if (item.papel === 'aluno') acoes.splice(2,0,['faixa','Revisar faixa etária']);
   return <><button type="button" ref={gatilho} className="gatilho-menu-usuario" aria-label={"Mais opções para " + item.nome}
     aria-expanded={aberto} aria-controls={aberto ? "menu-usuario-" + item.id : undefined} onClick={() => setAberto(!aberto)}><Icone nome="opcoes" /><span>Opções</span></button>
     {aberto && createPortal(<div ref={menu} id={"menu-usuario-" + item.id} className="menu-usuario-flutuante" style={posicao} aria-label={"Ações para " + item.nome}>

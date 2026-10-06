@@ -17,7 +17,7 @@ function criarCadastroPendenteRepository(pool, usuarios, auditoria) {
       const [existentes] = await c.execute("SELECT id FROM usuarios WHERE LOWER(TRIM(email))=? LIMIT 1 FOR UPDATE",[dados.email]);
       const [pendentes] = await c.execute("SELECT id FROM cadastros_publicos_pendentes WHERE email=? FOR UPDATE",[dados.email]);
       if (existentes.length || pendentes.length) throw new AppError("Este e-mail já possui conta ou cadastro pendente. Entre ou reenvie a confirmação.",409,"EMAIL_JA_CADASTRADO");
-      const [r] = await c.execute("INSERT INTO cadastros_publicos_pendentes(nome,email,email_destino,senha_hash,termos_versao,privacidade_versao,termos_aceitos_em) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP(3))",[dados.nome,dados.email,dados.email,hash,dados.aceiteTermos.termos,dados.aceiteTermos.privacidade]);
+      const [r] = await c.execute("INSERT INTO cadastros_publicos_pendentes(nome,email,email_destino,senha_hash,termos_versao,privacidade_versao,termos_aceitos_em,faixa_etaria_declarada) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP(3),?)",[dados.nome,dados.email,dados.email,hash,dados.aceiteTermos.termos,dados.aceiteTermos.privacidade,dados.faixaEtaria]);
       return { id:r.insertId,nome:dados.nome,email:dados.email,senhaHash:hash };
     });
   }
@@ -48,6 +48,8 @@ function criarCadastroPendenteRepository(pool, usuarios, auditoria) {
       const p = r[0];
       const usuario = await usuarios.criar(p.nome,p.email_destino.trim().toLowerCase(),p.senha_hash,"aluno",c);
       await c.execute("UPDATE usuarios SET email_confirmado_em=CURRENT_TIMESTAMP(3) WHERE id=?",[usuario.id]);
+      // Cadastros pendentes antigos continuam confirmáveis, sem inventar uma idade.
+      if (p.faixa_etaria_declarada) await c.execute("UPDATE usuarios SET faixa_etaria_declarada=?,faixa_etaria_declarada_em=CURRENT_TIMESTAMP(3),faixa_etaria_origem='cadastro' WHERE id=?",[p.faixa_etaria_declarada,usuario.id]);
       // Pendencias anteriores a esta versao nao recebem aceite retroativo.
       if(p.termos_aceitos_em && p.termos_versao && p.privacidade_versao) {
         await c.execute("INSERT INTO aceites_termos_alunos(usuario_id,termos_versao,privacidade_versao,aceito_em,origem) SELECT ?,termos_versao,privacidade_versao,termos_aceitos_em,'cadastro' FROM cadastros_publicos_pendentes WHERE id=?",[usuario.id,p.id]);

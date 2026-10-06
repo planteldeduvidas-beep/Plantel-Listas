@@ -11,6 +11,8 @@ import PainelAcervo from "./PainelAcervo.jsx";
 import {CaixaAceiteTermos,aceiteAtual} from './TermosAluno.jsx';
 import AvisoEmail from "./AvisoEmail.jsx";
 import AjudaConta from "./AjudaConta.jsx";
+import { CampoFaixaEtaria } from './FaixaEtariaAluno.jsx';
+import ExigirFaixaEtariaAluno from './ExigirFaixaEtariaAluno.jsx';
 import { ConfirmacaoEmail } from "./EmailConta.jsx";
 import { AguardarConfirmacaoCadastro, ConfirmacaoCadastro } from "./CadastroEmail.jsx";
 import PaginaInstitucional from "./PaginaInstitucional.jsx";
@@ -47,6 +49,7 @@ function Aplicacao() {
   const [email, definirEmail] = useState("");
   const [nome, definirNome] = useState("");
   const [termosAceitos, definirTermosAceitos] = useState(false);
+  const [faixaEtaria, definirFaixaEtaria] = useState('');
   const [senha, definirSenha] = useState("");
   const [mensagem, definirMensagem] = useState("");
   const [erro, definirErro] = useState("");
@@ -140,12 +143,13 @@ function Aplicacao() {
     evento.preventDefault();
     prepararOperacao();
     try {
-      const dados = await cadastrar(nome, email, senha, aceiteAtual(termosAceitos));
+      const dados = await cadastrar(nome, email, senha, aceiteAtual(termosAceitos), faixaEtaria);
       definirMensagem(dados.mensagem || "Cadastro concluído. Agora entre com sua conta.");
       definirTela(dados.confirmacaoPendente ? "confirmarCadastro" : "login");
       definirSenha("");
       definirNome("");
       definirTermosAceitos(false);
+      definirFaixaEtaria('');
     } catch (falha) {
       mostrarErroDaApi(falha);
     } finally {
@@ -201,6 +205,7 @@ function Aplicacao() {
 
   function trocarTela(novaTela) {
     definirTermosAceitos(false);
+    definirFaixaEtaria('');
     definirTela(novaTela);
     definirMensagem("");
     definirErro("");
@@ -216,7 +221,7 @@ function Aplicacao() {
 
   if (usuario && tela !== "redefinir") {
     if (retornoInicial.tokenEmail && !emailConcluido) return <ConfirmacaoEmail usuario={usuario} token={retornoInicial.tokenEmail} aoCancelar={() => definirEmailConcluido(true)} aoConcluir={dados => { definirUsuario(dados.usuario); definirEmailConcluido(true); }} />;
-    return <PainelAcervo usuario={usuario} aoSair={encerrarSessao} mostrarBoasVindas={entradaRecente} />;
+    return <ExigirFaixaEtariaAluno key={usuario.id} usuario={usuario} aoSair={encerrarSessao}><PainelAcervo usuario={usuario} aoAtualizarUsuario={definirUsuario} aoSair={encerrarSessao} mostrarBoasVindas={entradaRecente} /></ExigirFaixaEtariaAluno>;
   }
 
   const configuracoesDaTela = {
@@ -294,6 +299,7 @@ function Aplicacao() {
             </label>
           )}
 
+          {tela === 'cadastro' && <CampoFaixaEtaria valor={faixaEtaria} aoAlterar={definirFaixaEtaria} desabilitado={processando} />}
           {tela === 'cadastro' && <CaixaAceiteTermos marcado={termosAceitos} aoAlterar={definirTermosAceitos} />}
           {mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}
           {erro && <Alerta tipo="erro">{erro}</Alerta>}

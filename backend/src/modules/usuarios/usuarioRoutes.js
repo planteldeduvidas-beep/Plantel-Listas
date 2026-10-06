@@ -13,6 +13,8 @@ function criarUsuarioRoutes(dependencias) {
   router.use(autorizarAdmin);
   router.get("/", controller.listar);
   router.get("/:usuarioId", controller.detalhes);
+  router.get('/:usuarioId/faixa-etaria', controller.obterFaixaEtaria);
+  router.post('/:usuarioId/faixa-etaria', dependencias.rateLimiters.emailConta, protegerContraCsrf, controller.corrigirFaixaEtaria);
   router.delete("/:usuarioId", protegerContraCsrf, controller.excluir);
   router.post("/:usuarioId/verificacao-email", dependencias.rateLimiters.emailConta, protegerContraCsrf, controller.verificar);
   router.post("/:usuarioId/regularizacao-email", protegerContraCsrf, controller.regularizar);

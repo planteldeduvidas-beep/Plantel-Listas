@@ -110,6 +110,7 @@ test("consultas caras limitam por usuario sem afetar outro aluno ou streaming", 
   } });
   const limitadores = criarLimitadores({ seguranca: { janelaRateLimitMinutos: 15, limiteConsultaAcervo: 2 } });
   app.use(criarAcervoRoutes({ controller, rateLimiterConsulta: limitadores.consultaAcervo,
+    exigirFaixaEtaria: (req, res, next) => next(),
     autenticar: (req, res, next) => { req.usuario = { id: req.headers["x-usuario-fixture"] || "1" }; next(); },
     autorizarAdmin: (req, res, next) => next()
   }));

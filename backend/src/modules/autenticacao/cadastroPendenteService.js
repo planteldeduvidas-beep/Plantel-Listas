@@ -17,9 +17,10 @@ function criarCadastroPendenteService({repository,usuarioRepository,emailProvide
   }
   async function cadastrar(corpo) {
     exigirObjeto(corpo);
-    const {aceiteTermos,...cadastro}=corpo;
+    const {aceiteTermos,faixaEtaria,...cadastro}=corpo;
     const dados=validarCadastro(cadastro);
     require('./termosService').validarAceite(aceiteTermos);
+    dados.faixaEtaria=require('./faixaEtariaService').validarFaixaEtaria(faixaEtaria);
     dados.aceiteTermos=aceiteTermos;
     const p=await repository.criar(dados,await criarHashDaSenha(dados.senha));
     let confirmacaoEmailEnviada=false;

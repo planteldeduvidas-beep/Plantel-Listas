@@ -1,4 +1,4 @@
-function criarUsuarioController(service) {
+function criarUsuarioController(service, faixaEtariaService) {
   async function listar(req, res) {
     res.status(200).json(await service.listarUsuarios(req.query));
   }
@@ -26,6 +26,8 @@ function criarUsuarioController(service) {
   }
 
   return {
+    obterFaixaEtaria: async (req,res) => res.json(await faixaEtariaService.obterParaAdmin(req.usuario,req.params.usuarioId)),
+    corrigirFaixaEtaria: async (req,res) => res.json(await faixaEtariaService.corrigirComoAdmin(req.usuario,req.params.usuarioId,req.body)),
     detalhes: async (req,res) => res.json({usuario:await service.obterDetalhes(req.params.usuarioId)}),
     excluir: async (req,res) => res.json(await service.excluirUsuario(req.usuario,req.params.usuarioId,req.body)),
     regularizar: async (req,res) => res.json(await service.solicitarRegularizacao(req.usuario,req.params.usuarioId,req.body)),

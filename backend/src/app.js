@@ -121,6 +121,7 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   const usuarioRepository = criarUsuarioRepository(pool);
   const autenticacaoRepository = criarAutenticacaoRepository(pool);
   const auditoriaRepository = criarAuditoriaRepository(pool);
+  const faixaEtariaService = require('./modules/autenticacao/faixaEtariaService').criarFaixaEtariaService(pool,auditoriaRepository,usuarioRepository);
   const cadastroPendenteService = criarCadastroPendenteService({repository:criarCadastroPendenteRepository(pool,usuarioRepository,auditoriaRepository),usuarioRepository,emailProvider,configuracao,logger});
   const emailContaService = criarEmailContaService({
     repository: criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository),
@@ -212,12 +213,12 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   aplicacao.use("/api/uploads",criarUploadRetomavelRoutes({service:uploadRetomavelService,autenticar,limitarInicio:rateLimiters.upload}));
 
   aplicacao.use("/api/autenticacao", criarAutenticacaoRoutes({
-    controller: criarAutenticacaoController(serviceAutenticacao, configuracao, emailContaService, require('./modules/autenticacao/termosService').criarTermosService(pool,auditoriaRepository)),
+    controller: criarAutenticacaoController(serviceAutenticacao, configuracao, emailContaService, require('./modules/autenticacao/termosService').criarTermosService(pool,auditoriaRepository), faixaEtariaService),
     autenticar: autenticar,
     rateLimiters: rateLimiters
   }));
   aplicacao.use("/api/usuarios", criarUsuarioRoutes({
-    controller: criarUsuarioController(serviceUsuario),
+    controller: criarUsuarioController(serviceUsuario,faixaEtariaService),
     rateLimiters,
     autenticar: autenticar,
     autorizarAdmin: autorizarAdmin
@@ -242,6 +243,7 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
   }));
   aplicacao.use("/api/integracoes/google-drive", changesRoutes.administrativo);
   aplicacao.use("/api/acervo", criarAcervoRoutes({
+    exigirFaixaEtaria: require('./modules/autenticacao/exigirFaixaEtaria')(faixaEtariaService),
     controller: criarAcervoController(acervoService),
     autenticar: autenticar,
     rateLimiterConsulta: rateLimiters.consultaAcervo,
@@ -260,6 +262,7 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     autorizarAdmin: autorizarAdmin
   }));
   aplicacao.use("/api/meu-historico", criarHistoricoAlunoRoutes({
+    exigirFaixaEtaria: require('./modules/autenticacao/exigirFaixaEtaria')(faixaEtariaService),
     controller: criarHistoricoAlunoController(
       criarHistoricoAlunoService(criarHistoricoAlunoRepository(pool))
     ),

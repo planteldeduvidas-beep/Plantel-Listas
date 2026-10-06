@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import MenuUsuario from "./MenuUsuario.jsx";
+import CorrecaoFaixaEtariaAdmin from './CorrecaoFaixaEtariaAdmin.jsx';
 import { createPortal } from "react-dom";
 import GraficoBarras from "./GraficoBarras.jsx";
 import GraficoComposicao from "./GraficoComposicao.jsx";
@@ -120,6 +121,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
   const [emailEmEdicao, definirEmailEmEdicao] = useState("");
   const [nomeEmEdicao, definirNomeEmEdicao] = useState("");
   const [detalhes, definirDetalhes] = useState(null);
+  const [alunoFaixa, definirAlunoFaixa] = useState(null);
   const [todos, definirTodos] = useState(false);
   const consultaAtual = useRef(0);
   const filtrosAplicados = useRef({busca:"",papel:"",ativo:""});
@@ -201,6 +203,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
   }
 
   async function escolherAcao(tipo,item) {
+    if (tipo === 'faixa' && item.papel === 'aluno') return definirAlunoFaixa(item);
     if (tipo === "dados") return mudarEmail(item);
     if (tipo === "senha") return redefinir(item);
     if (tipo === "estado") return alternar(item);
@@ -259,6 +262,7 @@ function AdministracaoFase7({ usuario, area, aoMensagem, aoErro }) {
 
   return (
     <section className="administracao-fase7">
+      {alunoFaixa && createPortal(<CorrecaoFaixaEtariaAdmin aluno={alunoFaixa} aoFechar={() => definirAlunoFaixa(null)} aoConcluir={mensagem => { definirAlunoFaixa(null); aoMensagem(mensagem); }} />,document.body)}
       {carregando && <Esqueleto linhas={4} texto="Atualizando informações..." />}
 
       {area === "usuarios" && <section className="bloco-admin painel-conteudo">

@@ -20,7 +20,6 @@ export default function AjudaConta({ aoVoltar }) {
   return <>
     <h1 id="titulo-ajuda-conta">Problemas com sua conta?</h1>
     <p>Conte o que aconteceu. Nossa equipe responderá em até 24 horas pelo e-mail de contato informado.</p>
-    <p>Não envie sua senha, códigos de confirmação ou links de acesso. Esta mensagem não altera nem libera sua conta automaticamente.</p>
     <AvisoEmail />
     {enviado ? <Alerta tipo="sucesso">Mensagem enviada. Responderemos em até 24 horas. Confira também Spam ou Lixo eletrônico.</Alerta> :
       <form onSubmit={enviar}>

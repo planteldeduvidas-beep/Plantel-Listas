@@ -77,7 +77,7 @@ async function obterCsrf(agente) {
 
 async function cadastrar(agente, email, senha, camposAdicionais) {
   const csrf = await obterCsrf(agente);
-  const corpo = Object.assign({ nome: "Aluno Teste", email: email, senha: senha, aceiteTermos }, camposAdicionais || {});
+  const corpo = Object.assign({ nome: "Aluno Teste", email: email, senha: senha, aceiteTermos, faixaEtaria: '18_mais' }, camposAdicionais || {});
   const resposta = await agente
     .post("/api/autenticacao/cadastro")
     .set("X-CSRF-Token", csrf)
@@ -133,9 +133,152 @@ async function liberarCooldown(email) {
   await pool.execute("UPDATE cadastros_publicos_pendentes SET enviado_em=DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL 2 MINUTE) WHERE email=?",[email]);
 }
 
+test('faixa etaria declarada exige opcao valida no cadastro e persiste apos confirmar', async () => {
+  const agente=request.agent(aplicacao), csrf=await obterCsrf(agente);
+  const dados={nome:'Aluno Faixa',email:'faixa@example.com',senha:'Senha-forte-123',aceiteTermos};
+  for (const faixaEtaria of [undefined,null,'',12,'adulto',{idade:18}]) {
+    const r=await agente.post('/api/autenticacao/cadastro').set('X-CSRF-Token',csrf).send({...dados,faixaEtaria});
+    assert.equal(r.status,400); assert.equal(r.body.erro.codigo,'FAIXA_ETARIA_INVALIDA');
+  }
+  const [[antes]]=await pool.execute('SELECT COUNT(*) n FROM cadastros_publicos_pendentes');
+  assert.equal(antes.n,0);
+  for (const faixa of ['menos_12','12_17','18_mais']) {
+    const email=faixa+'@example.com';
+    const r=await cadastrar(agente,email,'Senha-forte-123',{faixaEtaria:faixa});
+    assert.equal(r.status,201);
+    const [[aluno]]=await pool.execute('SELECT faixa_etaria_declarada,faixa_etaria_declarada_em,faixa_etaria_origem,ativo FROM usuarios WHERE email=?',[email]);
+    assert.equal(aluno.faixa_etaria_declarada,faixa); assert.ok(aluno.faixa_etaria_declarada_em); assert.equal(aluno.ativo,1);
+    assert.equal(aluno.faixa_etaria_origem,'cadastro');
+    assert.equal((await entrar(agente,email,'Senha-forte-123')).status,200);
+  }
+});
+
+test('aluno existente sem faixa mantem login; atualizacao isola a propria conta, papeis e CSRF', async () => {
+  const repo=require('../src/modules/usuarios/usuarioRepository')(pool);
+  const hash=await require('../src/modules/autenticacao/senha').criarHashDaSenha('Senha-forte-123');
+  const aluno=await repo.criar('Aluno Legado','legado-faixa@example.com',hash,'aluno');
+  const outro=await repo.criar('Outro Aluno','outro-faixa@example.com',hash,'aluno');
+  const agente=request.agent(aplicacao), rota='/api/autenticacao/faixa-etaria';
+  assert.equal((await request(aplicacao).get(rota)).status,401);
+  assert.equal((await entrar(agente,aluno.email,'Senha-forte-123')).status,200);
+  const csrf=await obterCsrf(agente);
+  const inicial=await agente.get(rota);
+  assert.equal(inicial.body.faixaEtaria,null); assert.equal(inicial.body.verificada,false);
+  for (const url of ['/api/acervo','/api/acervo?categoriaId=1','/api/acervo/materiais/1/conteudo','/api/acervo/materiais/1/download','/api/meu-historico']) {
+    const bloqueada=await agente.get(url);
+    assert.equal(bloqueada.status,403);
+    assert.equal(bloqueada.body.erro.codigo,'FAIXA_ETARIA_OBRIGATORIA');
+  }
+  assert.equal((await agente.get('/api/autenticacao/me')).status,200);
+  assert.equal((await agente.get('/api/autenticacao/perfil')).status,200);
+  const [[antes]]=await pool.execute('SELECT email,senha_hash,papel,ativo,versao_sessao FROM usuarios WHERE id=?',[aluno.id]);
+  assert.equal((await agente.post(rota).send({faixaEtaria:'menos_12'})).status,403);
+  assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send({faixaEtaria:'18_mais',usuarioId:outro.id})).status,400);
+  for (let i=0;i<2;i++) assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send({faixaEtaria:'menos_12'})).status,200);
+  assert.equal((await agente.get('/api/meu-historico')).status,200);
+  assert.notEqual((await agente.get('/api/acervo')).body.erro?.codigo,'FAIXA_ETARIA_OBRIGATORIA');
+  const [[depois]]=await pool.execute('SELECT email,senha_hash,papel,ativo,versao_sessao FROM usuarios WHERE id=?',[aluno.id]);
+  assert.deepEqual(depois,antes);
+  const [[intacto]]=await pool.execute('SELECT faixa_etaria_declarada FROM usuarios WHERE id=?',[outro.id]);
+  assert.equal(intacto.faixa_etaria_declarada,null);
+  const [[audit]]=await pool.execute("SELECT COUNT(*) n FROM auditoria_geral WHERE acao='faixa_etaria_declarada' AND entidade_id=?",[aluno.id]);
+  assert.equal(audit.n,1);
+  assert.equal((await agente.get(rota)).body.origem,'coleta_obrigatoria');
+  assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send({faixaEtaria:'18_mais'})).status,403);
+  await pool.execute('UPDATE usuarios SET faixa_etaria_declarada_em=DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL 25 HOUR) WHERE id=?',[aluno.id]);
+  assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send({faixaEtaria:'12_17'})).status,403);
+  const corretor=await repo.criar('Admin Corretor','corretor-faixa@example.com',hash,'admin');
+  const falho=require('../src/modules/autenticacao/faixaEtariaService').criarFaixaEtariaService(pool,{registrar:async()=>{throw Error('auditoria QA');}});
+  await assert.rejects(falho.corrigirComoAdmin(corretor,aluno.id,{faixaEtaria:'12_17',justificativa:'Correção analisada no suporte'}),/auditoria QA/);
+  assert.equal((await agente.get(rota)).body.faixaEtaria,'menos_12');
+  const admin=request.agent(aplicacao); await entrar(admin,corretor.email,'Senha-forte-123');
+  const tokenAdmin=await obterCsrf(admin);
+  const correcao=await admin.post('/api/usuarios/'+aluno.id+'/faixa-etaria').set('X-CSRF-Token',tokenAdmin).send({faixaEtaria:'12_17',justificativa:'Correção analisada no suporte'});
+  assert.equal(correcao.status,200);
+  assert.equal((await agente.get(rota)).body.faixaEtaria,'12_17');
+  assert.equal((await agente.get(rota)).body.origem,'admin');
+  const [[evidencia]]=await pool.execute("SELECT ator_usuario_id,contexto,criado_em FROM auditoria_geral WHERE entidade_id=? AND acao='faixa_etaria_declarada' ORDER BY id DESC LIMIT 1",[aluno.id]);
+  const contexto=typeof evidencia.contexto==='string' ? JSON.parse(evidencia.contexto) : evidencia.contexto;
+  assert.equal(evidencia.ator_usuario_id,corretor.id); assert.ok(evidencia.criado_em);
+  assert.equal(contexto.faixaAnterior,'menos_12'); assert.equal(contexto.faixaNova,'12_17'); assert.equal(contexto.origem,'admin');
+  assert.equal((await agente.get('/api/autenticacao/me')).status,200);
+  for (const papel of ['admin','professor']) {
+    const u=await repo.criar('Pessoa Equipe',papel+'-faixa@example.com',hash,papel);
+    const equipe=request.agent(aplicacao); assert.equal((await entrar(equipe,u.email,'Senha-forte-123')).status,200);
+    const token=await obterCsrf(equipe);
+    assert.deepEqual((await equipe.get(rota)).body,{aplicavel:false});
+    assert.equal((await equipe.post(rota).set('X-CSRF-Token',token).send({faixaEtaria:'18_mais'})).status,403);
+    assert.equal((await equipe.get('/api/autenticacao/perfil')).status,403);
+    assert.equal((await equipe.post('/api/autenticacao/perfil').set('X-CSRF-Token',token).send({nome:'Pessoa Equipe',faixaEtaria:'18_mais'})).status,403);
+  }
+});
+
+test('perfil do aluno tem whitelist, isola conta, mantem sessao e rollback de auditoria', async () => {
+  const repo=require('../src/modules/usuarios/usuarioRepository')(pool);
+  const agente=request.agent(aplicacao), outroAgente=request.agent(aplicacao);
+  const cadastro=await cadastrar(agente,'perfil@example.com','Senha-forte-123',{faixaEtaria:'12_17'});
+  const outro=await cadastrar(outroAgente,'outro-perfil@example.com','Senha-forte-123');
+  assert.equal((await entrar(agente,'perfil@example.com','Senha-forte-123')).status,200);
+  const csrf=await obterCsrf(agente), rota='/api/autenticacao/perfil';
+  assert.equal((await request(aplicacao).get(rota)).status,401);
+  const leitura=await agente.get(rota);
+  assert.equal(leitura.status,200); assert.equal(leitura.body.emailConfirmado,true);
+  assert.ok(leitura.body.criadoEm); assert.equal(Object.hasOwn(leitura.body,'ultimoAcesso'),false);
+  assert.deepEqual(Object.keys(leitura.body).sort(),['nome','email','emailConfirmado','criadoEm','aplicavel','faixaEtaria','declaradaEm','origem','verificada'].sort());
+  const dados={nome:'Aluno Atualizado',faixaEtaria:'12_17'};
+  assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send({...dados,faixaEtaria:'18_mais'})).status,403);
+  assert.equal((await agente.post(rota).send(dados)).status,403);
+  for (const campo of ['id','usuarioId','papel','role','permissoes','ativo','email']) {
+    assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send({...dados,[campo]:outro.body.usuario.id})).status,400);
+  }
+  assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send(dados)).status,200);
+  assert.equal((await agente.get(rota)).body.nome,'Aluno Atualizado');
+  assert.equal((await repo.obterDetalhes(outro.body.usuario.id)).nome,'Aluno Teste');
+  assert.equal((await agente.get('/api/autenticacao/me')).body.usuario.papel,'aluno');
+  const falho=require('../src/modules/autenticacao/faixaEtariaService').criarFaixaEtariaService(pool,{registrar:async()=>{throw Error('auditoria perfil QA');}},repo);
+  await assert.rejects(falho.atualizarPerfil({id:cadastro.body.usuario.id,papel:'aluno'},{...dados,nome:'Nome Revertido'}),/auditoria perfil QA/);
+  assert.equal((await agente.get(rota)).body.nome,'Aluno Atualizado');
+});
+
+test('18+ pode corrigir para menor, mas nao pode voltar a adulto; admin exige justificativa e CSRF', async () => {
+  const repo=require('../src/modules/usuarios/usuarioRepository')(pool);
+  const agente=request.agent(aplicacao);
+  const cadastro=await cadastrar(agente,'adulto-perfil@example.com','Senha-forte-123');
+  await entrar(agente,'adulto-perfil@example.com','Senha-forte-123');
+  const csrf=await obterCsrf(agente), rota='/api/autenticacao/perfil';
+  assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send({nome:'Aluno Adulto',faixaEtaria:'menos_12'})).status,200);
+  assert.equal((await agente.post(rota).set('X-CSRF-Token',csrf).send({nome:'Aluno Adulto',faixaEtaria:'18_mais'})).body.erro.codigo,'FAIXA_ETARIA_CORRECAO_CONTROLADA');
+  const adminAlvo='/api/usuarios/'+cadastro.body.usuario.id+'/faixa-etaria';
+  assert.equal((await agente.get(adminAlvo)).status,403);
+  assert.equal((await agente.post(adminAlvo).set('X-CSRF-Token',csrf).send({faixaEtaria:'18_mais',justificativa:'Revisão suporte'})).status,403);
+  const hash=await require('../src/modules/autenticacao/senha').criarHashDaSenha('Senha-forte-123');
+  const corretor=await repo.criar('Admin Revisao','admin-revisao@example.com',hash,'admin');
+  const admin=request.agent(aplicacao); await entrar(admin,'admin-revisao@example.com','Senha-forte-123');
+  const token=await obterCsrf(admin);
+  assert.equal((await admin.get(adminAlvo)).body.faixaEtaria,'menos_12');
+  assert.equal((await admin.post(adminAlvo).send({faixaEtaria:'18_mais',justificativa:'Revisão suporte'})).status,403);
+  assert.equal((await admin.post(adminAlvo).set('X-CSRF-Token',token).send({faixaEtaria:'18_mais'})).status,400);
+  assert.equal((await admin.post(adminAlvo).set('X-CSRF-Token',token).send({faixaEtaria:'18_mais',justificativa:'Revisão feita após solicitação ao suporte'})).status,200);
+  const [[registro]]=await pool.execute("SELECT ator_usuario_id,contexto,criado_em FROM auditoria_geral WHERE entidade_id=? AND acao='faixa_etaria_declarada' ORDER BY id DESC LIMIT 1",[cadastro.body.usuario.id]);
+  const evento=typeof registro.contexto==='string' ? JSON.parse(registro.contexto) : registro.contexto;
+  assert.equal(evento.faixaAnterior,'menos_12'); assert.equal(evento.faixaNova,'18_mais');
+  assert.equal(evento.origem,'admin'); assert.equal(registro.ator_usuario_id,corretor.id); assert.ok(registro.criado_em);
+  assert.equal((await agente.get('/api/autenticacao/me')).status,200);
+  assert.equal((await agente.get(rota)).body.faixaEtaria,'18_mais');
+});
+
+test('cadastro pendente anterior sem faixa continua confirmavel sem inventar idade', async () => {
+  const agente=request.agent(aplicacao), csrf=await obterCsrf(agente);
+  assert.equal((await agente.post('/api/autenticacao/cadastro').set('X-CSRF-Token',csrf).send({nome:'Aluno Antigo',email:'pendente-faixa@example.com',senha:'Senha-forte-123',aceiteTermos,faixaEtaria:'12_17'})).status,201);
+  await pool.execute("UPDATE cadastros_publicos_pendentes SET faixa_etaria_declarada=NULL WHERE email='pendente-faixa@example.com'");
+  assert.equal((await confirmarCadastro(agente,tokenEmailMaisRecente())).status,200);
+  assert.equal((await entrar(agente,'pendente-faixa@example.com','Senha-forte-123')).status,200);
+  assert.equal((await agente.get('/api/autenticacao/faixa-etaria')).body.faixaEtaria,null);
+});
+
 test("cadastro exige aceite explicito da versao atual e transfere a data original ao confirmar", async () => {
   const agente=request.agent(aplicacao), csrf=await obterCsrf(agente);
-  const dados={nome:'Aluno Termos',email:'termos@example.com',senha:'Senha-forte-123'};
+  const dados={nome:'Aluno Termos',email:'termos@example.com',senha:'Senha-forte-123',faixaEtaria:'18_mais'};
   for(const aceite of [undefined,{...aceiteTermos,aceito:false},{...aceiteTermos,aceito:'true'}]) {
     const r=await agente.post('/api/autenticacao/cadastro').set('X-CSRF-Token',csrf).send({...dados,aceiteTermos:aceite});
     assert.equal(r.status,400); assert.equal(r.body.erro.codigo,'ACEITE_TERMOS_OBRIGATORIO');
@@ -158,7 +301,7 @@ test("novo cadastro exige confirmacao antes do login e falha SMTP preserva reenv
   const agente = request.agent(aplicacao);
   const csrf = await obterCsrf(agente);
   const cadastro = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token", csrf)
-    .send({nome:"Aluno novo",email:"cadastro-confirmacao@outlook.com",senha:"Senha-forte-123",aceiteTermos});
+    .send({nome:"Aluno novo",email:"cadastro-confirmacao@outlook.com",senha:"Senha-forte-123",aceiteTermos,faixaEtaria:'18_mais'});
   assert.equal(cadastro.status, 201);
   assert.equal(cadastro.body.confirmacaoEmailEnviada, true);
   assert.match(cadastro.body.mensagem, /Spam ou Lixo eletrônico/);
@@ -177,7 +320,7 @@ test("novo cadastro exige confirmacao antes do login e falha SMTP preserva reenv
   const enviar = emailProvider.enviarConfirmacaoEmail;
   emailProvider.enviarConfirmacaoEmail = async () => { throw new Error("SMTP indisponivel"); };
   const semEnvio = await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf)
-    .send({nome:"Aluno preservado",email:"cadastro-preservado@proton.me",senha:"Senha-forte-123",aceiteTermos});
+    .send({nome:"Aluno preservado",email:"cadastro-preservado@proton.me",senha:"Senha-forte-123",aceiteTermos,faixaEtaria:'18_mais'});
   emailProvider.enviarConfirmacaoEmail = enviar;
   assert.equal(semEnvio.status,201);
   assert.equal(semEnvio.body.confirmacaoEmailEnviada,false);
@@ -193,7 +336,7 @@ test("cadastro pendente corrige email ao confirmar, exige senha e rejeita expira
   const agente = request.agent(aplicacao);
   const email = "cadastro-errado@example.com", novo = "cadastro-correto@gmail.com";
   const csrf = await obterCsrf(agente);
-  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Novo",email,senha:"Senha-forte-123",aceiteTermos})).status,201);
+  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Novo",email,senha:"Senha-forte-123",aceiteTermos,faixaEtaria:'18_mais'})).status,201);
   const antigo = tokenEmailMaisRecente();
   assert.equal((await reenviarCadastro(agente,email,novo,"Senha-incorreta-123")).status,401);
   await liberarCooldown(email);
@@ -222,7 +365,7 @@ test("cadastro pendente corrige email ao confirmar, exige senha e rejeita expira
 test("recuperar senha nao libera cadastro pendente e token de conta existente nao confirma cadastro publico", async () => {
   const agente = request.agent(aplicacao), email = "aguardando-confirmacao@outlook.com";
   const csrf = await obterCsrf(agente);
-  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Pendente",email,senha:"Senha-forte-123",aceiteTermos})).status,201);
+  assert.equal((await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",csrf).send({nome:"Aluno Pendente",email,senha:"Senha-forte-123",aceiteTermos,faixaEtaria:'18_mais'})).status,201);
   const antigo = tokenEmailMaisRecente();
   emailProvider.limpar();
   await solicitarRecuperacao(agente,email);
@@ -272,7 +415,7 @@ test("pendencia do fluxo anterior confirma sem recriar ou modificar a identidade
 test("reenvio nao toma email existente e confirmacao publica exige CSRF", async () => {
   const agente = request.agent(aplicacao);
   await cadastrar(agente,"ocupado@example.com","Senha-forte-123");
-  await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",await obterCsrf(agente)).send({nome:"Aluno Pendente",email:"pendente@example.com",senha:"Senha-forte-123",aceiteTermos});
+  await agente.post("/api/autenticacao/cadastro").set("X-CSRF-Token",await obterCsrf(agente)).send({nome:"Aluno Pendente",email:"pendente@example.com",senha:"Senha-forte-123",aceiteTermos,faixaEtaria:'18_mais'});
   assert.equal((await reenviarCadastro(agente,"pendente@example.com","ocupado@example.com")).status,409);
   assert.equal((await agente.post("/api/autenticacao/cadastro/email/confirmar").send({token:tokenEmailMaisRecente()})).status,403);
   assert.equal((await entrar(agente,"pendente@example.com","Senha-forte-123")).status,403);
@@ -722,7 +865,7 @@ test("cookie de sessao usa Secure em producao", async function testarCookieProdu
     .post("/api/autenticacao/cadastro")
     .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)
     .set("X-CSRF-Token", tokenCsrf)
-    .send({ nome: "Conta Segura", email: "secure@gmail.com", senha: "Senha-forte-123",aceiteTermos });
+    .send({ nome: "Conta Segura", email: "secure@gmail.com", senha: "Senha-forte-123",aceiteTermos,faixaEtaria:'18_mais' });
   assert.equal((await request(aplicacao).post("/api/autenticacao/cadastro/email/confirmar")
     .set("Cookie", configuracaoProducao.seguranca.nomeCookieCsrf + "=" + tokenCsrf)
     .set("X-CSRF-Token", tokenCsrf).send({token:tokenEmailMaisRecente()})).status,200);

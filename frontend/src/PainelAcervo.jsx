@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {AvisoTermosAluno} from './TermosAluno.jsx';
+import MeuPerfil from './MeuPerfil.jsx';
 import {
   listarEstruturaPublica,
   vincularPastaAoDrive,
@@ -191,7 +192,7 @@ function FormularioCatalogo({ titulo, singular, registros, api, aoAtualizar, aoE
   );
 }
 
-function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
+function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }) {
   const [termosResolvidos,definirTermosResolvidos]=useState(usuario.papel!=='aluno');
   const liberarBoasVindas=useCallback(()=>definirTermosResolvidos(true),[]);
   const [emailAberto, definirEmailAberto] = useState(false);
@@ -560,6 +561,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
   );
 
   const informacoesDasAreas = {
+    meuPerfil: { codigo: 'PL / 13', contexto: 'Sua conta', titulo: 'Meu perfil', texto: 'Confira e atualize seus dados pessoais.' },
     acervo: { codigo: "PL / 01", contexto: "Biblioteca digital", titulo: "Materiais de estudo", texto: "Encontre pastas, PDFs e vídeos com facilidade." },
     meuHistorico: { codigo: "PL / 08", contexto: "Sua biblioteca", titulo: "Meu Histórico", texto: "Retome materiais que você já abriu ou baixou." },
     suporte: { codigo: "PL / 09", contexto: "Fale com o Plantel", titulo: "Suporte", texto: "Conte sua dúvida para nossa equipe." },
@@ -591,6 +593,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           {usuario.papel === "admin" && <ItemMenu area="estatisticas" atual={areaAtual} icone="estatisticas" texto="Visão geral" aoAbrir={navegar} />}
           <ItemMenu area="acervo" atual={areaAtual} icone="acervo" texto="Biblioteca" aoAbrir={navegar} />
           {usuario.papel === "aluno" && <ItemMenu area="meuHistorico" atual={areaAtual} icone="historico" texto="Meu Histórico" aoAbrir={navegar} />}
+          {usuario.papel === 'aluno' && <ItemMenu area="meuPerfil" atual={areaAtual} icone="usuarios" texto="Meu perfil" aoAbrir={navegar} />}
           {usuario.papel === "professor" && <ItemMenu area="minhasPastas" atual={areaAtual} icone="pasta" texto="Pastas liberadas" aoAbrir={navegar} />}
           {["aluno", "professor"].includes(usuario.papel) && <ItemMenu area="suporte" atual={areaAtual} icone="suporte" texto="Suporte" aoAbrir={navegar} />}
           <ItemMenu area="tutorial" atual={areaAtual} icone="inicio" texto="Como usar" aoAbrir={navegar} />
@@ -616,7 +619,8 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
 
         {areaAtual === "acervo" && <BibliotecaAcervo usuario={usuario} aoMensagem={definirMensagem} />}
         {usuario.papel === "aluno" && areaAtual === "meuHistorico" && <MeuHistorico aoErro={mostrarErro} />}
-        {["aluno", "professor"].includes(usuario.papel) && areaAtual === "suporte" && <Suporte usuario={usuario} aoAtualizarEmail={() => definirEmailAberto(true)} />}
+        {usuario.papel === 'aluno' && areaAtual === 'meuPerfil' && <MeuPerfil usuario={usuario} aoAtualizarUsuario={aoAtualizarUsuario} />}
+        {["aluno", "professor"].includes(usuario.papel) && areaAtual === "suporte" && <Suporte usuario={usuario} aoAbrirPerfil={() => navegar('meuPerfil')} aoAtualizarEmail={() => definirEmailAberto(true)} />}
         {emailAberto && <Modal titulo="Atualizar ou confirmar e-mail" classe="modal-email-conta" aoFechar={() => definirEmailAberto(false)}><FormularioEmailConta usuario={usuario} /></Modal>}
         {areaAtual === "tutorial" && <Tutorial papel={usuario.papel} aoAbrir={navegar} />}
 
