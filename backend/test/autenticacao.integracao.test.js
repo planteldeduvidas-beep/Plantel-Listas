@@ -333,13 +333,38 @@ test("lembrete apenas nas contas indicadas preserva login e sessao e desaparece 
 test("indisponibilidade do lembrete nao interfere na conta autenticada", async () => {
   const avisos = [];
   const service = require("../src/modules/autenticacao/emailContaService")({
-    repository:{precisaRevisao: async () => {throw new Error("Banco indisponivel");}},
+    repository:{emailConfirmado: async () => false, precisaRevisao: async () => {throw new Error("Banco indisponivel");}},
     logger:{warn:(...dados)=>avisos.push(dados)}
   });
   const usuario = {id:5,papel:"admin",ativo:true,email:"legado@example.com"};
-  assert.deepEqual(await service.obterAviso(usuario),{...usuario,emailPrecisaRevisao:false});
+  assert.deepEqual(await service.obterAviso(usuario),{...usuario,emailConfirmado:false,emailPrecisaRevisao:false});
   assert.equal(avisos.length,1);
   assert.equal(JSON.stringify(avisos).includes(usuario.email),false);
+});
+
+test("sessao informa confirmacao do endereco atual e reconhece confirmacoes historicas", async () => {
+  const hash = await require("../src/modules/autenticacao/senha").criarHashDaSenha("Senha-forte-123");
+  for (const papel of ["aluno", "professor", "admin"]) {
+    const email = `confirmacao-${papel}@example.com`;
+    const [inserido] = await pool.execute("INSERT INTO usuarios(nome,email,senha_hash,papel) VALUES (?,?,?,?)", ["Conta existente", email, hash, papel]);
+    const agente = request.agent(aplicacao);
+    assert.equal((await entrar(agente, email, "Senha-forte-123")).body.usuario.emailConfirmado, false);
+    await solicitarEmail(agente, email);
+    const confirmado = await confirmarEmail(agente, tokenEmailMaisRecente());
+    assert.equal(confirmado.status, 200);
+    assert.equal(confirmado.body.usuario.emailConfirmado, true);
+    assert.equal((await agente.get("/api/autenticacao/me")).body.usuario.emailConfirmado, true);
+    assert.equal((await entrar(agente, email, "Senha-forte-123")).body.usuario.emailConfirmado, true);
+    // Confirmacoes consumidas antes da coluna nova continuam reconhecidas.
+    await pool.execute("UPDATE usuarios SET email_confirmado_em=NULL WHERE id=?", [inserido.insertId]);
+    assert.equal((await agente.get("/api/autenticacao/me")).body.usuario.emailConfirmado, true);
+    // Um token enviado, mas nao consumido, nao confirma outro endereco.
+    const novoEmail = `novo-${papel}@example.com`;
+    await solicitarEmail(agente, novoEmail);
+    assert.equal((await agente.get("/api/autenticacao/me")).body.usuario.emailConfirmado, true);
+    await pool.execute("UPDATE usuarios SET email=? WHERE id=?", [novoEmail, inserido.insertId]);
+    assert.equal((await agente.get("/api/autenticacao/me")).body.usuario.emailConfirmado, false);
+  }
 });
 
 test("abrir outra aba nao invalida o CSRF da aba ja aberta", async () => {

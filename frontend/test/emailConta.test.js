@@ -26,6 +26,22 @@ test('lembrete e informativo, aparece somente quando indicado e mantem acao de a
       assert.match(html,/Atualizar ou confirmar e-mail/);
       assert.equal(html.includes('disabled'),false);
       assert.equal(renderToStaticMarkup(React.createElement(LembreteEmailConta,{usuario:{papel,emailPrecisaRevisao:false}})),'');
+      assert.equal(renderToStaticMarkup(React.createElement(LembreteEmailConta,{usuario:{papel,emailConfirmado:true,emailPrecisaRevisao:true}})),'');
+    }
+  } finally { await vite.close(); }
+});
+
+test('menu omite botao somente para email confirmado nas tres hierarquias', async () => {
+  const vite = await createServer({configFile:false,optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false},appType:'custom'});
+  try {
+    const {BotaoConfirmarEmailConta} = await vite.ssrLoadModule(new URL('../src/EmailConta.jsx',import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1'));
+    const painel = readFileSync(new URL('../src/PainelAcervo.jsx',import.meta.url),'utf8');
+    assert.match(painel, /<BotaoConfirmarEmailConta usuario=\{usuario\}/);
+    for (const papel of ['aluno','professor','admin']) {
+      for (const emailConfirmado of [false,true]) {
+        const html = renderToStaticMarkup(React.createElement(BotaoConfirmarEmailConta,{usuario:{papel,emailConfirmado},aoAtualizar:()=>{}}));
+        assert.equal(html.includes('Atualizar ou confirmar e-mail'),!emailConfirmado);
+      }
     }
   } finally { await vite.close(); }
 });

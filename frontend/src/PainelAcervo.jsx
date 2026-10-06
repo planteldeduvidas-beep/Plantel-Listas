@@ -21,7 +21,7 @@ import SeletorPasta from "./SeletorPasta.jsx";
 import AdministracaoFase7 from "./AdministracaoFase7.jsx";
 import MeuHistorico from "./MeuHistorico.jsx";
 import Suporte from "./Suporte.jsx";
-import { FormularioEmailConta, LembreteEmailConta } from "./EmailConta.jsx";
+import { BotaoConfirmarEmailConta, FormularioEmailConta, LembreteEmailConta } from "./EmailConta.jsx";
 import ParceirosSidebar from "./ParceirosSidebar.jsx";
 import ParceirosAdmin from "./ParceirosAdmin.jsx";
 import FaixaAvisos from "./FaixaAvisos.jsx";
@@ -594,7 +594,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           {usuario.papel === "admin" && <><span className="rotulo-menu espacada">Administração</span><ItemMenu area="usuarios" atual={areaAtual} icone="usuarios" texto="Usuários" aoAbrir={navegar} /><ItemMenu area="acessos" atual={areaAtual} icone="acessos" texto="Acessos" aoAbrir={navegar} /><ItemMenu area="organizacao" atual={areaAtual} icone="organizacao" texto="Organização" aoAbrir={navegar} /><ItemMenu area="historico" atual={areaAtual} icone="historico" texto="Histórico" aoAbrir={navegar} /><ItemMenu area="drive" atual={areaAtual} icone="drive" texto="Google Drive" aoAbrir={navegar} /><ItemMenu area="parceiros" atual={areaAtual} icone="parceiros" texto="Parceiros" aoAbrir={navegar} /><ItemMenu area="avisos" atual={areaAtual} icone="historico" texto="Avisos" aoAbrir={navegar} /></>}
         </nav>
         <ParceirosSidebar versao={versaoParceiros} />
-        <button type="button" className="botao-email-conta botao-secundario" onClick={() => { definirMenuAberto(false); definirEmailAberto(true); }}>Atualizar ou confirmar e-mail</button>
+        <BotaoConfirmarEmailConta usuario={usuario} aoAtualizar={() => { definirMenuAberto(false); definirEmailAberto(true); }} />
         <div className="conta-lateral"><span className="avatar-usuario">{(usuario.nome || usuario.email).slice(0, 1).toUpperCase()}</span><span><strong>{usuario.nome || usuario.email}</strong><small>{obterTipoDeUsuario(usuario.papel)}</small><small className="email-conta-lateral">{usuario.email}</small></span><button type="button" className="botao-icone" aria-label="Sair" title="Sair" onClick={aoSair}><Icone nome="sair" /></button></div>
       </aside>
 

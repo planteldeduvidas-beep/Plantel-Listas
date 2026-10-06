@@ -8,11 +8,15 @@ const { serializarErroSeguro } = require("../../shared/config/logger");
 function criarEmailContaService({ repository, usuarioRepository, emailProvider, configuracao, logger, cadastroPendenteService }) {
   async function obterAviso(usuario) {
     try {
-      return { ...usuario, emailPrecisaRevisao: await repository.precisaRevisao(usuario.id, usuario.email) };
+      const [emailConfirmado, emailPrecisaRevisao] = await Promise.all([
+        repository.emailConfirmado(usuario.id, usuario.email),
+        repository.precisaRevisao(usuario.id, usuario.email)
+      ]);
+      return { ...usuario, emailConfirmado, emailPrecisaRevisao: !emailConfirmado && emailPrecisaRevisao };
     } catch (erro) {
       // Um lembrete nunca pode impedir o login ou a continuidade da sessao.
       logger.warn({ err: serializarErroSeguro(erro), usuarioId: usuario.id }, "Falha ao consultar lembrete de email");
-      return { ...usuario, emailPrecisaRevisao: false };
+      return { ...usuario, emailConfirmado: false, emailPrecisaRevisao: false };
     }
   }
 
@@ -54,7 +58,7 @@ function criarEmailContaService({ repository, usuarioRepository, emailProvider, 
     if (typeof corpo.token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(corpo.token)) {
       throw new AppError("Link de confirmação inválido. Solicite um novo link na sua conta.", 400, "CONFIRMACAO_EMAIL_INVALIDA");
     }
-    return { usuario: criarUsuarioPublico(await repository.confirmar(usuario.id, gerarHashDoToken(corpo.token))), mensagem: "E-mail confirmado. Use o endereço mostrado na sua conta para entrar e receber nossas mensagens." };
+    return { usuario: { ...criarUsuarioPublico(await repository.confirmar(usuario.id, gerarHashDoToken(corpo.token))), emailConfirmado: true, emailPrecisaRevisao: false }, mensagem: "E-mail confirmado. Use o endereço mostrado na sua conta para entrar e receber nossas mensagens." };
   }
   async function solicitarCadastro(corpo) {
     exigirObjeto(corpo);

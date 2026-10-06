@@ -46,6 +46,14 @@ function criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository)
     return registros.length > 0;
   }
 
+  async function emailConfirmado(usuarioId, email) {
+    const [registros] = await pool.execute(
+      "SELECT (u.email_confirmado_em IS NOT NULL OR EXISTS(SELECT 1 FROM confirmacoes_email c WHERE c.usuario_id=u.id AND c.email_destino=u.email AND c.usada_em IS NOT NULL)) AS confirmado FROM usuarios u WHERE u.id=? AND u.email=? LIMIT 1",
+      [usuarioId, email]
+    );
+    return Boolean(Number(registros[0]?.confirmado || 0));
+  }
+
   async function confirmar(usuarioId, tokenHash, cadastro = false) {
     return transacionar(async conexao => {
       // Mesma ordem de locks da solicitacao: usuario, depois token.
@@ -78,7 +86,7 @@ function criarEmailContaRepository(pool, usuarioRepository, auditoriaRepository)
     const [registros] = await pool.execute("SELECT c.usuario_id FROM confirmacoes_email c INNER JOIN cadastros_email_pendentes p ON p.usuario_id=c.usuario_id WHERE c.token_hash=? AND c.usada_em IS NULL AND c.cancelada_em IS NULL AND c.expira_em>CURRENT_TIMESTAMP(3) LIMIT 1", [tokenHash]);
     return registros[0]?.usuario_id;
   }
-  return { criar, cancelar, confirmar, precisaRevisao, buscarCadastroPorToken };
+  return { criar, cancelar, confirmar, precisaRevisao, emailConfirmado, buscarCadastroPorToken };
 }
 
 module.exports = criarEmailContaRepository;

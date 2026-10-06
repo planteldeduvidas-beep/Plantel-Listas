@@ -4,8 +4,13 @@ import { Alerta, CampoSenha, mensagemHumana } from "./ComponentesInterface.jsx";
 import AvisoEmail from "./AvisoEmail.jsx";
 import "./gestaoUsuarios.css";
 
+export function BotaoConfirmarEmailConta({ usuario, aoAtualizar }) {
+  if (usuario.emailConfirmado) return null;
+  return <button type="button" className="botao-email-conta botao-secundario" onClick={aoAtualizar}>Atualizar ou confirmar e-mail</button>;
+}
+
 export function LembreteEmailConta({ usuario, aoAtualizar }) {
-  if (!usuario.emailPrecisaRevisao) return null;
+  if (usuario.emailConfirmado || !usuario.emailPrecisaRevisao) return null;
   return <aside className="lembrete-email-conta" aria-label="Confira seu e-mail">
     <div><strong>Confira seu e-mail</strong><p>Confirme um e-mail ao qual você tenha acesso para receber respostas do suporte e recuperar sua senha. Seu acesso ao Plantel continua disponível.</p></div>
     <button type="button" className="botao-secundario" onClick={aoAtualizar}>Atualizar ou confirmar e-mail</button>
