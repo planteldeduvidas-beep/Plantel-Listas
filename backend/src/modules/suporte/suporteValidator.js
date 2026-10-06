@@ -29,3 +29,17 @@ function validarMensagemDeSuporte(corpo) {
 }
 
 module.exports = { validarMensagemDeSuporte: validarMensagemDeSuporte };
+
+module.exports.validarAjudaConta = function (corpo) {
+  exigirObjeto(corpo);
+  validarCamposPermitidos(corpo, ["nome", "emailConta", "emailResposta", "mensagem"]);
+  const { normalizarNome, normalizarEmail } = require("../autenticacao/autenticacaoValidator");
+  const emailResposta = normalizarEmail(corpo.emailResposta);
+  if (!/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(emailResposta)) {
+    throw new AppError("Informe um e-mail valido para receber a resposta", 400, "EMAIL_INVALIDO");
+  }
+  const emailConta = validarTexto(corpo.emailConta, "E-mail ou identificacao da conta", 2, 254);
+  if (/[\r\n]/.test(emailConta)) throw new AppError("Identificacao da conta invalida", 400, "DADOS_SUPORTE_INVALIDOS");
+  return { nome: normalizarNome(corpo.nome), emailConta, emailResposta,
+    mensagem: validarTexto(corpo.mensagem, "Mensagem", 10, 3500) };
+};

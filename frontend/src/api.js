@@ -168,6 +168,7 @@ function obterAuditoria(filtros) {
 }
 function obterUrlRelatorio(periodo) { return API_BASE + "/analytics/relatorio.csv?periodo=" + periodo; }
 function enviarSuporte(assunto, mensagem) { return requisitar("/suporte", { method: "POST", body: JSON.stringify({ assunto: assunto, mensagem: mensagem }) }); }
+export function enviarAjudaConta(dados) { return requisitar("/suporte/conta", { method: "POST", body: JSON.stringify(dados) }); }
 function obterMeuHistorico(pagina, limite) { return requisitar("/meu-historico?pagina=" + pagina + "&limite=" + limite, { method: "GET" }); }
 function listarParceiros() { return requisitar("/parceiros", { method: "GET" }); }
 function listarParceirosAdmin() { return requisitar("/parceiros/admin", { method: "GET" }); }

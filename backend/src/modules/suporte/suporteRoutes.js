@@ -4,7 +4,9 @@ const { protegerContraCsrf } = require("../../shared/middlewares/protegerCsrf");
 
 function criarSuporteRoutes(dependencias) {
   const router = express.Router();
-  router.use(impedirCachePrivado, dependencias.autenticar);
+  router.use(impedirCachePrivado);
+  router.post("/conta", protegerContraCsrf, dependencias.rateLimiterPublico, dependencias.controller.ajudaConta);
+  router.use(dependencias.autenticar);
   router.post(
     "/",
     dependencias.autorizarAlunoOuProfessor,

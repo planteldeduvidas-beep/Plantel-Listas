@@ -274,7 +274,8 @@ function registrarModulos(aplicacao, configuracao, logger, dependencias) {
     })),
     autenticar: autenticar,
     autorizarAlunoOuProfessor: autorizarAlunoOuProfessor,
-    rateLimiter: rateLimiters.suporte
+    rateLimiter: rateLimiters.suporte,
+    rateLimiterPublico: rateLimiters.suportePublico
   }));
   aplicacao.use("/api/auditoria", criarAuditoriaRoutes({
     controller: criarAuditoriaController(criarAuditoriaService(auditoriaRepository)),

@@ -1,5 +1,5 @@
 const AppError = require("../../shared/errors/AppError");
-const { validarMensagemDeSuporte } = require("./suporteValidator");
+const { validarMensagemDeSuporte, validarAjudaConta } = require("./suporteValidator");
 
 function criarSuporteService(dependencias) {
   const emailProvider = dependencias.emailProvider;
@@ -32,7 +32,16 @@ function criarSuporteService(dependencias) {
     return { mensagem: "Mensagem enviada. A equipe do Plantel respondera pelo seu e-mail." };
   }
 
-  return { enviar: enviar };
+  async function ajudaConta(corpo) {
+    const dados = validarAjudaConta(corpo);
+    // Identidade declarada, nao autenticada: nunca consultar ou alterar a conta.
+    return enviar({ nome: dados.nome, email: dados.emailResposta, papel: "visitante (identidade nao verificada)" }, {
+      assunto: "Problemas com a conta",
+      mensagem: "Conta informada: " + dados.emailConta + "\n\n" + dados.mensagem
+    });
+  }
+
+  return { enviar: enviar, ajudaConta: ajudaConta };
 }
 
 module.exports = criarSuporteService;

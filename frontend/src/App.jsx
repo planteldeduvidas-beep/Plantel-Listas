@@ -10,6 +10,7 @@ import {
 import PainelAcervo from "./PainelAcervo.jsx";
 import {CaixaAceiteTermos,aceiteAtual} from './TermosAluno.jsx';
 import AvisoEmail from "./AvisoEmail.jsx";
+import AjudaConta from "./AjudaConta.jsx";
 import { ConfirmacaoEmail } from "./EmailConta.jsx";
 import { AguardarConfirmacaoCadastro, ConfirmacaoCadastro } from "./CadastroEmail.jsx";
 import PaginaInstitucional from "./PaginaInstitucional.jsx";
@@ -236,9 +237,10 @@ function Aplicacao() {
         <ul className="beneficios-autenticacao"><li><Icone nome="buscar" /><span>Encontre materiais em segundos</span></li><li><Icone nome="acervo" /><span>Acesse em qualquer dispositivo</span></li><li><Icone nome="sucesso" /><span>Conteúdo organizado pelo Plantel</span></li></ul>
       </section>
 
-      <section className="cartao-autenticacao" aria-labelledby="titulo-principal">
+      <section className="cartao-autenticacao" aria-labelledby={tela === "ajudaConta" ? "titulo-ajuda-conta" : "titulo-principal"}>
         <div className="marca-mobile"><img className="simbolo-marca" src="/plantel-logo.png" alt="" /><strong>Plantel Listas</strong></div>
         <span className="marca">Acesso à biblioteca</span>
+        {tela === "ajudaConta" ? <AjudaConta aoVoltar={() => trocarTela("login")} /> : <>
         <h1 id="titulo-principal">{configuracaoDaTela.titulo}</h1>
         <p className="descricao">{configuracaoDaTela.texto}</p>
         {retornoInicial.tokenEmail && !emailConcluido && <p>Para confirmar seu e-mail, entre com a conta que solicitou o link. Se está trocando o endereço, use o e-mail antigo para entrar.</p>}
@@ -305,8 +307,10 @@ function Aplicacao() {
             {tela !== "login" && <button type="button" onClick={function abrirLogin() { trocarTela("login"); }}>Já tenho conta</button>}
             {tela !== "cadastro" && <button type="button" onClick={function abrirCadastro() { trocarTela("cadastro"); }}>Criar conta</button>}
             {tela !== "recuperar" && <button type="button" onClick={function abrirRecuperacao() { trocarTela("recuperar"); }}>Esqueci a senha</button>}
+            <button type="button" onClick={() => trocarTela("ajudaConta")}>Problemas com sua conta?</button>
           </nav>
         )}
+        </>}
         <nav className="links-institucionais-autenticacao" aria-label="Informações legais">
           <a href="/privacidade">Política de Privacidade</a>
           <a href="/termos">Termos de Uso</a>

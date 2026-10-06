@@ -70,7 +70,7 @@ function PoliticaPrivacidade() {
         <h3>Dados fornecidos pelo usuário</h3>
         <ul>
           <li>nome, e-mail e senha no cadastro e na administração da conta;</li>
-          <li>assunto e mensagem enviados ao suporte, vinculados ao nome, e-mail e perfil da conta;</li>
+          <li>assunto e mensagem enviados ao suporte, vinculados ao nome, e-mail e perfil da conta; no atendimento sem login, nome, identificação da conta e e-mail de contato informados pela própria pessoa, cuja identidade ainda não foi verificada;</li>
           <li>nova senha e token temporário quando há recuperação de acesso.</li>
         </ul>
         <p>As senhas são protegidas por mecanismos criptográficos adequados e não são armazenadas em texto puro.</p>

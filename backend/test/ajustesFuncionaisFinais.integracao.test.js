@@ -63,6 +63,39 @@ test.beforeEach(async function preparar() {
 
 test.after(async function encerrar() { await limpar(); await pool.end(); });
 
+test("ajuda de conta publica exige CSRF, limita spam e nao consulta nem altera contas", async function () {
+  const agente = request.agent(aplicacao);
+  const corpo = { nome: "Pessoa Teste", emailConta: "endereco errado da conta", emailResposta: "contato@outlook.com", mensagem: "Nao consigo acessar minha conta antiga." };
+  assert.equal((await agente.post("/api/suporte/conta").send(corpo)).status, 403);
+  const csrf = (await agente.get("/api/autenticacao/csrf")).body.csrfToken;
+  const enviar = dados => agente.post("/api/suporte/conta").set("X-CSRF-Token", csrf).send(dados);
+  assert.equal((await enviar({...corpo, emailResposta:"contato\r\nBcc:evil@example.com"})).status,400);
+  assert.equal((await enviar({...corpo, papel:"admin"})).status,400);
+  const resposta = await enviar(corpo);
+  assert.equal(resposta.status,202);
+  assert.match(resposta.body.mensagem,/24 horas/);
+  const mensagens = emailProvider.obterMensagens();
+  assert.equal(mensagens.length,1);
+  assert.equal(mensagens[0].email,"contato@outlook.com");
+  assert.match(mensagens[0].mensagem,/endereco errado da conta/);
+  assert.match(mensagens[0].papel,/nao verificada/);
+  const [usuarios] = await pool.execute("SELECT COUNT(*) AS total FROM usuarios");
+  assert.equal(Number(usuarios[0].total),0);
+  await enviar(corpo); await enviar(corpo);
+  assert.equal((await enviar(corpo)).status,429);
+});
+
+test("falha SMTP na ajuda publica retorna erro seguro e nao confirma envio", async function () {
+  aplicacao = criarAplicacao(configuracao, pino({level:"silent"}), {pool,
+    emailProvider:{enviarSuporte:async function(){throw new Error("senha-secreta-SMTP");}}});
+  const agente=request.agent(aplicacao);
+  const csrf=(await agente.get("/api/autenticacao/csrf")).body.csrfToken;
+  const resposta=await agente.post("/api/suporte/conta").set("X-CSRF-Token",csrf).send({nome:"Pessoa Teste",emailConta:"antiga@example.com",emailResposta:"nova@proton.me",mensagem:"Nao tenho acesso ao email anterior."});
+  assert.equal(resposta.status,503);
+  assert.equal(resposta.body.erro.codigo,"SUPORTE_INDISPONIVEL");
+  assert.equal(JSON.stringify(resposta.body).includes("senha-secreta"),false);
+});
+
 test("suporte usa identidade da sessao, valida papeis, CSRF e destinatario seguro", async function testarSuporte() {
   await criarUsuario("Ana Aluna", "ana@example.com", "aluno");
   await criarUsuario("Paulo Professor", "paulo@example.com", "professor");
