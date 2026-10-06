@@ -351,6 +351,10 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
           definirMensagem("");
           if (resultado.googleDrive.renovacaoNecessaria) {
             definirErro("A conexão com o Google Drive precisa ser renovada.");
+          } else if (novoStatus.erroCodigo === "GOOGLE_DRIVE_INDISPONIVEL") {
+            definirErro("O Google Drive está temporariamente indisponível. Os materiais atuais foram preservados. Tente atualizar novamente mais tarde.");
+          } else if (novoStatus.erroCodigo === "SINCRONIZACAO_CONCORRENTE") {
+            definirErro("Há outra operação no Drive em andamento. Aguarde a conclusão antes de atualizar novamente.");
           } else {
             definirErro("Não foi possível concluir a sincronização dos materiais.");
           }
@@ -631,7 +635,9 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas }) {
               </div>
               {googleDrive && googleDrive.conectado ? (
                 <button type="button" onClick={sincronizarAcervo} disabled={processandoGoogleDrive || sincronizacaoEmAndamento}>
-                  {processandoGoogleDrive || sincronizacaoEmAndamento ? "Atualizando materiais..." : "Atualizar materiais agora"}
+                  {sincronizacaoEmAndamento && googleDrive.ultimaSincronizacao.erroCodigo === "SINCRONIZACAO_AGUARDANDO_TRAVA"
+                    ? "Aguardando outra operação terminar..."
+                    : processandoGoogleDrive || sincronizacaoEmAndamento ? "Atualizando materiais..." : "Atualizar materiais agora"}
                 </button>
               ) : (
                 <button type="button" onClick={conectarGoogleDrive} disabled={processandoGoogleDrive || !googleDrive || !googleDrive.configurado}>

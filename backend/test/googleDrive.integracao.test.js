@@ -528,8 +528,28 @@ test("POST desacopla a sincronizacao, expoe status e impede concorrencia", async
   const durante = await admin.agente.get("/api/integracoes/google-drive/status");
   assert.equal(durante.body.googleDrive.ultimaSincronizacao.status, "sincronizando");
 
-  liberarListagem();
-  await execucao;
+  const concorrente = await pool.getConnection();
+  try {
+    const [trava] = await concorrente.execute("SELECT GET_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64),0) AS adquirida");
+    assert.equal(Number(trava[0].adquirida), 1);
+    liberarListagem();
+    let esperando;
+    for (let tentativa = 0; tentativa < 20; tentativa += 1) {
+      esperando = await admin.agente.get("/api/integracoes/google-drive/status");
+      if (esperando.body.googleDrive.ultimaSincronizacao.erroCodigo === "SINCRONIZACAO_AGUARDANDO_TRAVA") break;
+      await new Promise(function (resolve) { setTimeout(resolve, 20); });
+    }
+    assert.equal(esperando.body.googleDrive.ultimaSincronizacao.status, "sincronizando");
+    assert.equal(esperando.body.googleDrive.ultimaSincronizacao.erroCodigo, "SINCRONIZACAO_AGUARDANDO_TRAVA");
+    const repetida = await admin.agente.post("/api/integracoes/google-drive/sincronizar")
+      .set("X-CSRF-Token", admin.csrf).send({});
+    assert.equal(repetida.status, 409);
+  } finally {
+    await concorrente.execute("SELECT RELEASE_LOCK(LEFT(CONCAT('plantel_drive_operacao_',DATABASE()),64))");
+    concorrente.release();
+    liberarListagem();
+    await execucao;
+  }
   const concluida = await admin.agente.get("/api/integracoes/google-drive/status");
   assert.equal(concluida.body.googleDrive.ultimaSincronizacao.status, "concluida");
 });

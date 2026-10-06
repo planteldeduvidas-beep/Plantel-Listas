@@ -23,8 +23,10 @@ function criarCenario(opcoes) {
     criarSincronizacaoAguardando: async function criar() { return 1; },
     adquirirTravaDeSincronizacao: async function adquirir() {
       estado.aquisicoes += 1;
+      if (opcoes.travaOcupada && opcoes.travaOcupada(estado.aquisicoes)) return null;
       return conexao;
     },
+    marcarEsperaPorTrava: async function (_id, aguardando) { estado.aguardandoTrava = aguardando; },
     marcarSincronizando: async function marcar() { return true; },
     obterInicioDaListagem: async function obterInicio() { return "2026-09-30 10:00:00.000000"; },
     aplicarSincronizacao: async function aplicar(_conexao, _id, _arvore, _raiz, inicioDaListagem) {
@@ -75,6 +77,7 @@ function criarCenario(opcoes) {
       seguranca: { csrfSecret: "csrf-de-teste" }
     },
     intervaloManutencaoTravaMs: 5,
+    aguardarTrava: async function () {},
     agendarTarefa: function agendar(tarefa) { estado.tarefa = tarefa; }
   });
   return { estado: estado, service: service };
@@ -89,6 +92,34 @@ test("libera a trava durante a listagem e a readquire antes de gravar", async fu
   assert.equal(cenario.estado.concluida, true);
   assert.equal(cenario.estado.liberada, true);
   assert.equal(cenario.estado.falhaSemTrava, null);
+});
+
+test("aguarda disputa antes da gravacao e aplica uma unica vez", async function () {
+  const cenario = criarCenario({ travaOcupada: function (n) { return n === 2 || n === 3; } });
+  await cenario.service.solicitarSincronizacao(1, {});
+  await cenario.estado.tarefa();
+  assert.equal(cenario.estado.aquisicoes, 4);
+  assert.equal(cenario.estado.aplicacoes, 1);
+  assert.equal(cenario.estado.concluida, true);
+  assert.equal(cenario.estado.aguardandoTrava, false);
+});
+
+test("encerra espera limitada sem aplicar arvore quando trava permanece ocupada", async function () {
+  const cenario = criarCenario({ travaOcupada: function (n) { return n >= 2; } });
+  await cenario.service.solicitarSincronizacao(1, {});
+  await cenario.estado.tarefa();
+  assert.equal(cenario.estado.aplicacoes, 0);
+  assert.equal(cenario.estado.concluida, false);
+  assert.equal(cenario.estado.falhaSemTrava, "SINCRONIZACAO_CONCORRENTE");
+  assert.equal(cenario.estado.aquisicoes, 33);
+});
+
+test("aguarda trava inicial sem perder a solicitacao", async function () {
+  const cenario = criarCenario({ travaOcupada: function (n) { return n === 1; } });
+  await cenario.service.solicitarSincronizacao(1, {});
+  await cenario.estado.tarefa();
+  assert.equal(cenario.estado.concluida, true);
+  assert.equal(cenario.estado.aplicacoes, 1);
 });
 
 test("nao aplica varredura da credencial antiga depois de nova autorizacao", async function() {

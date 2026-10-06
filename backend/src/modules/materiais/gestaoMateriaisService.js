@@ -552,8 +552,17 @@ function criarGestaoMateriaisService(dependencias) {
         const encontrado=await provider.buscarArquivoPorOperacao(refreshToken,operacao.chave);
         if(encontrado)detalhes.driveFileId=encontrado.id;
       }
-      if(!detalhes.driveFileId){await integracaoService.solicitarSincronizacaoAutomatica();throw new AppError("Upload com resultado externo incerto",503,"GOOGLE_UPLOAD_RESULTADO_INCERTO");}
-      if(!material||material.driveFileId!==detalhes.driveFileId){try{await provider.excluirArquivo(refreshToken,detalhes.driveFileId);}catch(erro){if(erro.codigo!=="GOOGLE_ARQUIVO_NAO_ENCONTRADO")throw erro;}}
+      if(!detalhes.driveFileId){const erro=new AppError("Upload com resultado externo incerto",503,"GOOGLE_UPLOAD_RESULTADO_INCERTO");erro.reconciliacaoNecessaria=true;throw erro;}
+      const registrado = material && material.driveFileId === detalhes.driveFileId
+        ? material : await repository.buscarMaterialPorDriveId(detalhes.driveFileId);
+      if(!registrado){
+        // Uma sincronizacao pode ainda nao ter indexado o arquivo. Nao apagar
+        // para compensar um upload cujo resultado e desconhecido.
+        const erro=new AppError("Upload aguarda reconciliacao com o banco",503,"GOOGLE_UPLOAD_RESULTADO_INCERTO");
+        erro.reconciliacaoNecessaria=true;
+        throw erro;
+      }
+      if(typeof repository.atualizarOperacaoDrive==="function")await repository.atualizarOperacaoDrive(operacao.chave,"reconciliacao_pendente",detalhes,registrado.id);
       await concluirOperacaoDrive(operacao.chave);return;
     }
     if(!material){await concluirOperacaoDrive(operacao.chave);return;}
@@ -561,7 +570,7 @@ function criarGestaoMateriaisService(dependencias) {
       await provider.renomearArquivo(refreshToken,material.driveFileId,material.nome);
     }else if(operacao.tipo==="movimentacao"){
       const item=await obterItemOuNulo(refreshToken,material.driveFileId);
-      if(!item){await integracaoService.solicitarSincronizacaoAutomatica();throw new AppError("Arquivo ausente durante reconciliacao",503,"GOOGLE_ARQUIVO_NAO_ENCONTRADO");}
+      if(!item){const erro=new AppError("Arquivo ausente durante reconciliacao",503,"GOOGLE_ARQUIVO_NAO_ENCONTRADO");erro.reconciliacaoNecessaria=true;throw erro;}
       const paiAtual=Array.isArray(item.parents)?item.parents[0]:null;
       if(paiAtual!==material.categoriaDriveId)await provider.moverArquivo(refreshToken,material.driveFileId,paiAtual,material.categoriaDriveId);
     }else if(operacao.tipo==="substituicao"){
@@ -569,7 +578,7 @@ function criarGestaoMateriaisService(dependencias) {
         const encontrado=await provider.buscarArquivoPorOperacao(refreshToken,operacao.chave);
         if(encontrado)detalhes.driveFileIdNovo=encontrado.id;
       }
-      if(!detalhes.driveFileIdNovo){await integracaoService.solicitarSincronizacaoAutomatica();throw new AppError("Substituicao com resultado externo incerto",503,"GOOGLE_SUBSTITUICAO_RESULTADO_INCERTO");}
+      if(!detalhes.driveFileIdNovo){const erro=new AppError("Substituicao com resultado externo incerto",503,"GOOGLE_SUBSTITUICAO_RESULTADO_INCERTO");erro.reconciliacaoNecessaria=true;throw erro;}
       if(material.driveFileId===detalhes.driveFileIdNovo){
         await provider.alterarLixeira(refreshToken,detalhes.driveFileIdAnterior,true);
         await provider.alterarLixeira(refreshToken,detalhes.driveFileIdNovo,false);
@@ -587,20 +596,34 @@ function criarGestaoMateriaisService(dependencias) {
     if(typeof repository.listarOperacoesDrivePendentes!=="function"||!provider)return 0;
     const conexao=await repository.adquirirTravaDeOperacao();
     if(!conexao)return 0;
+    let deveSincronizar=false;
     try{
       const operacoes=await repository.listarOperacoesDrivePendentes(25);
       if(!operacoes.length)return 0;
-      const refreshToken=await token();
+      let refreshToken;
       let concluidas=0;
       for(const operacao of operacoes){
-        try{await reconciliarOperacao(refreshToken,operacao);concluidas+=1;}
+        // Preserva evidencia e resultado incerto; nao presume sucesso nem ausencia.
+        if (Number(operacao.tentativas || 0)>=20) {
+          await repository.registrarFalhaOperacaoDrive(operacao.chave,"reconciliacao_pendente","OPERACAO_DRIVE_REVISAO_NECESSARIA",{...operacao.detalhes,revisaoNecessaria:true});
+          logger?.warn({operacaoId:operacao.id},"Operacao Google Drive requer revisao; retomada automatica suspensa");
+          continue;
+        }
+        try{refreshToken ||= await token();await reconciliarOperacao(refreshToken,operacao);concluidas+=1;}
         catch(erro){
-          await deixarOperacaoPendente(operacao.chave,"reconciliacao_pendente",erro,operacao.detalhes);
+          const revisaoNecessaria=Boolean(erro.revisaoNecessaria)||Number(operacao.tentativas || 0)+1>=20;
+          await deixarOperacaoPendente(operacao.chave,"reconciliacao_pendente",erro,{...operacao.detalhes,...(revisaoNecessaria?{revisaoNecessaria:true}:{})});
+          deveSincronizar ||= Boolean(erro.reconciliacaoNecessaria && !revisaoNecessaria);
           if(logger)logger.warn({operacaoId:operacao.id,materialId:operacao.materialId,codigo:erro.codigo||erro.code||"OPERACAO_DRIVE_PENDENTE"},"Operacao Google Drive continuara pendente");
         }
       }
       return concluidas;
-    }finally{await repository.liberarTravaDeOperacao(conexao);}
+    }finally{
+      await repository.liberarTravaDeOperacao(conexao);
+      // O worker de sincronizacao usa a mesma named lock. Agendar antes causa
+      // SINCRONIZACAO_CONCORRENTE; varias pendencias pedem uma unica varredura.
+      if(deveSincronizar)await integracaoService.solicitarSincronizacaoAutomatica();
+    }
   }
 
   function iniciarRetomada() {

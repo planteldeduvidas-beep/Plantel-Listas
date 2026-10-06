@@ -10,6 +10,22 @@ const {criarHashDaSenha}=require("../src/modules/autenticacao/senha");
 const {ESCOPO_LEITURA,ESCOPO_GESTAO}=require("../src/shared/providers/googleDriveProvider");
 const criarChangesRepository=require("../src/modules/materiais/googleDriveChangesRepository");
 
+test("retentativa SQL limita espera e preserva operacao suspensa para revisao",async()=>{
+  const repo=require("../src/modules/materiais/gestaoMateriaisRepository")(pool);
+  const chave="00000000-0000-4000-8000-000000000237";
+  await repo.criarOperacaoDrive({chave,tipo:"upload",usuarioId:usuarios.admin.id,detalhes:{nome:"evidencia"}});
+  await repo.registrarFalhaOperacaoDrive(chave,"reconciliacao_pendente","GOOGLE_UPLOAD_RESULTADO_INCERTO",{nome:"evidencia"});
+  let [linhas]=await pool.execute("SELECT tentativas,TIMESTAMPDIFF(SECOND,CURRENT_TIMESTAMP(3),proxima_tentativa_em) AS espera FROM operacoes_google_drive_pendentes WHERE chave=?",[chave]);
+  assert.equal(linhas[0].tentativas,1);assert.ok(linhas[0].espera>=29&&linhas[0].espera<=60);
+  await pool.execute("UPDATE operacoes_google_drive_pendentes SET tentativas=4772 WHERE chave=?",[chave]);
+  await repo.registrarFalhaOperacaoDrive(chave,"reconciliacao_pendente","OPERACAO_DRIVE_REVISAO_NECESSARIA",{nome:"evidencia",revisaoNecessaria:true});
+  [linhas]=await pool.execute("SELECT fase,detalhes,concluida_em,TIMESTAMPDIFF(SECOND,CURRENT_TIMESTAMP(3),proxima_tentativa_em) AS espera FROM operacoes_google_drive_pendentes WHERE chave=?",[chave]);
+  assert.equal(linhas[0].fase,"reconciliacao_pendente");assert.equal(linhas[0].concluida_em,null);assert.ok(linhas[0].espera>=3599&&linhas[0].espera<=3600);
+  await pool.execute("UPDATE operacoes_google_drive_pendentes SET proxima_tentativa_em=NULL WHERE chave=?",[chave]);
+  assert.equal((await repo.listarOperacoesDrivePendentes()).some(op=>op.chave===chave),false);
+  assert.equal((await repo.buscarMaterialPorDriveId("driveMaterial6")).id,materialId);
+});
+
 const base=obterConfiguracao();
 const configuracao=Object.assign({},base,{ambiente:"test",nivelDeLog:"silent",banco:Object.assign({},base.banco,{nome:process.env.DB_TEST_NAME||base.banco.nome+"_test"}),googleDrive:{clientId:"fase6.apps.googleusercontent.com",clientSecret:"segredo-fase6",pastaRaizId:"pastaRaizFaseSeis123",redirectUri:"http://localhost:3000/api/integracoes/google-drive/oauth/callback",refreshToken:"refresh-token-fase-seis",webhookUrl:"",intervaloChangesMs:60000,escopo:"https://www.googleapis.com/auth/drive"}});
 configuracao.seguranca=Object.assign({},base.seguranca,{limiteAutenticacao:100,limiteUpload:100});

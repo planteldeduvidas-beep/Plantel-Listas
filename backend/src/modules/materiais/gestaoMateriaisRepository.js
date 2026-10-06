@@ -97,6 +97,14 @@ function criarGestaoMateriaisRepository(pool) {
     return mapearMaterial(registros[0]);
   }
 
+  async function buscarMaterialPorDriveId(id) {
+    const [registros] = await pool.execute(
+      "SELECT m.*,c.drive_pasta_id AS categoria_drive_id FROM materiais m "
+      + "LEFT JOIN categorias c ON c.id=m.categoria_id WHERE m.drive_file_id=? LIMIT 1", [id]
+    );
+    return mapearMaterial(registros[0]);
+  }
+
   async function buscarCategoria(id) {
     const [registros] = await pool.execute(
       "SELECT id,nome,drive_pasta_id,categoria_pai_id,ativo FROM categorias WHERE id=? LIMIT 1",
@@ -450,7 +458,7 @@ function criarGestaoMateriaisRepository(pool) {
   async function registrarFalhaOperacaoDrive(chave, fase, codigo, detalhes) {
     await pool.execute(
       "UPDATE operacoes_google_drive_pendentes SET fase=?,detalhes=?,tentativas=tentativas+1,"
-      + "ultimo_erro_codigo=?,proxima_tentativa_em=DATE_ADD(CURRENT_TIMESTAMP(3),INTERVAL 30 SECOND) "
+      + "ultimo_erro_codigo=?,proxima_tentativa_em=DATE_ADD(CURRENT_TIMESTAMP(3),INTERVAL LEAST(3600,30*POW(2,LEAST(tentativas,7))) SECOND) "
       + "WHERE chave=? AND fase<>'concluida'",
       [fase,JSON.stringify(detalhes || {}),String(codigo || "OPERACAO_DRIVE_PENDENTE").slice(0,100),chave]
     );
@@ -460,6 +468,7 @@ function criarGestaoMateriaisRepository(pool) {
     const [registros] = await pool.execute(
       "SELECT id,chave,tipo,material_id,usuario_id,fase,detalhes,tentativas "
       + "FROM operacoes_google_drive_pendentes WHERE fase<>'concluida' "
+      + "AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(detalhes,'$.revisaoNecessaria')),'false')<>'true' "
       + "AND (proxima_tentativa_em IS NULL OR proxima_tentativa_em<=CURRENT_TIMESTAMP(3)) "
       + "ORDER BY id LIMIT ?",
       [limite || 25]
@@ -471,7 +480,7 @@ function criarGestaoMateriaisRepository(pool) {
     const [linhas] = await pool.execute("SELECT id FROM operacoes_google_drive_pendentes WHERE tipo='pasta_criacao' AND fase<>'concluida' AND JSON_UNQUOTE(JSON_EXTRACT(detalhes,'$.categoriaExistenteId'))=? LIMIT 1", [String(id)]);
     return linhas.length > 0;
   }
-  return { solicitarExclusaoPasta, listarSolicitacoesExclusao, buscarSolicitacaoExclusao, recusarExclusaoPasta, professorPodeExcluirSubarvore, concluirCriacaoPrincipalRecuperada, possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, reativarPastaVinculada, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
+  return { buscarMaterialPorDriveId, solicitarExclusaoPasta, listarSolicitacoesExclusao, buscarSolicitacaoExclusao, recusarExclusaoPasta, professorPodeExcluirSubarvore, concluirCriacaoPrincipalRecuperada, possuiVinculacaoPendente, excluirPastaComConteudo, adquirirTravaDeOperacao, liberarTravaDeOperacao, buscarMaterial, buscarCategoria, buscarCategoriaPorDriveId, reativarPastaVinculada, buscarDisciplinaEfetiva, professorPossuiDisciplina, professorPodeAcessarCategoria, listarPastasGerenciaveis, criarPasta, renomearPasta, criarMaterial, atualizarMaterial, enviarLixeira, restaurar, marcarExclusao, concluirExclusao, reverterExclusao, listarLixeira, registrarAuditoria, criarOperacaoDrive, atualizarOperacaoDrive, concluirOperacaoDrive, registrarFalhaOperacaoDrive, listarOperacoesDrivePendentes };
 }
 
 module.exports = criarGestaoMateriaisRepository;

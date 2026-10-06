@@ -62,7 +62,7 @@ async function classificarFalhaDrive(resposta, codigoPadrao) {
       ) || "");
     } catch (erro) { /* O status HTTP continua sendo suficiente para negar a operacao. */ }
     if (resposta.status === 429 || /^(userRateLimitExceeded|rateLimitExceeded|dailyLimitExceeded|quotaExceeded|storageQuotaExceeded|downloadQuotaExceeded|RESOURCE_EXHAUSTED)$/i.test(motivo)) {
-      return { codigo: "GOOGLE_LIMITE_EXCEDIDO", status: 503 };
+      return { codigo: "GOOGLE_LIMITE_EXCEDIDO", status: 503, retentavel: resposta.status === 429 || /^(userRateLimitExceeded|rateLimitExceeded)$/i.test(motivo) };
     }
     if (/^(domainPolicy|domainPolicyError|appNotAuthorizedToFile)$/i.test(motivo)) {
       return { codigo: "GOOGLE_POLITICA_BLOQUEIO", status: 403 };
@@ -277,27 +277,33 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       }
     });
 
-    let resposta;
-    try {
-      resposta = await buscar(url, {
+    for (let tentativa = 1; tentativa <= 4; tentativa += 1) {
+      let resposta;
+      let erro;
+      let retentavel = false;
+      try {
+        resposta = await buscar(url, {
         method: "GET",
         headers: { Authorization: "Bearer " + tokenDeAcesso },
         signal: AbortSignal.timeout(TEMPO_LIMITE_REQUISICAO_MS)
-      });
-    } catch (erro) {
-      throw new AppError(
-        "Google Drive temporariamente indisponivel",
-        503,
-        "GOOGLE_DRIVE_INDISPONIVEL"
-      );
+        });
+      } catch (falhaRede) {
+        erro = new AppError("Google Drive temporariamente indisponivel", 503, "GOOGLE_DRIVE_INDISPONIVEL");
+        retentavel = true;
+      }
+      if (resposta) {
+        if (resposta.ok) return resposta.json();
+        const falha = await classificarFalhaDrive(resposta);
+        erro = new AppError("Nao foi possivel consultar o Google Drive", falha.status, falha.codigo);
+        erro.driveHttpStatus = resposta.status;
+        retentavel = Boolean(falha.retentavel || [500, 502, 503, 504].includes(resposta.status));
+      }
+      erro.driveTentativas = tentativa;
+      if (!retentavel || tentativa === 4) throw erro;
+      // Somente GET: nunca repetir automaticamente uma escrita com resultado incerto.
+      const espera = 1000 * 2 ** (tentativa - 1) + Math.floor(Math.random() * 250);
+      await (dependencias.aguardarRetentativa || (ms => new Promise(resolve => setTimeout(resolve, ms))))(espera);
     }
-
-    if (!resposta.ok) {
-      const falha = await classificarFalhaDrive(resposta);
-      throw new AppError("Nao foi possivel consultar o Google Drive", falha.status, falha.codigo);
-    }
-
-    return resposta.json();
   }
 
   async function obterConteudoArquivo(refreshToken, arquivoId, intervalo) {
@@ -626,9 +632,15 @@ function criarGoogleDriveProvider(configuracao, dependenciasInformadas) {
       pageSize: 2,
       supportsAllDrives: true,
       includeItemsFromAllDrives: true,
-      fields: "files(id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,trashed,resourceKey,appProperties)"
+      fields: "nextPageToken,files(id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,trashed,resourceKey,appProperties)"
     }, token);
-    return Array.isArray(resposta.files) && resposta.files.length ? resposta.files[0] : null;
+    const arquivos = Array.isArray(resposta.files) ? resposta.files : [];
+    if (arquivos.length > 1 || resposta.nextPageToken) {
+      const erro = new AppError("Mais de um arquivo corresponde a operacao; revisao necessaria", 409, "GOOGLE_OPERACAO_AMBIGUA");
+      erro.revisaoNecessaria = true;
+      throw erro;
+    }
+    return arquivos[0] || null;
   }
 
   async function verificarDescendenteDaRaiz(refreshToken, item) {

@@ -301,6 +301,46 @@ for (const caso of [
   });
 }
 
+test("busca por operacao exige correspondencia unica, incluindo paginacao",async()=>{
+  for(const dados of [{files:[]},{files:[{id:"unico"}]},{files:[{id:"a"},{id:"b"}]},{files:[{id:"a"}],nextPageToken:"continua"}]) {
+    const provider=criarGoogleDriveProvider(criarConfiguracao(),{OAuth2Client:OAuth2ClientFake,fetch:async()=>criarResposta(dados)});
+    const consulta=provider.buscarArquivoPorOperacao("refresh","f2678700-4544-4a6c-bb4b-427a54181ea1");
+    if(dados.files.length>1||dados.nextPageToken)await assert.rejects(consulta,e=>e.codigo==="GOOGLE_OPERACAO_AMBIGUA"&&e.revisaoNecessaria);
+    else assert.deepEqual(await consulta,dados.files[0]||null);
+  }
+});
+
+test("retentativa de pagina da arvore não duplica nem reinicia páginas anteriores",async()=>{
+  const chamadas=[];let falhou=false;
+  const provider=criarGoogleDriveProvider(criarConfiguracao(),{OAuth2Client:OAuth2ClientFake,aguardarRetentativa:async()=>{},fetch:async url=>{
+    const u=new URL(url);if(u.pathname.endsWith("/pastaRaizTeste12345"))return criarResposta({id:"pastaRaizTeste12345",mimeType:"application/vnd.google-apps.folder"});
+    const pagina=u.searchParams.get("pageToken")||"primeira";chamadas.push(pagina);
+    if(pagina==="segunda"&&!falhou){falhou=true;return {ok:false,status:503};}
+    return criarResposta({files:[{id:pagina,name:pagina+".pdf",mimeType:"application/pdf",parents:["pastaRaizTeste12345"]}],...(pagina==="primeira"?{nextPageToken:"segunda"}:{})});
+  }});
+  const arvore=await provider.listarArvore("refresh");
+  assert.deepEqual(chamadas,["primeira","segunda","segunda"]);assert.deepEqual(arvore.arquivos.map(item=>item.id),["primeira","segunda"]);
+});
+
+test("GET Drive recupera falhas transitorias com espera limitada", async()=>{
+  for (const status of [429,500,502,503,504,"rede",403]) {
+    let chamadas=0;const esperas=[];
+    const provider=criarGoogleDriveProvider(criarConfiguracao(),{OAuth2Client:OAuth2ClientFake,aguardarRetentativa:async ms=>esperas.push(ms),fetch:async()=>{
+      chamadas++;if(chamadas===1){if(status==="rede")throw Error("rede");return {ok:false,status,json:async()=>({error:{errors:[{reason:"rateLimitExceeded"}]}})};}return criarResposta({id:"arquivo"});
+    }});
+    assert.equal((await provider.obterItem("refresh","arquivo")).id,"arquivo");assert.equal(chamadas,2);assert.equal(esperas.length,1);assert.ok(esperas[0]>=1000&&esperas[0]<1250);
+  }
+});
+
+test("GET Drive não repete credencial, permissão ou quota diária e limita 503",async()=>{
+  for(const [status,motivo,total] of [[401,"",1],[403,"insufficientFilePermissions",1],[403,"dailyLimitExceeded",1],[403,"domainPolicy",1],[404,"",1],[400,"",1],[503,"",4]]) {
+    let chamadas=0;const esperas=[];
+    const provider=criarGoogleDriveProvider(criarConfiguracao(),{OAuth2Client:OAuth2ClientFake,aguardarRetentativa:async ms=>esperas.push(ms),fetch:async()=>{chamadas++;return {ok:false,status,json:async()=>({error:{errors:[{reason:motivo}]}})};}});
+    await assert.rejects(provider.obterItem("refresh","arquivo"),erro=>erro.driveHttpStatus===status&&erro.driveTentativas===total);
+    assert.equal(chamadas,total);assert.equal(esperas.length,total-1);
+  }
+});
+
 test("limita a concorrencia ao listar pastas sem perder arquivos", async function testarConcorrenciaDaArvore() {
   const configuracao = criarConfiguracao();
   let requisicoesAtivas = 0;

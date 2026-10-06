@@ -7,6 +7,54 @@ const AppError = require("../src/shared/errors/AppError");
 const criarService = require("../src/modules/materiais/gestaoMateriaisService");
 const { ESCOPO_GESTAO } = require("../src/shared/providers/googleDriveProvider");
 
+test("retomada agenda uma varredura somente depois de liberar a trava", async () => {
+  let travada=false; let sincronizacoes=0; const falhas=[];
+  const d=criarDependencias({repository:{
+    adquirirTravaDeOperacao:async()=>{travada=true;return {};},
+    liberarTravaDeOperacao:async()=>{travada=false;},
+    listarOperacoesDrivePendentes:async()=>[1,2].map(id=>({id,chave:String(id),tipo:"upload",detalhes:{nome:"preservado"}})),
+    registrarFalhaOperacaoDrive:async(...args)=>falhas.push(args)
+  },integracaoService:{solicitarSincronizacaoAutomatica:async()=>{assert.equal(travada,false);assert.equal(falhas.length,2);sincronizacoes++;}}});
+  assert.equal(await d.service.recuperarOperacoesPendentes(),0);
+  assert.equal(sincronizacoes,1); assert.deepEqual(d.chamadas,[]);
+});
+
+test("retomada suspende pendencias antigas sem apagar, concluir ou depender do token", async () => {
+  const falhas=[];
+  const d=criarDependencias({repository:{
+    listarOperacoesDrivePendentes:async()=>[{id:237,chave:"antiga",tipo:"upload",tentativas:4772,detalhes:{nome:"evidencia"}}],
+    registrarFalhaOperacaoDrive:async(...args)=>falhas.push(args)
+  },integracaoService:{obterRefreshTokenParaUso:async()=>{throw Error("nao deve consultar token");},solicitarSincronizacaoAutomatica:async()=>{throw Error("nao deve sincronizar");}}});
+  assert.equal(await d.service.recuperarOperacoesPendentes(),0);
+  assert.equal(falhas[0][3].revisaoNecessaria,true);assert.equal(falhas[0][3].nome,"evidencia");assert.deepEqual(d.chamadas,[]);
+});
+
+test("vigésima falha mantém evidencia e interrompe agendamentos automaticos", async()=>{
+  const falhas=[];
+  const d=criarDependencias({repository:{listarOperacoesDrivePendentes:async()=>[{chave:"limite",tipo:"upload",tentativas:19,detalhes:{nome:"original"}}],registrarFalhaOperacaoDrive:async(...args)=>falhas.push(args)},integracaoService:{solicitarSincronizacaoAutomatica:async()=>{throw Error("nao deve agendar");}}});
+  assert.equal(await d.service.recuperarOperacoesPendentes(),0);
+  assert.equal(falhas[0][3].revisaoNecessaria,true);
+});
+
+test("retomada preserva upload já indexado por ID exato do Drive", async()=>{
+  const concluidas=[];const vinculos=[];
+  const d=criarDependencias({repository:{listarOperacoesDrivePendentes:async()=>[{chave:"indexada",tipo:"upload",detalhes:{driveFileId:"driveOriginal"}}],buscarMaterialPorDriveId:async id=>{assert.equal(id,"driveOriginal");return material();},atualizarOperacaoDrive:async(...args)=>vinculos.push(args),concluirOperacaoDrive:async chave=>concluidas.push(chave)}});
+  assert.equal(await d.service.recuperarOperacoesPendentes(),1);assert.deepEqual(concluidas,["indexada"]);assert.deepEqual(d.chamadas,[]);
+  assert.equal(vinculos[0][3],material().id);
+});
+
+test("upload encontrado sem registro e preservado e solicita indexacao antes de concluir",async()=>{
+  let sincronizacoes=0;const falhas=[];
+  const d=criarDependencias({repository:{listarOperacoesDrivePendentes:async()=>[{chave:"incerta",tipo:"upload",detalhes:{nome:"igual.pdf"}}],registrarFalhaOperacaoDrive:async(...args)=>falhas.push(args)},provider:{buscarArquivoPorOperacao:async()=>({id:"arquivo-recuperado"})},integracaoService:{solicitarSincronizacaoAutomatica:async()=>{sincronizacoes++;}}});
+  assert.equal(await d.service.recuperarOperacoesPendentes(),0);assert.deepEqual(d.chamadas,[]);assert.equal(sincronizacoes,1);assert.equal(falhas[0][3].driveFileId,"arquivo-recuperado");
+});
+
+test("identificacao ambigua suspende recuperacao sem tocar em arquivos",async()=>{
+  const falhas=[];
+  const d=criarDependencias({repository:{listarOperacoesDrivePendentes:async()=>[{chave:"ambigua",tipo:"upload",detalhes:{nome:"original"}}],registrarFalhaOperacaoDrive:async(...args)=>falhas.push(args)},provider:{buscarArquivoPorOperacao:async()=>{const e=new AppError("Ambigua",409,"GOOGLE_OPERACAO_AMBIGUA");e.revisaoNecessaria=true;throw e;}}});
+  assert.equal(await d.service.recuperarOperacoesPendentes(),0);assert.equal(falhas[0][3].revisaoNecessaria,true);assert.deepEqual(d.chamadas,[]);
+});
+
 test("vinculacao preserva pasta preexistente em falha SQL e nao compensa commit incerto", async () => {
   for (const preexistente of [false, true]) for (const incerto of [false, true]) {
     const erro = new Error("falha SQL");
@@ -101,6 +149,7 @@ function categoria(id) {
 function criarDependencias(alteracoes) {
   const chamadas = [];
   const repository = {
+    buscarMaterialPorDriveId: async () => null,
     adquirirTravaDeOperacao: async function adquirirTrava() { return {}; },
     liberarTravaDeOperacao: async function liberarTrava() {},
     buscarMaterial: async function buscar() { return material(); },

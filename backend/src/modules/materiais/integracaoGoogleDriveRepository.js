@@ -228,6 +228,14 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     }
   }
 
+  async function marcarEsperaPorTrava(sincronizacaoId, aguardando) {
+    await pool.execute(
+      "UPDATE sincronizacoes_google_drive SET erro_codigo = ? "
+      + "WHERE id = ? AND status IN ('aguardando', 'sincronizando')",
+      [aguardando ? "SINCRONIZACAO_AGUARDANDO_TRAVA" : null, sincronizacaoId]
+    );
+  }
+
   async function falharSincronizacao(conexao, sincronizacaoId, codigo) {
     await conexao.execute(
       "UPDATE sincronizacoes_google_drive SET status = 'falhou', erro_codigo = ?, "
@@ -451,6 +459,7 @@ function criarIntegracaoGoogleDriveRepository(pool) {
     buscarCredencial: buscarCredencial,
     buscarUltimaSincronizacao: buscarUltimaSincronizacao,
     adquirirTravaDeSincronizacao: adquirirTravaDeSincronizacao,
+    marcarEsperaPorTrava: marcarEsperaPorTrava,
     liberarTravaDeSincronizacao: liberarTravaDeSincronizacao,
     criarSincronizacaoAguardando: criarSincronizacaoAguardando,
     marcarSincronizando: marcarSincronizando,
