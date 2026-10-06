@@ -17,11 +17,15 @@ test('faixas minimizam dados e nao confundem declaracao com verificacao', async 
     const componente=readFileSync(new URL('../src/FaixaEtariaAluno.jsx',import.meta.url),'utf8');
     const gate=readFileSync(new URL('../src/ExigirFaixaEtariaAluno.jsx',import.meta.url),'utf8');
     assert.doesNotMatch(gate,/Agora não|aoFechar|onClick=.*definirDados/);
-    assert.match(gate,/usuario\.papel !== 'aluno'/); assert.match(gate,/if \(dados.faixaEtaria\) return children/);
+    assert.match(gate,/usuario\.papel !== 'aluno'/); assert.match(gate,/if \(dados.faixaEtaria\) return <TermosTratadosNaColeta.Provider/);
     const {PerguntaFaixaEtaria}=await vite.ssrLoadModule(caminho('ExigirFaixaEtariaAluno.jsx'));
     const modal=renderToStaticMarkup(React.createElement(PerguntaFaixaEtaria,{valor:'',aoAlterar:()=>{},aoSalvar:()=>{},salvando:false}));
     assert.match(modal,/role="dialog"/); assert.match(modal,/aria-modal="true"/); assert.match(modal,/disabled=""/);
     assert.doesNotMatch(modal,/Agora não|Fechar|type="date"|type="file"/);
+    const {CaixaAceiteTermos}=await vite.ssrLoadModule(caminho('TermosAluno.jsx'));
+    const unificado=renderToStaticMarkup(React.createElement(PerguntaFaixaEtaria,{valor:'12_17',aoAlterar:()=>{},aoSalvar:()=>{},salvando:false},React.createElement(CaixaAceiteTermos,{marcado:false,aoAlterar:()=>{},obrigatorio:false})));
+    assert.match(unificado,/type="checkbox"/); assert.match(unificado,/Termos de Uso/);
+    assert.doesNotMatch(unificado,/<input[^>]*required/); assert.match(unificado,/<select[^>]*required/);
     const cadastro=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
     assert.match(cadastro,/tela === 'cadastro' && <CampoFaixaEtaria/);
     const suporte=readFileSync(new URL('../src/Suporte.jsx',import.meta.url),'utf8');

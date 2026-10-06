@@ -7,6 +7,9 @@
 .coleta-faixa-modal { width: 100%; max-width: 32rem; box-sizing: border-box; padding: clamp(1.25rem, 4vw, 2rem); background: var(--cor-superficie, #fff); color: var(--cor-texto, #142c29); border-radius: 1rem; box-shadow: 0 12px 40px #123c3020; }
 .coleta-faixa-modal h1 { font-size: 1.5rem; margin-top: 0; }
 .coleta-faixa-modal small { display: block; margin-top: .75rem; }
+.termos-na-coleta { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #718e8533; }
+.termos-na-coleta h2 { font-size: 1rem; margin-top: 0; }
+.termos-na-coleta p { font-size: .9rem; }
 .meu-perfil { padding: clamp(1rem, 3vw, 2rem); }
 .meu-perfil form { display: grid; gap: 1rem; }
 .meu-perfil input { width: 100%; box-sizing: border-box; }

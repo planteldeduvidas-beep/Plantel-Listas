@@ -37,7 +37,7 @@ const GUIAS = Object.freeze({
         passos: [
           "No menu, toque em Meu perfil. Confira seu nome, e-mail, confirmação, faixa etária declarada e data da conta.",
           "Para corrigir seu nome, altere o campo e toque em Salvar meus dados. Quem declarou menos de 18 anos precisa pedir revisão da faixa etária ao Suporte. Quem declarou 18 anos ou mais pode corrigir a faixa no perfil; se escolher uma faixa de menor, próximas correções também passam pelo Suporte. Seus estudos continuam disponíveis.",
-          "Se sua conta ainda não tiver faixa etária, uma pergunta aparece antes de abrir o painel. Escolha uma das três opções e toque em Continuar. Não pedimos data de nascimento nem documentos.",
+          "Se sua conta ainda não tiver faixa etária, uma pergunta aparece antes de abrir o painel. Escolha uma das três opções e toque em Continuar. Se os termos também estiverem pendentes, aparecem no mesmo aviso: marcar a caixa salva o aceite automaticamente, sem precisar abrir os links ou clicar em outro botão. Você pode aceitar os termos depois, mas precisa preencher a faixa para continuar. Não pedimos data de nascimento nem documentos.",
           "Para mudar ou confirmar seu e-mail, abra Atualizar ou confirmar meu e-mail, informe o endereço e sua senha atual e envie o link. Confira também spam e lixo eletrônico. Só após confirmar o link o endereço muda; até lá, use o e-mail antigo para entrar e recuperar a senha."
         ], dica: "A faixa é uma declaração, não uma comprovação de idade. Não muda suas permissões nem apaga seu histórico."
       }

@@ -53,6 +53,13 @@
 - Revisão final em interface completa com API e MySQL reais locais, contas fictícias e SMTP fake: URL direta de histórico/biblioteca sem faixa mantém popup; salvar libera painel; recarga não repete; perfil de menor bloqueia alteração; correção admin de 12–17 para 18+ salva e registra ator, anterior/nova faixa, data e justificativa; novo login preservado; adulto que declara menor volta a ter campo protegido. Mobile sem overflow (375 px úteis). Foi corrigido o encolhimento do modal na combinação do CSS do build completo.
 - QA manual reproduzível: `backend/scripts/qaPerfilReal.cjs`, somente loopback, banco fixo `plantel_gmail_transicao_qa`, sem envio real de e-mail ou Drive. Exige build com `VITE_API_URL=http://127.0.0.1:5190/api`; credenciais são exclusivamente fictícias. Nunca usar contas reais nesse servidor.
 
+### Ajuste de interface — popup unificado
+
+- Aluno existente sem faixa vê a pergunta obrigatória antes do painel. Termos pendentes são mostrados no mesmo popup; o aceite é salvo ao marcar a caixa, sem abrir links ou clicar em confirmação extra. Faixa exige seleção e Continuar.
+- Aceites e faixas já registrados não são solicitados novamente. Termos continuam adiáveis; optar por preencher apenas a faixa não gera outro popup de termos imediatamente, mesmo sem armazenamento local disponível (estado compartilhado em memória).
+- Interface antiga/versão divergente não aceita os documentos silenciosamente: disponibiliza Atualizar página. Erro no salvamento desmarca a caixa e permite nova tentativa, sem fingir sucesso.
+- Verificação visual com API/MySQL local: conta legada com ambas as pendências, checkbox salva um aceite com faixa ainda nula, faixa libera painel, adiamento não registra aceite, nenhum segundo popup de termos; layout móvel 390 px sem overflow. QA manual com `QA_TERMOS_PENDENTES=1` não pré-aceita os documentos da conta fictícia.
+
 ### Arquivos do escopo (novos ou alterados)
 
 - Backend: `src/app.js`; `src/modules/autenticacao/{autenticacaoController.js,autenticacaoRoutes.js,cadastroPendenteRepository.js,cadastroPendenteService.js,faixaEtariaService.js}`; `src/modules/usuarios/{usuarioController.js,usuarioRoutes.js}`; migrations `032_faixa_etaria_declarada.sql`, `033_origem_faixa_etaria.sql`, `034_correcao_faixa_etaria_admin.sql`.

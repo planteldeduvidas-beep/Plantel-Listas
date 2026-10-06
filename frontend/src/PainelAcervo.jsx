@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {AvisoTermosAluno} from './TermosAluno.jsx';
+import {AvisoTermosAluno,TermosTratadosNaColeta} from './TermosAluno.jsx';
 import MeuPerfil from './MeuPerfil.jsx';
 import {
   listarEstruturaPublica,
@@ -193,7 +193,8 @@ function FormularioCatalogo({ titulo, singular, registros, api, aoAtualizar, aoE
 }
 
 function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }) {
-  const [termosResolvidos,definirTermosResolvidos]=useState(usuario.papel!=='aluno');
+  const termosTratadosNaColeta=React.useContext(TermosTratadosNaColeta);
+  const [termosResolvidos,definirTermosResolvidos]=useState(usuario.papel!=='aluno'||termosTratadosNaColeta);
   const liberarBoasVindas=useCallback(()=>definirTermosResolvidos(true),[]);
   const [emailAberto, definirEmailAberto] = useState(false);
   const areaInicial = obterAreaInicial(usuario.papel);
@@ -737,7 +738,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
             {!professores.length && <p className="estado-vazio">Nenhum professor ativo encontrado.</p>}
           </section>}
       </section>
-      <AvisoTermosAluno key={usuario.id} usuario={usuario} aoLiberar={liberarBoasVindas} />
+      {!termosTratadosNaColeta && <AvisoTermosAluno key={usuario.id} usuario={usuario} aoLiberar={liberarBoasVindas} />}
       {termosResolvidos && boasVindasAlunoAberta && usuario.papel === "aluno" && (
         <Modal
           titulo={"Bem-vindo, " + String(usuario.nome || "aluno").trim().split(/\s+/)[0] + "!"}

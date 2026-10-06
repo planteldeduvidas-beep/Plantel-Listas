@@ -26,7 +26,7 @@ async function iniciar() {
   const aluno = await usuarios.buscarPorEmail('aluno-visual@example.com');
   await pool.execute('UPDATE usuarios SET faixa_etaria_declarada=NULL,faixa_etaria_declarada_em=NULL,faixa_etaria_origem=NULL WHERE id=?',[aluno.id]);
   const versoes = require('../../shared/documentosLegais.json');
-  await pool.execute("INSERT IGNORE INTO aceites_termos_alunos(usuario_id,termos_versao,privacidade_versao,origem) VALUES (?,?,?,'conta')",[aluno.id,versoes.termos,versoes.privacidade]);
+  if (process.env.QA_TERMOS_PENDENTES !== '1') await pool.execute("INSERT IGNORE INTO aceites_termos_alunos(usuario_id,termos_versao,privacidade_versao,origem) VALUES (?,?,?,'conta')",[aluno.id,versoes.termos,versoes.privacidade]);
   const api = criarAplicacao(config,pino({level:'silent'}),{pool,emailProvider:criarEmailProviderFake(),
     googleDriveProvider:{},agendarTarefaGoogleDrive:()=>{},agendarTarefaGoogleDriveChanges:()=>{}});
   const app = express(), dist = path.resolve(__dirname,'../../frontend/dist');
