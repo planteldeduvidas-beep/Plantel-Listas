@@ -1,33 +1,30 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { lazy, useCallback, useEffect, useRef, useState } from "react";
+import CarregamentoSobDemanda from './CarregamentoSobDemanda.jsx';
+import { carregarDadosArea } from './dadosAreaPainel.js';
+import * as apiPainel from './api.js';
 import {AvisoTermosAluno,TermosTratadosNaColeta} from './TermosAluno.jsx';
 import MeuPerfil from './MeuPerfil.jsx';
 import {
-  listarEstruturaPublica,
   vincularPastaAoDrive,
-  listarUsuarios,
   categorias as apiCategorias,
   disciplinas as apiDisciplinas,
   concursos as apiConcursos,
-  listarPermissoes,
-  listarDisciplinasDosProfessores,
-  listarMinhasPermissoes,
   salvarAcessosProfessor,
   obterStatusGoogleDrive,
   iniciarOAuthGoogleDrive,
-  sincronizarGoogleDrive,
-  obterStatusDasAtualizacoesGoogleDrive
+  sincronizarGoogleDrive
 } from "./api.js";
-import BibliotecaAcervo from "./BibliotecaAcervo.jsx";
+const BibliotecaAcervo = lazy(() => import("./BibliotecaAcervo.jsx"));
 import SeletorPasta from "./SeletorPasta.jsx";
-import AdministracaoFase7 from "./AdministracaoFase7.jsx";
+const AdministracaoFase7 = lazy(() => import("./AdministracaoFase7.jsx"));
 import MeuHistorico from "./MeuHistorico.jsx";
 import Suporte from "./Suporte.jsx";
 import { BotaoConfirmarEmailConta, FormularioEmailConta, LembreteEmailConta } from "./EmailConta.jsx";
 import ParceirosSidebar from "./ParceirosSidebar.jsx";
-import ParceirosAdmin from "./ParceirosAdmin.jsx";
+const ParceirosAdmin = lazy(() => import("./ParceirosAdmin.jsx"));
 import FaixaAvisos from "./FaixaAvisos.jsx";
-import AvisosAdmin from "./AvisosAdmin.jsx";
-import Tutorial from "./Tutorial.jsx";
+const AvisosAdmin = lazy(() => import("./AvisosAdmin.jsx"));
+const Tutorial = lazy(() => import("./Tutorial.jsx"));
 import { Alerta, AlternadorTema, Carregando, Icone, Modal, Vazio, mensagemHumana } from "./ComponentesInterface.jsx";
 import { criarUrlDaNavegacao, obterAreaInicial, obterAreaPermitida, obterPastaDaUrl } from "./navegacao.js";
 
@@ -198,7 +195,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
   const liberarBoasVindas=useCallback(()=>definirTermosResolvidos(true),[]);
   const [emailAberto, definirEmailAberto] = useState(false);
   const areaInicial = obterAreaInicial(usuario.papel);
-  const [estrutura, definirEstrutura] = useState({ categorias: [], disciplinas: [], concursos: [] });
+  const versaoCarga = useRef(0);
   const [categorias, definirCategorias] = useState([]);
   const [disciplinas, definirDisciplinas] = useState([]);
   const [concursos, definirConcursos] = useState([]);
@@ -224,6 +221,8 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
   const [areaAtual, definirAreaAtual] = useState(function lerAreaInicialDaUrl() {
     return obterAreaPermitida(usuario.papel, window.location.search);
   });
+  const contextoCarga = useRef(null);
+  contextoCarga.current = { papel: usuario.papel, area: areaAtual };
   const [menuAberto, definirMenuAberto] = useState(false);
   const [versaoParceiros, definirVersaoParceiros] = useState(0);
   const [boasVindasAlunoAberta, definirBoasVindasAlunoAberta] = useState(
@@ -266,41 +265,36 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
   }
 
   async function carregar(mensagemInformada) {
+    const versao = ++versaoCarga.current;
+    definirCarregando(true);
     definirErro("");
     try {
-      const publica = await listarEstruturaPublica();
-      definirEstrutura(publica.estrutura);
-
-      if (usuario.papel === "admin") {
-        const resultados = await Promise.all([
-          apiCategorias.listar(), apiDisciplinas.listar(), apiConcursos.listar(),
-          listarUsuarios({ papel: "professor", ativo: true, limite: 100 }), listarPermissoes(), obterStatusGoogleDrive(),
-          obterStatusDasAtualizacoesGoogleDrive(), listarDisciplinasDosProfessores()
-        ]);
-        definirCategorias(resultados[0].categorias);
-        definirDisciplinas(resultados[1].disciplinas);
-        definirConcursos(resultados[2].concursos);
-        definirUsuarios(resultados[3].usuarios);
-        definirPermissoes(resultados[4].permissoes);
-        definirDisciplinasDosProfessores(resultados[7].disciplinas);
-        definirGoogleDrive(resultados[5].googleDrive);
-        definirAcompanhamentoDrive(resultados[6].acompanhamento);
-      } else if (usuario.papel === "professor") {
-        const proprias = await listarMinhasPermissoes();
-        definirMinhasPermissoes(proprias.permissoes);
-      }
-
+      // Uma mutacao concluida depois de navegar deve atualizar a area atual,
+      // nao restaurar as dependencias da area onde a operacao comecou.
+      const contexto = contextoCarga.current;
+      const dados = await carregarDadosArea(contexto.papel, contexto.area, apiPainel);
+      if (versao !== versaoCarga.current) return;
+      if (dados.categorias) definirCategorias(dados.categorias);
+      if (dados.disciplinas) definirDisciplinas(dados.disciplinas);
+      if (dados.concursos) definirConcursos(dados.concursos);
+      if (dados.usuarios) definirUsuarios(dados.usuarios);
+      if (dados.permissoes) definirPermissoes(dados.permissoes);
+      if (dados.disciplinasDosProfessores) definirDisciplinasDosProfessores(dados.disciplinasDosProfessores);
+      if (dados.googleDrive) definirGoogleDrive(dados.googleDrive);
+      if (dados.acompanhamento) definirAcompanhamentoDrive(dados.acompanhamento);
+      if (dados.minhasPermissoes) definirMinhasPermissoes(dados.minhasPermissoes);
       definirMensagem(mensagemInformada || "");
     } catch (falha) {
-      mostrarErro(falha.message);
+      if (versao === versaoCarga.current) mostrarErro(falha.message);
     } finally {
-      definirCarregando(false);
+      if (versao === versaoCarga.current) definirCarregando(false);
     }
   }
 
   useEffect(function carregarAoEntrar() {
     carregar();
-  }, [usuario.id]);
+    return () => { versaoCarga.current++; };
+  }, [usuario.id, usuario.papel, areaAtual]);
 
   useEffect(function prepararHistoricoDaNavegacao() {
     const areaPermitida = obterAreaPermitida(usuario.papel, window.location.search);
@@ -335,7 +329,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
 
   useEffect(function acompanharSincronizacao() {
     const ultimaSincronizacao = googleDrive && googleDrive.ultimaSincronizacao;
-    const deveAcompanhar = usuario.papel === "admin"
+    const deveAcompanhar = usuario.papel === "admin" && areaAtual === "drive"
       && ultimaSincronizacao
       && ["aguardando", "sincronizando"].includes(ultimaSincronizacao.status);
 
@@ -371,6 +365,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
     };
   }, [
     usuario.papel,
+    areaAtual,
     googleDrive && googleDrive.ultimaSincronizacao
       ? googleDrive.ultimaSincronizacao.id
       : null,
@@ -579,10 +574,6 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
   };
   const informacaoDaArea = informacoesDasAreas[areaAtual] || informacoesDasAreas.acervo;
 
-  if (carregando) {
-    return <main className="pagina-painel carregamento-inicial"><Carregando texto="Preparando seus materiais..." /></main>;
-  }
-
   return (
     <main className="pagina-painel">
       <button type="button" className="fundo-menu-mobile" aria-label="Fechar menu" tabIndex={menuAberto ? 0 : -1} onClick={function fecharMenu() { definirMenuAberto(false); }} />
@@ -618,6 +609,8 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
         {usuario.papel === "aluno" && areaAtual === "acervo" && <FaixaAvisos />}
         <div className="avisos-globais">{mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}{erro && <Alerta tipo="erro">{erro}</Alerta>}</div>
 
+        {carregando && <Carregando texto="Carregando informações desta área..." />}
+        {!carregando && <CarregamentoSobDemanda key={areaAtual}>
         {areaAtual === "acervo" && <BibliotecaAcervo usuario={usuario} aoMensagem={definirMensagem} />}
         {usuario.papel === "aluno" && areaAtual === "meuHistorico" && <MeuHistorico aoErro={mostrarErro} />}
         {usuario.papel === 'aluno' && areaAtual === 'meuPerfil' && <MeuPerfil usuario={usuario} aoAtualizarUsuario={aoAtualizarUsuario} />}
@@ -737,6 +730,7 @@ function PainelAcervo({ usuario, aoSair, mostrarBoasVindas, aoAtualizarUsuario }
             </form>
             {!professores.length && <p className="estado-vazio">Nenhum professor ativo encontrado.</p>}
           </section>}
+        </CarregamentoSobDemanda>}
       </section>
       {!termosTratadosNaColeta && <AvisoTermosAluno key={usuario.id} usuario={usuario} aoLiberar={liberarBoasVindas} />}
       {termosResolvidos && boasVindasAlunoAberta && usuario.papel === "aluno" && (

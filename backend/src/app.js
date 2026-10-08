@@ -352,7 +352,19 @@ function criarAplicacao(configuracao, logger, dependenciasInformadas) {
   if (configuracao.ambiente === "production") {
     const caminhoDoFrontend = dependencias.caminhoDoFrontend
       || path.resolve(__dirname, "../../frontend/dist");
-    aplicacao.use(express.static(caminhoDoFrontend));
+    aplicacao.use(express.static(caminhoDoFrontend, {
+      setHeaders: function definirCachePublico(res, arquivo) {
+        // So arquivos com hash no nome podem ter cache longo. HTML/worker
+        // devem revalidar para nao prender usuarios no build anterior.
+        const nome = path.basename(arquivo);
+        if (/-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|png|jpe?g|webp|svg)$/.test(nome)
+            && path.basename(path.dirname(arquivo)) === "assets") {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (["index.html", "sw.js", "manifest.webmanifest"].includes(nome)) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      }
+    }));
     aplicacao.use(function servirFallbackDaSpa(req, res, next) {
       if (req.method !== "GET" || req.path.startsWith("/api/") || !req.accepts("html")) {
         next();

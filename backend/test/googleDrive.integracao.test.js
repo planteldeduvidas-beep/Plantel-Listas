@@ -209,6 +209,31 @@ test.after(async function encerrarTeste() {
   await pool.end();
 });
 
+test("webhook valida canal com collations diferentes, preserva sync de preparacao e idempotencia", async function testarCollationWebhook() {
+  const conexao = await pool.getConnection();
+  const channelId = '123e4567-e89b-12d3-a456-426614174099';
+  const tokenHash = 'a'.repeat(64);
+  try {
+    // Sessao e parametros diferem do literal/tabela unicode_ci das migrations.
+    await conexao.query("SET NAMES utf8mb4 COLLATE utf8mb4_general_ci");
+    await conexao.execute("INSERT INTO canais_google_drive (channel_id,resource_id,token_hash,expira_em,status,criado_em) VALUES (?,NULL,?,DATE_ADD(NOW(3),INTERVAL 1 DAY),'preparando',NOW(3))", [channelId,tokenHash]);
+    const repository = criarChangesRepository(conexao);
+    const headers = {channelId,resourceId:'recurso-valido',resourceState:'sync',messageNumber:'1'};
+    assert.equal(await repository.registrarNotificacao(headers,tokenHash),true);
+    assert.equal(await repository.registrarNotificacao(headers,tokenHash),false);
+    await assert.rejects(repository.registrarNotificacao({...headers,resourceState:'change',messageNumber:'2'},tokenHash), {codigo:'GOOGLE_WEBHOOK_INVALIDO'});
+    await assert.rejects(repository.registrarNotificacao(headers,'b'.repeat(64)), {codigo:'GOOGLE_WEBHOOK_INVALIDO'});
+    await conexao.execute("UPDATE canais_google_drive SET status='ativo',resource_id=? WHERE channel_id=?",[headers.resourceId,channelId]);
+    assert.equal(await repository.registrarNotificacao({...headers,resourceState:'change',messageNumber:'2'},tokenHash),true);
+    await assert.rejects(repository.registrarNotificacao({...headers,resourceId:'outro-recurso',messageNumber:'3'},tokenHash), {codigo:'GOOGLE_WEBHOOK_INVALIDO'});
+    await conexao.execute("UPDATE canais_google_drive SET expira_em=DATE_SUB(NOW(3),INTERVAL 1 DAY) WHERE channel_id=?",[channelId]);
+    await assert.rejects(repository.registrarNotificacao({...headers,messageNumber:'3'},tokenHash), {codigo:'GOOGLE_WEBHOOK_INVALIDO'});
+  } finally {
+    await conexao.query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+    conexao.release();
+  }
+});
+
 test("migration cria estrutura segura para OAuth, sincronizacoes e materiais", async function testarMigration() {
   const tabelasEsperadas = [
     "credenciais_google_drive",

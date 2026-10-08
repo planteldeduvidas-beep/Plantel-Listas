@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { lazy, useEffect, useState } from "react";
+import CarregamentoSobDemanda from './CarregamentoSobDemanda.jsx';
 import {
   cadastrar,
   entrar,
@@ -7,12 +8,12 @@ import {
   solicitarRecuperacao,
   redefinirSenha
 } from "./api.js";
-import PainelAcervo from "./PainelAcervo.jsx";
+const PainelAcervo = lazy(() => import("./PainelAcervo.jsx"));
 import {CaixaAceiteTermos,aceiteAtual} from './TermosAluno.jsx';
 import AvisoEmail from "./AvisoEmail.jsx";
 import AjudaConta from "./AjudaConta.jsx";
 import { CampoFaixaEtaria } from './FaixaEtariaAluno.jsx';
-import ExigirFaixaEtariaAluno from './ExigirFaixaEtariaAluno.jsx';
+const ExigirFaixaEtariaAluno = lazy(() => import('./ExigirFaixaEtariaAluno.jsx'));
 import { ConfirmacaoEmail } from "./EmailConta.jsx";
 import { AguardarConfirmacaoCadastro, ConfirmacaoCadastro } from "./CadastroEmail.jsx";
 import PaginaInstitucional from "./PaginaInstitucional.jsx";
@@ -125,6 +126,7 @@ function Aplicacao() {
 
   async function enviarLogin(evento) {
     evento.preventDefault();
+    if (carregando || processando) return;
     prepararOperacao();
     try {
       const dados = await entrar(email, senha);
@@ -204,6 +206,7 @@ function Aplicacao() {
   }
 
   function trocarTela(novaTela) {
+    if (carregando) return;
     definirTermosAceitos(false);
     definirFaixaEtaria('');
     definirTela(novaTela);
@@ -212,7 +215,7 @@ function Aplicacao() {
     definirSenha("");
   }
 
-  if (carregando) {
+  if (carregando && (retornoInicial.tokenEmail || tokenRecuperacao)) {
     return <main className="pagina-autenticacao"><Carregando texto="Preparando seu acesso..." /></main>;
   }
 
@@ -221,7 +224,7 @@ function Aplicacao() {
 
   if (usuario && tela !== "redefinir") {
     if (retornoInicial.tokenEmail && !emailConcluido) return <ConfirmacaoEmail usuario={usuario} token={retornoInicial.tokenEmail} aoCancelar={() => definirEmailConcluido(true)} aoConcluir={dados => { definirUsuario(dados.usuario); definirEmailConcluido(true); }} />;
-    return <ExigirFaixaEtariaAluno key={usuario.id} usuario={usuario} aoSair={encerrarSessao}><PainelAcervo usuario={usuario} aoAtualizarUsuario={definirUsuario} aoSair={encerrarSessao} mostrarBoasVindas={entradaRecente} /></ExigirFaixaEtariaAluno>;
+    return <CarregamentoSobDemanda key={usuario.id} texto="Preparando seus materiais..."><ExigirFaixaEtariaAluno key={usuario.id} usuario={usuario} aoSair={encerrarSessao}><PainelAcervo usuario={usuario} aoAtualizarUsuario={definirUsuario} aoSair={encerrarSessao} mostrarBoasVindas={entradaRecente} /></ExigirFaixaEtariaAluno></CarregamentoSobDemanda>;
   }
 
   const configuracoesDaTela = {
@@ -248,6 +251,7 @@ function Aplicacao() {
         {tela === "ajudaConta" ? <AjudaConta aoVoltar={() => trocarTela("login")} /> : <>
         <h1 id="titulo-principal">{configuracaoDaTela.titulo}</h1>
         <p className="descricao">{configuracaoDaTela.texto}</p>
+        {carregando && <Carregando texto="Verificando sua sessão..." />}
         {retornoInicial.tokenEmail && !emailConcluido && <p>Para confirmar seu e-mail, entre com a conta que solicitou o link. Se está trocando o endereço, use o e-mail antigo para entrar.</p>}
         {(tela === "recuperar" || tela === "cadastro") && <AvisoEmail />}
 
@@ -278,6 +282,7 @@ function Aplicacao() {
                 autoComplete="email"
                 placeholder={tela === "cadastro" ? "seunome@provedor.com" : undefined}
                 value={email}
+                disabled={carregando}
                 onChange={function atualizarEmail(evento) { definirEmail(evento.target.value); }}
                 required
               />
@@ -288,6 +293,7 @@ function Aplicacao() {
             <label>
               {tela === "redefinir" ? "Nova senha" : "Senha"}
               <CampoSenha
+                disabled={carregando}
                 minLength="12"
                 maxLength="128"
                 autoComplete={tela === "login" ? "current-password" : "new-password"}
@@ -303,12 +309,12 @@ function Aplicacao() {
           {tela === 'cadastro' && <CaixaAceiteTermos marcado={termosAceitos} aoAlterar={definirTermosAceitos} />}
           {mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}
           {erro && <Alerta tipo="erro">{erro}</Alerta>}
-          <button type="submit" className="botao-principal botao-largo" disabled={processando}>
-            {processando ? "Aguarde..." : configuracaoDaTela.botao}
+          <button type="submit" className="botao-principal botao-largo" disabled={processando || carregando}>
+            {carregando ? "Verificando acesso..." : processando ? "Aguarde..." : configuracaoDaTela.botao}
           </button>
         </form>
 
-        {tela !== "redefinir" && (
+        {!carregando && tela !== "redefinir" && (
           <nav className="acoes-secundarias" aria-label="Outras opcoes de acesso">
             {tela !== "login" && <button type="button" onClick={function abrirLogin() { trocarTela("login"); }}>Já tenho conta</button>}
             {tela !== "cadastro" && <button type="button" onClick={function abrirCadastro() { trocarTela("cadastro"); }}>Criar conta</button>}

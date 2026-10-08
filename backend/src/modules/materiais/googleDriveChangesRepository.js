@@ -459,12 +459,14 @@ function criarGoogleDriveChangesRepository(pool, opcoes) {
       "SELECT channel_id FROM canais_google_drive WHERE channel_id=? AND token_hash=? "
       + "AND expira_em>CURRENT_TIMESTAMP(3) AND ("
       + "(status='ativo' AND resource_id=?) OR "
-      + "(status='preparando' AND resource_id IS NULL AND ?='sync')) LIMIT 1",
+      // Comparar dois textos (parametro e literal) depende da collation da sessao.
+      // O indicador numerico preserva a regra sem alterar schema ou credenciais.
+      + "(status='preparando' AND resource_id IS NULL AND ?=1)) LIMIT 1",
       [
         cabecalhos.channelId,
         tokenHash,
         cabecalhos.resourceId,
-        cabecalhos.resourceState
+        cabecalhos.resourceState === "sync" ? 1 : 0
       ]
     );
     if (!canais[0]) {

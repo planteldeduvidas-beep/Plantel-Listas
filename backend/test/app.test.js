@@ -61,6 +61,9 @@ test("separa liveness de readiness do MySQL", async function() {
 test("producao entrega o fallback da SPA nas rotas institucionais sem mascarar a API", async function testarFallbackSpa(t) {
   const diretorio = fs.mkdtempSync(path.join(os.tmpdir(), "plantel-spa-"));
   fs.writeFileSync(path.join(diretorio, "index.html"), "<!doctype html><title>Plantel Listas</title>");
+  fs.mkdirSync(path.join(diretorio,"assets"));
+  fs.writeFileSync(path.join(diretorio,"assets","index-abcdefgh.js"),"console.log('fixture')");
+  fs.writeFileSync(path.join(diretorio,"sw.js"),"// fixture");
   t.after(function limpar() { fs.rmSync(diretorio, { recursive: true, force: true }); });
   const app = criarAplicacao(
     criarConfiguracao("production"),
@@ -77,5 +80,9 @@ test("producao entrega o fallback da SPA nas rotas institucionais sem mascarar a
   const apiInexistente = await request(app).get("/api/inexistente").set("Accept", "text/html");
   assert.equal(apiInexistente.status, 404);
   assert.equal(apiInexistente.body.erro.codigo, "ROTA_NAO_ENCONTRADA");
+  assert.equal((await request(app).get('/assets/index-abcdefgh.js')).headers['cache-control'],'public, max-age=31536000, immutable');
+  assert.equal((await request(app).get('/')).headers['cache-control'],'no-cache');
+  assert.equal((await request(app).get('/sw.js')).headers['cache-control'],'no-cache');
+  assert.doesNotMatch((await request(app).get('/api/saude')).headers['cache-control'] || '', /immutable/);
 });
 
