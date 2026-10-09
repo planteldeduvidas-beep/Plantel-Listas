@@ -107,7 +107,8 @@ const GUIAS = Object.freeze({
       {
         area: "usuarios", titulo: "Usuários", resumo: "Crie contas e ajuste o acesso de cada pessoa.",
         passos: [
-          "No menu, toque em Usuários. Use Buscar, Tipo e Conta para localizar alguém pelo nome, e-mail, papel ou estado.",
+          "No menu, toque em Usuários. Use Buscar pessoa, Tipo, Conta e Confirmação de e-mail, depois toque em Aplicar filtros. Em Mostrar primeiro, escolha cadastros recentes/antigos, quem entrou recentemente, quem está há mais/menos tempo sem entrar ou somente quem nunca entrou. O tempo considera o último login registrado, não a última página visitada.",
+          "Solicitar confirmação de e-mail para todos marca um aviso dentro do sistema para as contas existentes ainda não confirmadas, independentemente dos filtros. Confirme a ação no popup. Não envia e-mails em massa nem bloqueia acessos. Para enviar um link individual, use Opções > Enviar verificação de e-mail; lembre a pessoa de conferir Spam ou Lixo eletrônico.",
           "Para cadastrar, toque em Novo usuário, preencha nome, e-mail e senha temporária, escolha Aluno, Professor ou Administrador e toque em Criar usuário.",
           "Na linha da pessoa, o seletor Tipo de usuário altera o papel. Em Opções, você encontra Editar dados, Redefinir senha e Bloquear/Liberar conta.",
           "Depois de uma alteração, confira o papel e o estado exibidos na própria linha."

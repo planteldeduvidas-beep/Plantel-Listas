@@ -40,7 +40,7 @@ export default function MenuUsuario({ item, proprio, aoAcao }) {
   return <><button type="button" ref={gatilho} className="gatilho-menu-usuario" aria-label={"Mais opções para " + item.nome}
     aria-expanded={aberto} aria-controls={aberto ? "menu-usuario-" + item.id : undefined} onClick={() => setAberto(!aberto)}><Icone nome="opcoes" /><span>Opções</span></button>
     {aberto && createPortal(<div ref={menu} id={"menu-usuario-" + item.id} className="menu-usuario-flutuante" style={posicao} aria-label={"Ações para " + item.nome}>
-      {acoes.map(([tipo, texto]) => <button key={tipo} type="button" disabled={proprio && ["estado", "excluir"].includes(tipo)}
+      {acoes.filter(([tipo]) => !item.emailConfirmado || !["verificar", "regularizar"].includes(tipo)).map(([tipo, texto]) => <button key={tipo} type="button" disabled={proprio && ["estado", "excluir"].includes(tipo)}
         className={tipo === "excluir" ? "perigo-texto" : ""} onClick={() => { setAberto(false); aoAcao(tipo, item); }}>{texto}</button>)}
     </div>, document.body)}</>;
 }

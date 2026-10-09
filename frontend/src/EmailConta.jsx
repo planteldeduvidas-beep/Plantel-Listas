@@ -10,7 +10,7 @@ export function BotaoConfirmarEmailConta({ usuario, aoAtualizar }) {
 }
 
 export function LembreteEmailConta({ usuario, aoAtualizar }) {
-  if (usuario.emailConfirmado || !usuario.emailPrecisaRevisao) return null;
+  if (usuario.emailConfirmado) return null;
   return <aside className="lembrete-email-conta" aria-label="Confira seu e-mail">
     <div><strong>Confira seu e-mail</strong><p>Confirme um e-mail ao qual você tenha acesso para receber respostas do suporte e recuperar sua senha. Seu acesso ao Plantel continua disponível.</p></div>
     <button type="button" className="botao-secundario" onClick={aoAtualizar}>Atualizar ou confirmar e-mail</button>

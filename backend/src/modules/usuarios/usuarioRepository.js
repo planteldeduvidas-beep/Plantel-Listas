@@ -112,19 +112,29 @@ function criarUsuarioRepository(pool) {
   }
 
   async function listar(filtros) {
-    const condicoes = ["excluido_em IS NULL", "NOT EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=usuarios.id)"];
+    // Uma única consulta paginada; sem buscar os detalhes de cada conta separadamente.
+    const origem = " FROM usuarios u LEFT JOIN (SELECT usuario_id, MAX(criado_em) ultimo_login FROM sessoes GROUP BY usuario_id) s ON s.usuario_id=u.id"
+      + " LEFT JOIN (SELECT usuario_id,email_destino,MAX(usada_em) confirmada_em FROM confirmacoes_email WHERE usada_em IS NOT NULL GROUP BY usuario_id,email_destino) e ON e.usuario_id=u.id AND e.email_destino=u.email";
+    const confirmacao = "COALESCE(u.email_confirmado_em,e.confirmada_em)";
+    const condicoes = ["u.excluido_em IS NULL", "NOT EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=u.id)"];
     const parametros = [];
-    if (filtros.busca) { condicoes.push("(nome LIKE ? OR email LIKE ?)"); parametros.push("%" + filtros.busca + "%", "%" + filtros.busca + "%"); }
-    if (filtros.papel) { condicoes.push("papel=?"); parametros.push(filtros.papel); }
-    if (filtros.ativo !== null) { condicoes.push("ativo=?"); parametros.push(filtros.ativo ? 1 : 0); }
+    if (filtros.busca) { condicoes.push("(u.nome LIKE ? OR u.email LIKE ?)"); parametros.push("%" + filtros.busca + "%", "%" + filtros.busca + "%"); }
+    if (filtros.papel) { condicoes.push("u.papel=?"); parametros.push(filtros.papel); }
+    if (filtros.ativo !== null) { condicoes.push("u.ativo=?"); parametros.push(filtros.ativo ? 1 : 0); }
+    if (typeof filtros.emailConfirmado === "boolean") condicoes.push(confirmacao + (filtros.emailConfirmado ? " IS NOT NULL" : " IS NULL"));
+    if (filtros.ordenacao === "nunca_entrou") condicoes.push("s.ultimo_login IS NULL");
+    const ordens = { email: "u.email ASC,u.id ASC", cadastro_recente: "u.criado_em DESC,u.id DESC", cadastro_antigo: "u.criado_em ASC,u.id ASC",
+      login_recente: "s.ultimo_login DESC,u.id DESC", menos_inativos: "s.ultimo_login DESC,u.id DESC",
+      mais_inativos: "s.ultimo_login IS NOT NULL ASC,s.ultimo_login ASC,u.criado_em ASC,u.id ASC", nunca_entrou: "u.criado_em ASC,u.id ASC" };
     const onde = condicoes.length ? " WHERE " + condicoes.join(" AND ") : "";
-    const [totais] = await pool.execute("SELECT COUNT(*) AS total FROM usuarios" + onde, parametros);
+    const [totais] = await pool.execute("SELECT COUNT(*) AS total" + origem + onde, parametros);
     const [registros] = await pool.execute(
-      "SELECT id, nome, email, senha_hash, versao_sessao, papel, ativo, criado_em, atualizado_em "
-      + "FROM usuarios" + onde + " ORDER BY email ASC,id ASC LIMIT ? OFFSET ?",
+      "SELECT u.*, UNIX_TIMESTAMP(u.criado_em)*1000 criado_ms, UNIX_TIMESTAMP(s.ultimo_login)*1000 login_ms, UNIX_TIMESTAMP(" + confirmacao + ")*1000 email_ms"
+      + origem + onde + " ORDER BY " + (ordens[filtros.ordenacao] || ordens.email) + " LIMIT ? OFFSET ?",
       parametros.concat([filtros.limite, (filtros.pagina - 1) * filtros.limite])
     );
-    return { itens: registros.map(mapearUsuario), total: Number(totais[0].total) };
+    const data = ms => ms == null ? null : new Date(Number(ms));
+    return { itens: registros.map(r => ({ ...mapearUsuario(r), criadoEm: data(r.criado_ms), ultimoLogin: data(r.login_ms), emailConfirmadoEm: data(r.email_ms) })), total: Number(totais[0].total) };
   }
 
   async function atualizarAtivo(usuarioId, ativo, executorInformado) {
@@ -201,6 +211,16 @@ function criarUsuarioRepository(pool) {
   }
 
   return {
+    regularizarEmailsNaoConfirmados: async c => {
+      const onde = " FROM usuarios u WHERE u.excluido_em IS NULL AND u.email_confirmado_em IS NULL"
+        + " AND NOT EXISTS(SELECT 1 FROM cadastros_email_pendentes p WHERE p.usuario_id=u.id)"
+        + " AND NOT EXISTS(SELECT 1 FROM confirmacoes_email e WHERE e.usuario_id=u.id AND e.email_destino=u.email AND e.usada_em IS NOT NULL)";
+      // Transação compartilhada com auditoria; reexecutar não cria lembretes duplicados.
+      const [[total]] = await c.execute("SELECT COUNT(*) quantidade" + onde);
+      await c.execute("INSERT INTO lembretes_email(usuario_id,email_identificado) SELECT u.id,u.email" + onde
+        + " ON DUPLICATE KEY UPDATE email_identificado=VALUES(email_identificado),resolvido_em=NULL");
+      return Number(total.quantidade);
+    },
     obterDetalhes: async id => {
       const usuario = await buscarPorId(id);
       if (!usuario || usuario.excluidoEm || usuario.cadastroEmailPendente) return null;

@@ -174,6 +174,66 @@ test("falha de auditoria desfaz exclusao e revogacao de sessao",async()=>{
   assert.equal((await aluno.agente.get("/api/autenticacao/me")).status,200);
 });
 
+test("gestao ordena cadastro e ultimo login, filtra confirmacao e preserva paginacao e autorizacao", async () => {
+  await usuario("admin-filtros@example.com","admin");
+  const admin=await sessao("admin-filtros@example.com");
+  const ids=[];
+  for (let i=0;i<3;i++) ids.push(await usuario(`filtro-${i}@example.com`,"professor"));
+  for (let i=0;i<3;i++) await pool.execute("UPDATE usuarios SET criado_em=? WHERE id=?",[`2025-01-0${i+1} 12:00:00`,ids[i]]);
+  for (const [i,dia] of [[0,1],[1,9]]) await pool.execute("INSERT INTO sessoes(usuario_id,token_hash,expira_em,criado_em) VALUES (?,?,DATE_ADD(NOW(),INTERVAL 1 DAY),?)",[ids[i],String(i+1).padStart(64,"0"),`2026-01-0${dia} 12:00:00`]);
+  await pool.execute("UPDATE usuarios SET email_confirmado_em=NOW() WHERE id=?",[ids[0]]);
+  await pool.execute("INSERT INTO confirmacoes_email(usuario_id,email_anterior,email_destino,usuario_versao,token_hash,expira_em,usada_em) VALUES (?,?,?,1,?,NOW(),NOW())",[ids[1],"filtro-1@example.com","filtro-1@example.com","a".repeat(64)]);
+  const consultar=async query => {
+    const r=await admin.agente.get("/api/usuarios?busca=filtro-&"+query);
+    assert.equal(r.status,200,JSON.stringify(r.body));
+    assert.equal(JSON.stringify(r.body).includes("senhaHash"),false);
+    return r.body;
+  };
+  for (const [ordenacao,esperados] of [["cadastro_antigo",ids],["cadastro_recente",[ids[2],ids[1],ids[0]]],["mais_inativos",[ids[2],ids[0],ids[1]]],["menos_inativos",[ids[1],ids[0],ids[2]]],["login_recente",[ids[1],ids[0],ids[2]]],["nunca_entrou",[ids[2]]]]) {
+    assert.deepEqual((await consultar("ordenacao="+ordenacao)).usuarios.map(u=>u.id),esperados);
+  }
+  assert.equal((await consultar("emailConfirmado=true")).paginacao.total,2);
+  assert.deepEqual((await consultar("emailConfirmado=false")).usuarios.map(u=>u.id),[ids[2]]);
+  const pagina=await consultar("ordenacao=cadastro_antigo&limite=1&pagina=2&emailConfirmado=true&papel=professor&ativo=true");
+  assert.equal(pagina.usuarios[0].id,ids[1]); assert.equal(pagina.paginacao.total,2);
+  assert.ok(pagina.usuarios[0].ultimoLogin); assert.equal(pagina.usuarios[0].emailConfirmado,true);
+  assert.equal((await admin.agente.get('/api/usuarios?ordenacao=criado_em;DROP')).status,400);
+  assert.equal((await admin.agente.get('/api/usuarios?emailConfirmado=talvez')).status,400);
+  const professor=await sessao("filtro-0@example.com");
+  assert.equal((await professor.agente.get('/api/usuarios?emailConfirmado=false')).status,403);
+});
+
+test("aviso coletivo exclui confirmados, excluidos e pendentes; e transacional, auditado e nao bloqueia",async () => {
+  const adminId=await usuario('admin-lote@example.com','admin');
+  await pool.execute('UPDATE usuarios SET email_confirmado_em=NOW() WHERE id=?',[adminId]);
+  const ids=[];
+  for(let i=0;i<4;i++) ids.push(await usuario(`lote-${i}@example.com`,'professor'));
+  await pool.execute('UPDATE usuarios SET email_confirmado_em=NOW() WHERE id=?',[ids[1]]);
+  await pool.execute('UPDATE usuarios SET excluido_em=NOW() WHERE id=?',[ids[2]]);
+  await pool.execute('INSERT INTO cadastros_email_pendentes(usuario_id) VALUES (?)',[ids[3]]);
+  const admin=await sessao('admin-lote@example.com');
+  const prof=await sessao('lote-0@example.com');
+  const rota='/api/usuarios/solicitar-confirmacao-email';
+  assert.equal((await request(aplicacao).post(rota).send({confirmar:true})).status,401);
+  assert.equal((await prof.agente.post(rota).set('X-CSRF-Token',prof.csrf).send({confirmar:true})).status,403);
+  assert.equal((await admin.agente.post(rota).send({confirmar:true})).status,403);
+  assert.equal((await admin.agente.post(rota).set('X-CSRF-Token',admin.csrf).send({})).status,400);
+  const repo=require('../src/modules/usuarios/usuarioRepository')(pool);
+  const service=require('../src/modules/usuarios/usuarioService')({usuarioRepository:repo,auditoriaRepository:{registrar:async()=>{throw Error('auditoria QA indisponivel');}}});
+  await assert.rejects(service.solicitarConfirmacaoEmLote({id:adminId},{confirmar:true}),/auditoria QA/);
+  const [[antes]]=await pool.execute('SELECT COUNT(*) n FROM lembretes_email'); assert.equal(antes.n,0);
+  for(let i=0;i<2;i++) {
+    const r=await admin.agente.post(rota).set('X-CSRF-Token',admin.csrf).send({confirmar:true});
+    assert.equal(r.status,200,JSON.stringify(r.body)); assert.equal(r.body.quantidade,1);
+  }
+  const [avisos]=await pool.execute('SELECT usuario_id FROM lembretes_email');
+  assert.deepEqual(avisos.map(x=>Number(x.usuario_id)),[ids[0]]);
+  const me=await prof.agente.get('/api/autenticacao/me');
+  assert.equal(me.status,200); assert.equal(me.body.usuario.emailPrecisaRevisao,true);
+  const [[auditoria]]=await pool.execute("SELECT COUNT(*) n FROM auditoria_geral WHERE acao='confirmacao_email_solicitada_em_lote'"); assert.equal(auditoria.n,2);
+  const [[emails]]=await pool.execute('SELECT COUNT(*) n FROM confirmacoes_email'); assert.equal(emails.n,0);
+});
+
 test("admin cria, pesquisa e filtra usuarios sem expor campos internos", async function testarUsuarios() {
   const adminId = await usuario("admin-f7@example.com", "admin");
   const admin = await sessao("admin-f7@example.com");

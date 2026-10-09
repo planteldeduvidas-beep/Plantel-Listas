@@ -12,6 +12,7 @@ function criarUsuarioRoutes(dependencias) {
   router.use(autenticar);
   router.use(autorizarAdmin);
   router.get("/", controller.listar);
+  router.post("/solicitar-confirmacao-email", dependencias.rateLimiters.emailConta, protegerContraCsrf, controller.solicitarConfirmacaoEmLote);
   router.get("/:usuarioId", controller.detalhes);
   router.get('/:usuarioId/faixa-etaria', controller.obterFaixaEtaria);
   router.post('/:usuarioId/faixa-etaria', dependencias.rateLimiters.emailConta, protegerContraCsrf, controller.corrigirFaixaEtaria);

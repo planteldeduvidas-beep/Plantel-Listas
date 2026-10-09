@@ -158,6 +158,7 @@ function obterDetalhesUsuario(id) { return requisitar("/usuarios/" + id); }
 function excluirUsuario(id) { return requisitar("/usuarios/" + id, {method:"DELETE",body:JSON.stringify({confirmar:true})}); }
 function enviarVerificacaoUsuario(id) { return requisitar("/usuarios/" + id + "/verificacao-email",{method:"POST",body:JSON.stringify({})}); }
 function regularizarEmailUsuario(id) { return requisitar("/usuarios/" + id + "/regularizacao-email",{method:"POST",body:JSON.stringify({})}); }
+export function solicitarConfirmacaoEmailEmLote() { return requisitar("/usuarios/solicitar-confirmacao-email",{method:"POST",body:JSON.stringify({confirmar:true})}); }
 function salvarAcessosProfessor(id, categoriaIds, disciplinaIds) { return requisitar("/permissoes/professores/" + id, { method: "PUT", body: JSON.stringify({ categoriaIds: categoriaIds, disciplinaIds: disciplinaIds }) }); }
 function listarDisciplinasDosProfessores() { return requisitar("/permissoes/disciplinas", { method: "GET" }); }
 function obterAnalytics(periodo) { return requisitar("/analytics?periodo=" + periodo, { method: "GET" }); }

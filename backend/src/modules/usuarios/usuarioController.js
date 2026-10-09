@@ -26,6 +26,7 @@ function criarUsuarioController(service, faixaEtariaService) {
   }
 
   return {
+    solicitarConfirmacaoEmLote: async (req,res) => res.json(await service.solicitarConfirmacaoEmLote(req.usuario,req.body)),
     obterFaixaEtaria: async (req,res) => res.json(await faixaEtariaService.obterParaAdmin(req.usuario,req.params.usuarioId)),
     corrigirFaixaEtaria: async (req,res) => res.json(await faixaEtariaService.corrigirComoAdmin(req.usuario,req.params.usuarioId,req.body)),
     detalhes: async (req,res) => res.json({usuario:await service.obterDetalhes(req.params.usuarioId)}),

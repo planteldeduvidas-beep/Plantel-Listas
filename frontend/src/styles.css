@@ -6322,6 +6322,13 @@ textarea {
   background: var(--cor-superficie-suave);
 }
 
+.area-usuarios .filtros-gestao-usuarios {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+}
+.area-usuarios .filtros-gestao-usuarios label { min-width: 0; grid-column: auto; }
+.area-usuarios .filtros-gestao-usuarios select { width: 100%; }
+.explicacao-filtros-usuarios { grid-column: 1 / -1; margin: 0; font-size: .85rem; color: var(--cor-texto-suave); }
+
 .area-usuarios .lista-usuarios {
   margin-top: 0;
 }

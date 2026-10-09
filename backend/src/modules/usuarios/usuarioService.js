@@ -70,10 +70,21 @@ function criarUsuarioService(dependencias) {
     return resultado;
   }
 
+  async function solicitarConfirmacaoEmLote(ator, corpo) {
+    if (!corpo || corpo.confirmar !== true || Object.keys(corpo).some(k => k !== "confirmar")) throw new AppError("Confirme a solicitação para todas as contas não confirmadas",400,"CONFIRMACAO_OBRIGATORIA");
+    const quantidade = await usuarioRepository.comTravaAdministrativa(async c => {
+      const total = await usuarioRepository.regularizarEmailsNaoConfirmados(c);
+      await registrar(ator,"confirmacao_email_solicitada_em_lote",null,{quantidade:total},c);
+      return total;
+    });
+    return { quantidade, mensagem: `Aviso solicitado para ${quantidade} contas com e-mail não confirmado. Aparecerá ao acessar o sistema; nenhum e-mail foi enviado e nenhum acesso foi bloqueado.` };
+  }
+
   async function listarUsuarios(query) {
     const filtros = validarConsulta(query || {});
     const resultado = await usuarioRepository.listar(filtros);
-    return { usuarios: resultado.itens.map(criarUsuarioPublico), paginacao: { pagina: filtros.pagina, limite: filtros.limite, total: resultado.total, totalPaginas: Math.max(1, Math.ceil(resultado.total / filtros.limite)) } };
+    return { usuarios: resultado.itens.map(item => ({ ...criarUsuarioPublico(item), criadoEm: item.criadoEm, ultimoLogin: item.ultimoLogin,
+      emailConfirmadoEm: item.emailConfirmadoEm, emailConfirmado: Boolean(item.emailConfirmadoEm) })), paginacao: { pagina: filtros.pagina, limite: filtros.limite, total: resultado.total, totalPaginas: Math.max(1, Math.ceil(resultado.total / filtros.limite)) } };
   }
 
   async function registrar(ator, acao, alvo, contexto, executor) {
@@ -178,7 +189,7 @@ function criarUsuarioService(dependencias) {
   }
 
   return {
-    obterDetalhes, excluirUsuario, solicitarRegularizacao, enviarVerificacao,
+    obterDetalhes, excluirUsuario, solicitarRegularizacao, enviarVerificacao, solicitarConfirmacaoEmLote,
     listarUsuarios: listarUsuarios,
     criarUsuario: criarUsuario,
     editarUsuario: editarUsuario,

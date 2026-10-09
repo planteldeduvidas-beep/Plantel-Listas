@@ -37,3 +37,16 @@ test("gestao usa portal, pagina existente e rejeita resultados de busca ultrapas
   assert.match(menu,/window.innerHeight/);
   assert.match(menu,/aoAcao\(tipo, item\)/);
 });
+
+test("filtros de usuarios exibem criterios claros e acao coletiva nao promete disparo de emails",async()=>{
+  const vite=await createServer({configFile:false,optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false},appType:"custom"});
+  try {
+    const {default:Filtros}=await vite.ssrLoadModule(new URL('../src/FiltrosUsuarios.jsx',import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1'));
+    const html=renderToStaticMarkup(React.createElement(Filtros,{busca:'',papel:'',estado:'',emailConfirmado:'false',ordenacao:'mais_inativos',aoMudar:()=>{},aoBuscar:()=>{},ocupado:false}));
+    for(const texto of ['Mais tempo sem entrar','Menos tempo sem entrar','Cadastros mais recentes','Cadastros mais antigos','Entraram recentemente','Somente quem nunca entrou','Não confirmados','último login registrado']) assert.ok(html.includes(texto));
+    assert.match(html,/value="false" selected/); assert.match(html,/value="mais_inativos" selected/);
+    const src=readFileSync(new URL('../src/AdministracaoFase7.jsx',import.meta.url),'utf8');
+    assert.match(src,/Não envia e-mails em massa nem bloqueia acessos/);
+    assert.match(src,/confirmacao.item &&/);
+  }finally{await vite.close();}
+});

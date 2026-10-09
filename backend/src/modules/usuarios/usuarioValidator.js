@@ -42,7 +42,7 @@ function validarAlteracaoDePapel(corpo) {
 }
 
 function validarConsulta(query) {
-  const permitidos = ["pagina", "limite", "busca", "papel", "ativo"];
+  const permitidos = ["pagina", "limite", "busca", "papel", "ativo", "emailConfirmado", "ordenacao"];
   if (Object.keys(query).some(function invalido(chave) { return !permitidos.includes(chave); })) {
     throw new AppError("Filtros invalidos", 400, "FILTROS_INVALIDOS");
   }
@@ -54,7 +54,10 @@ function validarConsulta(query) {
   }
   if (query.papel && !papeis.includes(query.papel)) throw new AppError("Tipo de usuario invalido", 400, "PAPEL_INVALIDO");
   if (query.ativo !== undefined && !["true", "false"].includes(query.ativo)) throw new AppError("Estado invalido", 400, "ESTADO_USUARIO_INVALIDO");
-  return { pagina: pagina, limite: limite, busca: String(query.busca || "").trim().slice(0, 120), papel: query.papel || null, ativo: query.ativo === undefined ? null : query.ativo === "true" };
+  if (query.emailConfirmado !== undefined && !["true", "false"].includes(query.emailConfirmado)) throw new AppError("Confirmação de e-mail inválida", 400, "FILTROS_INVALIDOS");
+  const ordenacao = query.ordenacao || "email";
+  if (!["email", "cadastro_recente", "cadastro_antigo", "login_recente", "mais_inativos", "menos_inativos", "nunca_entrou"].includes(ordenacao)) throw new AppError("Ordenação inválida", 400, "FILTROS_INVALIDOS");
+  return { pagina: pagina, limite: limite, busca: String(query.busca || "").trim().slice(0, 120), papel: query.papel || null, ativo: query.ativo === undefined ? null : query.ativo === "true", emailConfirmado: query.emailConfirmado === undefined ? null : query.emailConfirmado === "true", ordenacao };
 }
 
 function validarCriacao(corpo) {

@@ -16,7 +16,7 @@ test('cadastro pendente vai para confirmacao e logout continua voltando para log
   assert.match(navegacao,/parametros.delete\("cadastroEmail"\)/);
 });
 
-test('lembrete e informativo, aparece somente quando indicado e mantem acao de atualizacao', async () => {
+test('lembrete e informativo para todos os nao confirmados e mantem acao de atualizacao', async () => {
   const vite = await createServer({configFile:false,optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false},appType:'custom'});
   try {
     const { LembreteEmailConta } = await vite.ssrLoadModule(new URL('../src/EmailConta.jsx',import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1'));
@@ -25,7 +25,7 @@ test('lembrete e informativo, aparece somente quando indicado e mantem acao de a
       assert.match(html,/Seu acesso ao Plantel continua disponível/);
       assert.match(html,/Atualizar ou confirmar e-mail/);
       assert.equal(html.includes('disabled'),false);
-      assert.equal(renderToStaticMarkup(React.createElement(LembreteEmailConta,{usuario:{papel,emailPrecisaRevisao:false}})),'');
+      assert.match(renderToStaticMarkup(React.createElement(LembreteEmailConta,{usuario:{papel,emailPrecisaRevisao:false,emailConfirmado:false}})),/Atualizar ou confirmar e-mail/);
       assert.equal(renderToStaticMarkup(React.createElement(LembreteEmailConta,{usuario:{papel,emailConfirmado:true,emailPrecisaRevisao:true}})),'');
     }
   } finally { await vite.close(); }
