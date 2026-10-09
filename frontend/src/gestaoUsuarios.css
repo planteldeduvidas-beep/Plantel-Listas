@@ -1,11 +1,15 @@
 .gatilho-menu-usuario { display:flex;align-items:center;gap:6px;min-height:42px;padding:8px 12px;border:1px solid var(--borda, #cfd8d5);border-radius:8px;background:var(--superficie, #fff);color:var(--texto, #143c34); }
 .menu-usuario-flutuante { position:fixed;z-index:1500;width:min(280px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow:auto;border:1px solid var(--cor-borda,#cfd8d5);border-radius:12px;background:var(--cor-superficie,#fff);color:var(--cor-texto,#143c34);box-shadow:0 12px 36px #0003;padding:6px; }
-.menu-usuario-flutuante button { display:block;width:100%;text-align:left;min-height:42px;padding:10px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:.9rem;box-shadow:none;margin:0; }
+:root .menu-usuario-flutuante button { display:block;width:100%;text-align:left;min-height:42px;padding:10px;border:0;border-radius:6px;background:transparent;color:#143c34;font-size:.9rem;box-shadow:none;margin:0; }
 .lista-usuarios .controles-usuario > select {min-width:160px;flex-shrink:0;white-space:nowrap;}
-.menu-usuario-flutuante button:hover:not(:disabled),.menu-usuario-flutuante button:focus-visible { background:#1483711c; }
-.menu-usuario-flutuante .perigo-texto { color:#c44040; }
+:root .menu-usuario-flutuante button:hover:not(:disabled),:root .menu-usuario-flutuante button:focus-visible { background:#d9e8e3;color:#143c34; }
+:root .menu-usuario-flutuante button:focus-visible { outline:2px solid #237d70;outline-offset:-2px; }
+:root .menu-usuario-flutuante button.perigo-texto { color:#9e2828; }
 .menu-usuario-flutuante button:disabled { opacity:.45; }
 [data-tema="escuro"] .menu-usuario-flutuante,[data-tema="escuro"] .gatilho-menu-usuario { background:#142622;color:#e7f2ee;border-color:#36524a; }
+:root[data-tema="escuro"] .menu-usuario-flutuante button { background:transparent;color:#e7f2ee; }
+:root[data-tema="escuro"] .menu-usuario-flutuante button:hover:not(:disabled),:root[data-tema="escuro"] .menu-usuario-flutuante button:focus-visible { background:#294b41;color:#e7f2ee; }
+:root[data-tema="escuro"] .menu-usuario-flutuante button.perigo-texto { color:#ffb3b3; }
 .paginacao-usuarios {display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:20px;}
 .detalhes-usuario {display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:24px 0;}
 .detalhes-usuario div {min-width:0;}

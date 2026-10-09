@@ -5882,18 +5882,18 @@ body:has(.barra-lateral.aberta) {
   }
 }
 
-/* Camada final: respiro real do titulo e branco suave acromatico. */
+/* Superfícies claras distintas, sem depender de diferenças quase brancas. */
 :root:not([data-tema="escuro"]),
 :root[data-tema="claro"] {
-  --cor-fundo: #f4f4f4;
-  --cor-superficie: #ffffff;
-  --cor-superficie-suave: #f7f7f7;
-  --cor-borda: #dddddd;
+  --cor-fundo: #e5e9e7;
+  --cor-superficie: #f7f9f8;
+  --cor-superficie-suave: #eaf0ed;
+  --cor-borda: #c6cfca;
   --cor-texto-suave: #646464;
 }
 
 .conteudo-aplicacao {
-  background: #f4f4f4;
+  background: var(--cor-fundo);
 }
 
 :root[data-tema="escuro"] .conteudo-aplicacao {
@@ -5905,7 +5905,7 @@ body:has(.barra-lateral.aberta) {
 }
 
 .cabecalho-painel {
-  background: rgb(255 255 255 / 96%);
+  background: var(--cor-superficie);
   box-shadow: 0 8px 24px rgb(0 0 0 / 7%);
 }
 
@@ -6230,11 +6230,11 @@ textarea {
   }
 }
 
-/* Tema claro: o plano de fundo e as superficies nao herdam matiz verde. */
+/* Tema claro: separar fundo e superfícies também nas regras específicas. */
 :root:not([data-tema="escuro"]) body,
 :root:not([data-tema="escuro"]) .pagina-painel,
 :root:not([data-tema="escuro"]) .conteudo-aplicacao {
-  background-color: #f4f4f4;
+  background-color: var(--cor-fundo);
   background-image: none;
 }
 
@@ -6253,9 +6253,12 @@ textarea {
 :root:not([data-tema="escuro"]) .formulario-edicao,
 :root:not([data-tema="escuro"]) .formulario-acessos,
 :root:not([data-tema="escuro"]) .organizacao-lote,
-:root:not([data-tema="escuro"]) .apresentacao-suporte {
-  border-color: #dddddd;
-  background: #ffffff;
+:root:not([data-tema="escuro"]) .apresentacao-suporte,
+:root:not([data-tema="escuro"]) .bloco-admin,
+:root:not([data-tema="escuro"]) .introducao-area,
+:root:not([data-tema="escuro"]) .cabecalho-painel {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie);
   background-image: none;
 }
 
@@ -6265,8 +6268,8 @@ textarea {
 :root:not([data-tema="escuro"]) .area-organizacao .lista-administrativa,
 :root:not([data-tema="escuro"]) .lista-historico,
 :root:not([data-tema="escuro"]) .lista-pastas-professor {
-  border-color: #dddddd;
-  background: #ffffff;
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie);
 }
 
 /* Filtros: verde mineral localizado, sem alterar os demais botoes. */
